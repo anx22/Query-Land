@@ -1,4 +1,4 @@
-import { appRoutes, demoProject, seoMemory } from "@seo/shared-config";
+import { appRoutes, demoProject, seoMemory } from "@seo-tool/shared-config";
 
 export function getFoundationState() {
   return {

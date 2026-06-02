@@ -1,11 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { getFoundationState } from "./index";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { getFoundationState } from "./index.js";
 
-describe("api foundation state", () => {
-  it("exposes the foundation memory and documented route count", () => {
-    expect(getFoundationState()).toMatchObject({
-      routeCount: 9,
-      memory: { deliveryWave: "foundation" },
-    });
-  });
+test("exposes the foundation memory and documented route count", () => {
+  assert.deepEqual(getFoundationState().routeCount, 9);
+  assert.equal(getFoundationState().memory.deliveryWave, "foundation");
 });

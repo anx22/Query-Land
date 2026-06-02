@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { appRoutes } from "@seo/shared-config";
+import { appRoutes } from "@seo-tool/shared-config";
 
 function initials(label: string) {
   return label
