@@ -1,0 +1,237 @@
+import { randomUUID } from "node:crypto";
+import type { FoundationJob, IntegrationProvider, ProjectStatus, SiteScopeType } from "@seo-tool/domain-model";
+import { createSQLiteStore, RequestError, type BackendStore } from "./sqlite-store.js";
+
+export interface ApiResponse {
+  status: number;
+  body: unknown;
+}
+
+export interface RequestContext {
+  headers?: Record<string, string | undefined>;
+}
+
+export interface ApiErrorBody {
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+    requestId: string;
+  };
+}
+
+type MarketInput = { country: string; language: string; device: "desktop" | "mobile"; searchEngine: "google" | "bing" };
+type CreateProjectRequest = { name: string; slug: string; status?: ProjectStatus; defaultLocale?: string; markets?: MarketInput[] };
+type CreateSiteRequest = { baseUrl: string; scopeType: SiteScopeType; crawlFrequency?: "manual" | "daily" | "weekly"; businessValue?: number };
+type CreateIntegrationRequest = { projectId: string; provider: IntegrationProvider };
+type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string };
+type AuthRequest = { email: string; password: string; name?: string };
+
+const projectStatuses = new Set<ProjectStatus>(["draft", "active", "archived"]);
+const siteScopeTypes = new Set<SiteScopeType>(["domain", "subdomain", "folder"]);
+const crawlFrequencies = new Set(["manual", "daily", "weekly"]);
+const integrationProviders = new Set<IntegrationProvider>(["gsc", "ga4", "matomo", "pagespeed", "lighthouse", "serverlogs", "sitemap", "robots", "crawler", "cms", "serp", "backlink", "keyword"]);
+const jobTypes = new Set<FoundationJob["type"]>(["connector_sync", "crawl_seed", "source_map_refresh", "health_check"]);
+
+export function createApp(store: BackendStore = createSQLiteStore()) {
+  return async function appHandleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
+    return routeRequest(store, method, pathname, body, context);
+  };
+}
+
+const defaultHandleRequest = createApp();
+
+export async function handleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
+  return defaultHandleRequest(method, pathname, body, context);
+}
+
+async function routeRequest(store: BackendStore, method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
+  const requestId = context.headers?.["x-request-id"] ?? context.headers?.["X-Request-Id"] ?? `req-${randomUUID()}`;
+  try {
+    let response: ApiResponse;
+    if (method === "GET" && pathname === "/health") {
+      response = json(200, store.health());
+    } else if (method === "POST" && pathname === "/auth/register") {
+      const input = authRequest(body, true);
+      response = json(201, { data: store.registerUser(input) });
+    } else if (method === "POST" && pathname === "/auth/login") {
+      const input = authRequest(body, false);
+      const result = store.login(input.email, input.password);
+      response = result ? json(200, { data: result }) : apiError(401, "invalid_credentials", "Invalid credentials", requestId);
+    } else if (method === "POST" && pathname === "/auth/logout") {
+      const token = bearerToken(context.headers?.authorization ?? context.headers?.Authorization);
+      if (!token) {
+        response = apiError(401, "missing_bearer_token", "Missing bearer token", requestId);
+      } else {
+        store.invalidateSessionToken(token);
+        response = json(204, null);
+      }
+    } else if (method === "GET" && pathname === "/auth/session") {
+      const token = bearerToken(context.headers?.authorization ?? context.headers?.Authorization);
+      if (!token) {
+        response = apiError(401, "missing_bearer_token", "Missing bearer token", requestId);
+      } else {
+        const user = store.getUserBySessionToken(token);
+        response = user ? json(200, { data: { user } }) : apiError(401, "invalid_or_expired_session", "Invalid or expired session", requestId);
+      }
+    } else if (method === "GET" && pathname === "/projects") {
+      response = json(200, { data: store.listProjects() });
+    } else if (method === "POST" && pathname === "/projects") {
+      response = json(201, { data: store.createProject(createProjectRequest(body)) });
+    } else {
+      response = await routeProjectChildren(store, method, pathname, body, requestId);
+    }
+    logRequest(method, pathname, response.status, requestId);
+    return response;
+  } catch (error) {
+    const response = error instanceof RequestError
+      ? apiError(error.status, error.code, error.message, requestId, error.details)
+      : error instanceof Error
+        ? apiError(400, "validation_error", error.message, requestId)
+        : apiError(500, "internal_error", "Internal error", requestId);
+    logRequest(method, pathname, response.status, requestId);
+    return response;
+  }
+}
+
+async function routeProjectChildren(store: BackendStore, method: string, pathname: string, body: unknown, requestId: string): Promise<ApiResponse> {
+  const siteMatch = pathname.match(/^\/projects\/([^/]+)\/sites$/);
+  if (method === "GET" && siteMatch) {
+    return json(200, { data: store.listSites(siteMatch[1]) });
+  }
+  if (method === "POST" && siteMatch) {
+    return json(201, { data: store.createSite(siteMatch[1], createSiteRequest(body)) });
+  }
+  if (method === "GET" && pathname === "/integrations") {
+    return json(200, { data: store.listIntegrations() });
+  }
+  if (method === "POST" && pathname === "/integrations") {
+    const input = createIntegrationRequest(body);
+    return json(201, { data: store.createIntegration(input.projectId, input.provider) });
+  }
+  if (method === "GET" && pathname === "/jobs") {
+    return json(200, { data: store.listJobs() });
+  }
+  if (method === "POST" && pathname === "/jobs") {
+    const input = createJobRequest(body);
+    const result = store.createJob(input.projectId, input.type, input.subject);
+    return json(result.idempotent ? 200 : 201, { data: result.job, idempotent: result.idempotent });
+  }
+  if (method === "GET" && pathname === "/source-map") {
+    return json(200, { data: store.listSourceMapEntries() });
+  }
+  return apiError(404, "not_found", "Route not found", requestId);
+}
+
+function authRequest(body: unknown, allowName: boolean): AuthRequest {
+  const input = objectBody(body);
+  const email = stringField(input, "email");
+  const password = stringField(input, "password");
+  const name = allowName && typeof input.name === "string" ? input.name : undefined;
+  return { email, password, name };
+}
+
+function createProjectRequest(body: unknown): CreateProjectRequest {
+  const input = objectBody(body);
+  const status = optionalEnum(input.status, projectStatuses, "status");
+  return {
+    name: stringField(input, "name"),
+    slug: slugField(input, "slug"),
+    status,
+    defaultLocale: typeof input.defaultLocale === "string" ? input.defaultLocale : undefined,
+    markets: Array.isArray(input.markets) ? input.markets as MarketInput[] : undefined
+  };
+}
+
+function createSiteRequest(body: unknown): CreateSiteRequest {
+  const input = objectBody(body);
+  const baseUrl = stringField(input, "baseUrl");
+  try {
+    new URL(baseUrl);
+  } catch {
+    throw new RequestError(400, "invalid_url", "baseUrl must be a valid URL");
+  }
+  return {
+    baseUrl,
+    scopeType: enumField(input, siteScopeTypes, "scopeType"),
+    crawlFrequency: optionalEnum(input.crawlFrequency, crawlFrequencies, "crawlFrequency") as CreateSiteRequest["crawlFrequency"],
+    businessValue: typeof input.businessValue === "number" ? input.businessValue : undefined
+  };
+}
+
+function createIntegrationRequest(body: unknown): CreateIntegrationRequest {
+  const input = objectBody(body);
+  return {
+    projectId: stringField(input, "projectId"),
+    provider: enumField(input, integrationProviders, "provider")
+  };
+}
+
+function createJobRequest(body: unknown): CreateJobRequest {
+  const input = objectBody(body);
+  return {
+    projectId: stringField(input, "projectId"),
+    type: enumField(input, jobTypes, "type"),
+    subject: stringField(input, "subject")
+  };
+}
+
+function objectBody(body: unknown): Record<string, unknown> {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new RequestError(400, "invalid_body", "Request body must be an object");
+  }
+  return body as Record<string, unknown>;
+}
+
+function stringField(input: Record<string, unknown>, field: string): string {
+  if (typeof input[field] !== "string" || input[field].trim() === "") {
+    throw new RequestError(400, "missing_field", `${field} is required`, { field });
+  }
+  return input[field].trim();
+}
+
+function slugField(input: Record<string, unknown>, field: string): string {
+  const slug = stringField(input, field);
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    throw new RequestError(400, "invalid_slug", "slug must contain lowercase letters, numbers and dashes only", { field });
+  }
+  return slug;
+}
+
+function enumField<T extends string>(input: Record<string, unknown>, allowed: Set<T>, field: string): T {
+  const value = stringField(input, field) as T;
+  if (!allowed.has(value)) {
+    throw new RequestError(400, "invalid_enum", `${field} is invalid`, { field, allowed: [...allowed] });
+  }
+  return value;
+}
+
+function optionalEnum<T extends string>(value: unknown, allowed: Set<T>, field: string): T | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !allowed.has(value as T)) {
+    throw new RequestError(400, "invalid_enum", `${field} is invalid`, { field, allowed: [...allowed] });
+  }
+  return value as T;
+}
+
+function bearerToken(authorization: string | undefined): string | null {
+  if (!authorization?.startsWith("Bearer ")) {
+    return null;
+  }
+  return authorization.slice("Bearer ".length).trim();
+}
+
+function apiError(status: number, code: string, message: string, requestId: string, details?: unknown): ApiResponse {
+  const error: ApiErrorBody["error"] = { code, message, requestId };
+  if (details !== undefined) error.details = details;
+  return { status, body: { error } };
+}
+
+function json(status: number, body: unknown): ApiResponse {
+  return { status, body };
+}
+
+function logRequest(method: string, path: string, status: number, requestId: string): void {
+  if (process.env.NODE_ENV === "test") return;
+  console.log(JSON.stringify({ service: "api", event: "request", method, path, status, requestId, at: new Date().toISOString() }));
+}
