@@ -1,0 +1,25 @@
+{
+  "projects": [
+    {
+      "id": "proj-demo",
+      "name": "Demo Property",
+      "slug": "demo-property",
+      "status": "active",
+      "defaultLocale": "de-DE"
+    }
+  ],
+  "sites": [
+    {
+      "id": "site-demo",
+      "projectId": "proj-demo",
+      "scopeType": "domain",
+      "baseUrl": "https://example.com",
+      "crawlFrequency": "weekly",
+      "businessValue": 80
+    }
+  ],
+  "integrations": [
+    { "id": "int-gsc-demo", "projectId": "proj-demo", "provider": "gsc", "status": "pending", "sourceConfidence": "B" },
+    { "id": "int-ga4-demo", "projectId": "proj-demo", "provider": "ga4", "status": "pending", "sourceConfidence": "A" }
+  ]
+}

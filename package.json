@@ -27,4 +27,26 @@
     "apps/*",
     "packages/*"
   ]
+  "name": "seo-tool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal SEO Operating System foundation monorepo.",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "npm run build && NODE_ENV=test node --test packages/domain-model/dist/test/*.test.js apps/api/dist/test/*.test.js",
+    "typecheck": "tsc -b --pretty false",
+    "dev": "node scripts/dev.mjs",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "validate:openapi": "node scripts/validate-openapi.mjs",
+    "check": "npm run typecheck && npm run check:boundaries && npm run validate:openapi && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.11",
+    "typescript": "^5.9.2"
+  }
 }

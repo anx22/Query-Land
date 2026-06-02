@@ -42,5 +42,11 @@
   ],
   "exclude": [
     "node_modules"
+  "files": [],
+  "references": [
+    { "path": "packages/domain-model" },
+    { "path": "packages/shared-config" },
+    { "path": "apps/api" },
+    { "path": "services/crawler" }
   ]
 }
