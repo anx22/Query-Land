@@ -1,0 +1,15 @@
+{
+  "name": "@seo-tool/crawler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/src/index.js"
+  },
+  "dependencies": {
+    "@seo-tool/domain-model": "0.1.0"
+  }
+}

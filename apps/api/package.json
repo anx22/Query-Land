@@ -1,0 +1,17 @@
+{
+  "name": "@seo-tool/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/server.js",
+  "types": "dist/src/server.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/src/server.js",
+    "dev": "node --watch dist/src/server.js"
+  },
+  "dependencies": {
+    "@seo-tool/domain-model": "0.1.0",
+    "@seo-tool/shared-config": "0.1.0"
+  }
+}
