@@ -1,0 +1,8 @@
+# internal-api.yaml — Gerüst.
+# Stabiler interner API-Contract; UI und Agent/MCP konsumieren denselben Kern (Master §2.9, §4.4).
+# Wird pro Welle erweitert, keine Brüche außerhalb des jeweiligen Scopes (§12.3).
+openapi: 3.1.0
+info:
+  title: Internal SEO OS API
+  version: 0.1.0
+paths: {}
