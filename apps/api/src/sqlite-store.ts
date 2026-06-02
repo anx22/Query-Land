@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuthUser, type FoundationJob, type HealthSnapshot, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UserRole } from "@seo-tool/domain-model";
+import { makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuthUser, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UserRole } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
 import { hashPassword, hashToken, verifyPassword } from "./password.js";
 import { sqliteFoundationSchema } from "./sqlite-schema.js";
@@ -48,6 +48,8 @@ export interface BackendStore {
   createProject(input: Partial<Project>): Project;
   listSites(projectId: string): Site[];
   createSite(projectId: string, input: Partial<Site>): Site;
+  listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
+  recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
   listIntegrations(): IntegrationAccount[];
   createIntegration(projectId: string, provider: IntegrationProvider): IntegrationAccount;
   listJobs(): FoundationJob[];
@@ -201,6 +203,55 @@ class SQLiteStore implements BackendStore {
     return site;
   }
 
+  listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[] {
+    const sql = siteId
+      ? `SELECT * FROM discovered_urls WHERE project_id = ? AND site_id = ? ORDER BY discovered_at ASC, normalized_url ASC`
+      : `SELECT * FROM discovered_urls WHERE project_id = ? ORDER BY discovered_at ASC, normalized_url ASC`;
+    const rows = siteId
+      ? this.db.prepare(sql).all(projectId, siteId)
+      : this.db.prepare(sql).all(projectId);
+    return rows.map(mapDiscoveredUrl);
+  }
+
+  recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number } {
+    const site = this.db.prepare(`SELECT id FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId);
+    if (!site) {
+      throw new RequestError(404, "unknown_site", "Referenced site does not exist", { projectId, siteId });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    const now = new Date().toISOString();
+
+    for (const url of urls) {
+      if (url.projectId !== projectId || url.siteId !== siteId) {
+        throw new RequestError(400, "url_scope_mismatch", "Discovered URL projectId/siteId must match the route scope", { url: url.normalizedUrl });
+      }
+      const existing = this.db.prepare(`SELECT id FROM discovered_urls WHERE project_id = ? AND site_id = ? AND normalized_url = ?`)
+        .get(projectId, siteId, url.normalizedUrl);
+      this.db.prepare(`
+        INSERT INTO discovered_urls (id, project_id, site_id, url, normalized_url, source, discovered_from, depth, discovered_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(project_id, site_id, normalized_url) DO UPDATE SET
+          url = excluded.url,
+          source = excluded.source,
+          discovered_from = excluded.discovered_from,
+          depth = excluded.depth,
+          discovered_at = excluded.discovered_at,
+          updated_at = excluded.updated_at
+      `).run(url.id, projectId, siteId, url.url, url.normalizedUrl, url.source, url.discoveredFrom, url.depth, url.discoveredAt, now);
+      if (existing) {
+        updated += 1;
+      } else {
+        inserted += 1;
+      }
+    }
+
+    const stored = this.listDiscoveredUrls(projectId, siteId);
+    this.audit("system", "crawl.discovery.record", "site", siteId, { projectId, inserted, updated, total: stored.length });
+    return { urls: stored, inserted, updated };
+  }
+
   listIntegrations(): IntegrationAccount[] {
     return this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all().map(mapIntegration);
   }
@@ -256,7 +307,6 @@ class SQLiteStore implements BackendStore {
     this.audit("system", "job.create", "job_queue", job.id, { projectId, type, subject });
     return { job, idempotent: false };
   }
-
 
   claimNextJob(): FoundationJob | null {
     const row = this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get();
@@ -385,6 +435,20 @@ function mapSite(row: Record<string, unknown>): Site {
     baseUrl: String(row.base_url),
     crawlFrequency: row.crawl_frequency as Site["crawlFrequency"],
     businessValue: Number(row.business_value)
+  };
+}
+
+function mapDiscoveredUrl(row: Record<string, unknown>): DiscoveredUrl {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    url: String(row.url),
+    normalizedUrl: String(row.normalized_url),
+    source: row.source as DiscoveredUrl["source"],
+    discoveredFrom: row.discovered_from === null ? null : String(row.discovered_from),
+    depth: Number(row.depth),
+    discoveredAt: String(row.discovered_at)
   };
 }
 

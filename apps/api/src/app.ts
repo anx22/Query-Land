@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { FoundationJob, IntegrationProvider, ProjectStatus, SiteScopeType } from "@seo-tool/domain-model";
+import type { DiscoveredUrl, FoundationJob, IntegrationProvider, ProjectStatus, SiteScopeType, UrlDiscoverySource } from "@seo-tool/domain-model";
 import { createSQLiteStore, RequestError, type BackendStore } from "./sqlite-store.js";
 
 export interface ApiResponse {
@@ -23,13 +23,15 @@ export interface ApiErrorBody {
 type MarketInput = { country: string; language: string; device: "desktop" | "mobile"; searchEngine: "google" | "bing" };
 type CreateProjectRequest = { name: string; slug: string; status?: ProjectStatus; defaultLocale?: string; markets?: MarketInput[] };
 type CreateSiteRequest = { baseUrl: string; scopeType: SiteScopeType; crawlFrequency?: "manual" | "daily" | "weekly"; businessValue?: number };
+type RecordDiscoveredUrlsRequest = { urls: DiscoveredUrl[] };
 type CreateIntegrationRequest = { projectId: string; provider: IntegrationProvider };
 type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string };
 type AuthRequest = { email: string; password: string; name?: string };
 
 const projectStatuses = new Set<ProjectStatus>(["draft", "active", "archived"]);
 const siteScopeTypes = new Set<SiteScopeType>(["domain", "subdomain", "folder"]);
-const crawlFrequencies = new Set(["manual", "daily", "weekly"]);
+const crawlFrequencies = new Set<Exclude<CreateSiteRequest["crawlFrequency"], undefined>>(["manual", "daily", "weekly"]);
+const urlDiscoverySources = new Set<UrlDiscoverySource>(["seed", "sitemap", "link"]);
 const integrationProviders = new Set<IntegrationProvider>(["gsc", "ga4", "matomo", "pagespeed", "lighthouse", "serverlogs", "sitemap", "robots", "crawler", "cms", "serp", "backlink", "keyword"]);
 const jobTypes = new Set<FoundationJob["type"]>(["connector_sync", "crawl_seed", "source_map_refresh", "health_check"]);
 
@@ -102,6 +104,17 @@ async function routeProjectChildren(store: BackendStore, method: string, pathnam
   if (method === "POST" && siteMatch) {
     return json(201, { data: store.createSite(siteMatch[1], createSiteRequest(body)) });
   }
+
+  const discoveredUrlsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls$/);
+  if (method === "GET" && discoveredUrlsMatch) {
+    return json(200, { data: store.listDiscoveredUrls(discoveredUrlsMatch[1], discoveredUrlsMatch[2]) });
+  }
+  if (method === "POST" && discoveredUrlsMatch) {
+    const input = recordDiscoveredUrlsRequest(body);
+    const result = store.recordDiscoveredUrls(discoveredUrlsMatch[1], discoveredUrlsMatch[2], input.urls);
+    return json(201, { data: result.urls, meta: { inserted: result.inserted, updated: result.updated } });
+  }
+
   if (method === "GET" && pathname === "/integrations") {
     return json(200, { data: store.listIntegrations() });
   }
@@ -159,6 +172,34 @@ function createSiteRequest(body: unknown): CreateSiteRequest {
   };
 }
 
+function recordDiscoveredUrlsRequest(body: unknown): RecordDiscoveredUrlsRequest {
+  const input = objectBody(body);
+  if (!Array.isArray(input.urls)) {
+    throw new RequestError(400, "missing_field", "urls is required", { field: "urls" });
+  }
+
+  return {
+    urls: input.urls.map((item, index) => discoveredUrlField(item, index))
+  };
+}
+
+function discoveredUrlField(value: unknown, index: number): DiscoveredUrl {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new RequestError(400, "invalid_discovered_url", "Each discovered URL must be an object", { index });
+  }
+  const input = value as Record<string, unknown>;
+  return {
+    id: stringField(input, "id"),
+    projectId: stringField(input, "projectId"),
+    siteId: stringField(input, "siteId"),
+    url: urlField(input, "url"),
+    normalizedUrl: urlField(input, "normalizedUrl"),
+    source: enumField(input, urlDiscoverySources, "source"),
+    discoveredFrom: input.discoveredFrom === null || input.discoveredFrom === undefined ? null : urlField(input, "discoveredFrom"),
+    depth: integerField(input, "depth", 0),
+    discoveredAt: stringField(input, "discoveredAt")
+  };
+}
 function createIntegrationRequest(body: unknown): CreateIntegrationRequest {
   const input = objectBody(body);
   return {
@@ -196,6 +237,24 @@ function slugField(input: Record<string, unknown>, field: string): string {
     throw new RequestError(400, "invalid_slug", "slug must contain lowercase letters, numbers and dashes only", { field });
   }
   return slug;
+}
+
+function urlField(input: Record<string, unknown>, field: string): string {
+  const value = stringField(input, field);
+  try {
+    new URL(value);
+  } catch {
+    throw new RequestError(400, "invalid_url", `${field} must be a valid URL`, { field });
+  }
+  return value;
+}
+
+function integerField(input: Record<string, unknown>, field: string, minimum?: number): number {
+  const value = input[field];
+  if (!Number.isInteger(value) || (minimum !== undefined && (value as number) < minimum)) {
+    throw new RequestError(400, "invalid_integer", `${field} must be an integer`, { field, minimum });
+  }
+  return value as number;
 }
 
 function enumField<T extends string>(input: Record<string, unknown>, allowed: Set<T>, field: string): T {

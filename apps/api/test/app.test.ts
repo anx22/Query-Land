@@ -112,3 +112,49 @@ test("API maps duplicate and invalid input errors to stable codes", async () => 
   assert.equal((invalidProvider.body as { error: { code: string } }).error.code, "invalid_enum");
   store.close();
 });
+
+test("crawl discovery API persists sitemap URLs with source metadata", async () => {
+  const { app, store } = testApp();
+  const discoveredAt = "2026-06-02T08:00:00.000Z";
+  const urls = [
+    {
+      id: "url-seed-demo",
+      projectId: "proj-demo",
+      siteId: "site-demo",
+      url: "https://example.com",
+      normalizedUrl: "https://example.com/",
+      source: "seed",
+      discoveredFrom: null,
+      depth: 0,
+      discoveredAt
+    },
+    {
+      id: "url-pricing-demo",
+      projectId: "proj-demo",
+      siteId: "site-demo",
+      url: "https://example.com/pricing/",
+      normalizedUrl: "https://example.com/pricing",
+      source: "sitemap",
+      discoveredFrom: "https://example.com/sitemap.xml",
+      depth: 1,
+      discoveredAt
+    }
+  ];
+
+  const first = await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", { urls });
+  assert.equal(first.status, 201);
+  assert.deepEqual((first.body as { meta: { inserted: number; updated: number } }).meta, { inserted: 2, updated: 0 });
+
+  const second = await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", { urls: [{ ...urls[1], source: "link", depth: 2 }] });
+  assert.equal(second.status, 201);
+  assert.deepEqual((second.body as { meta: { inserted: number; updated: number } }).meta, { inserted: 0, updated: 1 });
+
+  const list = await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls");
+  assert.equal(list.status, 200);
+  const data = (list.body as { data: Array<{ normalizedUrl: string; source: string; depth: number }> }).data;
+  assert.equal(data.length, 2);
+  assert.deepEqual(data.map((item) => item.normalizedUrl), ["https://example.com/", "https://example.com/pricing"]);
+  assert.equal(data[1]?.source, "link");
+  assert.equal(data[1]?.depth, 2);
+  store.close();
+});
