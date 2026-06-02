@@ -1,4 +1,10 @@
 {
+  "name": "@seo/domain-model",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
   "name": "@seo-tool/domain-model",
   "version": "0.1.0",
   "private": true,

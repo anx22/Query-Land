@@ -1,4 +1,13 @@
 {
+  "name": "@seo/shared-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@seo/domain-model": "0.1.0"
   "name": "@seo-tool/shared-config",
   "version": "0.1.0",
   "private": true,

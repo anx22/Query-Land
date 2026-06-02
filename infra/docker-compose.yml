@@ -2,6 +2,16 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
+      POSTGRES_USER: seo_os
+      POSTGRES_PASSWORD: seo_os
+      POSTGRES_DB: seo_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - seo_os_postgres:/var/lib/postgresql/data
+
+volumes:
+  seo_os_postgres:
       POSTGRES_DB: seo_os
       POSTGRES_USER: seo
       POSTGRES_PASSWORD: seo

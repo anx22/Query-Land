@@ -1,12 +1,6 @@
 node_modules/
-dist/
 .next/
-data/
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
-.env
-.env.*
-!.env.example
-coverage/
-.DS_Store
+apps/web/.next/
+*.tsbuildinfo
+.env*
+artifacts/
