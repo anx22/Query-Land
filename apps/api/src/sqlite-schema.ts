@@ -43,6 +43,22 @@ CREATE TABLE IF NOT EXISTS sites (
   UNIQUE (project_id, base_url)
 );
 
+CREATE TABLE IF NOT EXISTS discovered_urls (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  normalized_url TEXT NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('seed', 'sitemap', 'link')),
+  discovered_from TEXT,
+  depth INTEGER NOT NULL DEFAULT 0,
+  discovered_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (project_id, site_id, normalized_url)
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovered_urls_project_site ON discovered_urls(project_id, site_id, discovered_at);
+
 CREATE TABLE IF NOT EXISTS integration_accounts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
