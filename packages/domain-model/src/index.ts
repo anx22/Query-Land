@@ -169,12 +169,28 @@ export interface FetchResult {
   errorMessage?: string;
 }
 
+export interface UrlFetchRecord extends FetchResult {
+  id: string;
+  projectId: string;
+  siteId: string;
+  discoveredUrlId: string;
+}
+
 export interface IndexabilityAssessment {
   url: string;
   state: IndexabilityState;
   isIndexable: boolean;
   reasons: string[];
   canonicalUrl: string | null;
+}
+
+export interface IndexabilityRecord extends IndexabilityAssessment {
+  id: string;
+  projectId: string;
+  siteId: string;
+  discoveredUrlId: string;
+  fetchResultId: string | null;
+  assessedAt: string;
 }
 
 export interface AuditIssue {

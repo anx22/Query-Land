@@ -158,3 +158,99 @@ test("crawl discovery API persists sitemap URLs with source metadata", async () 
   assert.equal(data[1]?.depth, 2);
   store.close();
 });
+
+test("crawl fetch API stores normalized fetch results for a discovered URL", async () => {
+  const { app, store } = testApp();
+  const discoveredAt = "2026-06-02T08:00:00.000Z";
+  await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", {
+    urls: [
+      {
+        id: "url-fetch-demo",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        url: "https://example.com/redirect",
+        normalizedUrl: "https://example.com/redirect",
+        source: "sitemap",
+        discoveredFrom: "https://example.com/sitemap.xml",
+        depth: 1,
+        discoveredAt
+      }
+    ]
+  });
+
+  const response = await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls/url-fetch-demo/fetch-results", {
+    url: "https://example.com/redirect",
+    finalUrl: "https://example.com/final",
+    statusCode: 301,
+    statusClass: "redirect",
+    headers: { Location: "https://example.com/final" },
+    redirectChain: ["https://example.com/redirect", "https://example.com/final"],
+    fetchedAt: "2026-06-02T08:01:00.000Z"
+  });
+
+  assert.equal(response.status, 201);
+  const created = (response.body as { data: { statusClass: string; statusCode: number; headers: Record<string, string> } }).data;
+  assert.equal(created.statusClass, "redirect");
+  assert.equal(created.statusCode, 301);
+  assert.equal(created.headers.location, "https://example.com/final");
+
+  const list = await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls/url-fetch-demo/fetch-results");
+  assert.equal(list.status, 200);
+  const data = (list.body as { data: Array<{ finalUrl: string; redirectChain: string[] }> }).data;
+  assert.equal(data.length, 1);
+  assert.equal(data[0]?.finalUrl, "https://example.com/final");
+  assert.deepEqual(data[0]?.redirectChain, ["https://example.com/redirect", "https://example.com/final"]);
+  store.close();
+});
+
+test("crawl indexability API stores deterministic assessment state", async () => {
+  const { app, store } = testApp();
+  await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", {
+    urls: [
+      {
+        id: "url-index-demo",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        url: "https://example.com/noindex",
+        normalizedUrl: "https://example.com/noindex",
+        source: "sitemap",
+        discoveredFrom: "https://example.com/sitemap.xml",
+        depth: 1,
+        discoveredAt: "2026-06-02T08:00:00.000Z"
+      }
+    ]
+  });
+  const fetch = await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls/url-index-demo/fetch-results", {
+    url: "https://example.com/noindex",
+    finalUrl: "https://example.com/noindex",
+    statusCode: 200,
+    statusClass: "success",
+    headers: { "x-robots-tag": "noindex" },
+    redirectChain: [],
+    fetchedAt: "2026-06-02T08:01:00.000Z"
+  });
+  const fetchResultId = (fetch.body as { data: { id: string } }).data.id;
+
+  const response = await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls/url-index-demo/indexability", {
+    url: "https://example.com/noindex",
+    state: "blocked_by_x_robots",
+    isIndexable: false,
+    reasons: ["X-Robots-Tag contains noindex"],
+    canonicalUrl: null,
+    fetchResultId,
+    assessedAt: "2026-06-02T08:02:00.000Z"
+  });
+
+  assert.equal(response.status, 201);
+  const created = (response.body as { data: { state: string; isIndexable: boolean; fetchResultId: string } }).data;
+  assert.equal(created.state, "blocked_by_x_robots");
+  assert.equal(created.isIndexable, false);
+  assert.equal(created.fetchResultId, fetchResultId);
+
+  const list = await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls/url-index-demo/indexability");
+  assert.equal(list.status, 200);
+  const data = (list.body as { data: Array<{ reasons: string[]; canonicalUrl: string | null }> }).data;
+  assert.deepEqual(data[0]?.reasons, ["X-Robots-Tag contains noindex"]);
+  assert.equal(data[0]?.canonicalUrl, null);
+  store.close();
+});

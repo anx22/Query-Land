@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DiscoveredUrl, FoundationJob, IntegrationProvider, ProjectStatus, SiteScopeType, UrlDiscoverySource } from "@seo-tool/domain-model";
+import type { DiscoveredUrl, FetchStatusClass, FoundationJob, IndexabilityRecord, IndexabilityState, IntegrationProvider, ProjectStatus, SiteScopeType, UrlDiscoverySource, UrlFetchRecord } from "@seo-tool/domain-model";
 import { createSQLiteStore, RequestError, type BackendStore } from "./sqlite-store.js";
 
 export interface ApiResponse {
@@ -24,6 +24,8 @@ type MarketInput = { country: string; language: string; device: "desktop" | "mob
 type CreateProjectRequest = { name: string; slug: string; status?: ProjectStatus; defaultLocale?: string; markets?: MarketInput[] };
 type CreateSiteRequest = { baseUrl: string; scopeType: SiteScopeType; crawlFrequency?: "manual" | "daily" | "weekly"; businessValue?: number };
 type RecordDiscoveredUrlsRequest = { urls: DiscoveredUrl[] };
+type RecordFetchResultRequest = Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
+type RecordIndexabilityRequest = Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
 type CreateIntegrationRequest = { projectId: string; provider: IntegrationProvider };
 type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string };
 type AuthRequest = { email: string; password: string; name?: string };
@@ -32,6 +34,8 @@ const projectStatuses = new Set<ProjectStatus>(["draft", "active", "archived"]);
 const siteScopeTypes = new Set<SiteScopeType>(["domain", "subdomain", "folder"]);
 const crawlFrequencies = new Set<Exclude<CreateSiteRequest["crawlFrequency"], undefined>>(["manual", "daily", "weekly"]);
 const urlDiscoverySources = new Set<UrlDiscoverySource>(["seed", "sitemap", "link"]);
+const fetchStatusClasses = new Set<FetchStatusClass>(["success", "redirect", "client_error", "server_error", "network_error"]);
+const indexabilityStates = new Set<IndexabilityState>(["indexable", "blocked_by_status", "blocked_by_meta", "blocked_by_x_robots", "canonicalized"]);
 const integrationProviders = new Set<IntegrationProvider>(["gsc", "ga4", "matomo", "pagespeed", "lighthouse", "serverlogs", "sitemap", "robots", "crawler", "cms", "serp", "backlink", "keyword"]);
 const jobTypes = new Set<FoundationJob["type"]>(["connector_sync", "crawl_seed", "source_map_refresh", "health_check"]);
 
@@ -113,6 +117,24 @@ async function routeProjectChildren(store: BackendStore, method: string, pathnam
     const input = recordDiscoveredUrlsRequest(body);
     const result = store.recordDiscoveredUrls(discoveredUrlsMatch[1], discoveredUrlsMatch[2], input.urls);
     return json(201, { data: result.urls, meta: { inserted: result.inserted, updated: result.updated } });
+  }
+
+  const fetchResultsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls\/([^/]+)\/fetch-results$/);
+  if (method === "GET" && fetchResultsMatch) {
+    return json(200, { data: store.listFetchResults(fetchResultsMatch[1], fetchResultsMatch[2], fetchResultsMatch[3]) });
+  }
+  if (method === "POST" && fetchResultsMatch) {
+    const input = recordFetchResultRequest(body);
+    return json(201, { data: store.recordFetchResult(fetchResultsMatch[1], fetchResultsMatch[2], fetchResultsMatch[3], input) });
+  }
+
+  const indexabilityMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls\/([^/]+)\/indexability$/);
+  if (method === "GET" && indexabilityMatch) {
+    return json(200, { data: store.listIndexabilityAssessments(indexabilityMatch[1], indexabilityMatch[2], indexabilityMatch[3]) });
+  }
+  if (method === "POST" && indexabilityMatch) {
+    const input = recordIndexabilityRequest(body);
+    return json(201, { data: store.recordIndexabilityAssessment(indexabilityMatch[1], indexabilityMatch[2], indexabilityMatch[3], input) });
   }
 
   if (method === "GET" && pathname === "/integrations") {
@@ -200,6 +222,34 @@ function discoveredUrlField(value: unknown, index: number): DiscoveredUrl {
     discoveredAt: stringField(input, "discoveredAt")
   };
 }
+
+function recordFetchResultRequest(body: unknown): RecordFetchResultRequest {
+  const input = objectBody(body);
+  return {
+    url: urlField(input, "url"),
+    finalUrl: urlField(input, "finalUrl"),
+    statusCode: nullableStatusCodeField(input, "statusCode"),
+    statusClass: enumField(input, fetchStatusClasses, "statusClass"),
+    headers: stringRecordField(input, "headers"),
+    redirectChain: urlArrayField(input, "redirectChain"),
+    fetchedAt: stringField(input, "fetchedAt"),
+    errorMessage: input.errorMessage === undefined ? undefined : stringField(input, "errorMessage")
+  };
+}
+
+function recordIndexabilityRequest(body: unknown): RecordIndexabilityRequest {
+  const input = objectBody(body);
+  return {
+    url: urlField(input, "url"),
+    state: enumField(input, indexabilityStates, "state"),
+    isIndexable: booleanField(input, "isIndexable"),
+    reasons: stringArrayField(input, "reasons"),
+    canonicalUrl: input.canonicalUrl === null || input.canonicalUrl === undefined ? null : urlField(input, "canonicalUrl"),
+    fetchResultId: input.fetchResultId === null || input.fetchResultId === undefined ? null : stringField(input, "fetchResultId"),
+    assessedAt: stringField(input, "assessedAt")
+  };
+}
+
 function createIntegrationRequest(body: unknown): CreateIntegrationRequest {
   const input = objectBody(body);
   return {
@@ -255,6 +305,56 @@ function integerField(input: Record<string, unknown>, field: string, minimum?: n
     throw new RequestError(400, "invalid_integer", `${field} must be an integer`, { field, minimum });
   }
   return value as number;
+}
+
+function booleanField(input: Record<string, unknown>, field: string): boolean {
+  if (typeof input[field] !== "boolean") {
+    throw new RequestError(400, "invalid_boolean", `${field} must be a boolean`, { field });
+  }
+  return input[field];
+}
+
+function stringArrayField(input: Record<string, unknown>, field: string): string[] {
+  const value = input[field];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new RequestError(400, "invalid_array", `${field} must be an array of strings`, { field });
+  }
+  return value;
+}
+
+function nullableStatusCodeField(input: Record<string, unknown>, field: string): number | null {
+  if (input[field] === null) return null;
+  const value = integerField(input, field, 100);
+  if (value > 599) {
+    throw new RequestError(400, "invalid_status_code", `${field} must be between 100 and 599`, { field });
+  }
+  return value;
+}
+
+function stringRecordField(input: Record<string, unknown>, field: string): Record<string, string> {
+  const value = input[field];
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new RequestError(400, "invalid_object", `${field} must be an object`, { field });
+  }
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key.toLowerCase(), String(item)]));
+}
+
+function urlArrayField(input: Record<string, unknown>, field: string): string[] {
+  const value = input[field];
+  if (!Array.isArray(value)) {
+    throw new RequestError(400, "invalid_array", `${field} must be an array`, { field });
+  }
+  return value.map((item, index) => {
+    if (typeof item !== "string") {
+      throw new RequestError(400, "invalid_url", `${field} entries must be valid URLs`, { field, index });
+    }
+    try {
+      new URL(item);
+    } catch {
+      throw new RequestError(400, "invalid_url", `${field} entries must be valid URLs`, { field, index });
+    }
+    return item;
+  });
 }
 
 function enumField<T extends string>(input: Record<string, unknown>, allowed: Set<T>, field: string): T {
