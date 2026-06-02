@@ -1,0 +1,6 @@
+node_modules/
+.next/
+apps/web/.next/
+*.tsbuildinfo
+.env*
+artifacts/
