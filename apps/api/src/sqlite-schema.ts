@@ -43,6 +43,59 @@ CREATE TABLE IF NOT EXISTS sites (
   UNIQUE (project_id, base_url)
 );
 
+CREATE TABLE IF NOT EXISTS discovered_urls (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  normalized_url TEXT NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('seed', 'sitemap', 'link')),
+  discovered_from TEXT,
+  depth INTEGER NOT NULL DEFAULT 0,
+  discovered_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (project_id, site_id, normalized_url)
+);
+
+CREATE INDEX IF NOT EXISTS idx_discovered_urls_project_site ON discovered_urls(project_id, site_id, discovered_at);
+
+
+CREATE TABLE IF NOT EXISTS url_fetch_results (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  discovered_url_id TEXT NOT NULL REFERENCES discovered_urls(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  final_url TEXT NOT NULL,
+  status_code INTEGER,
+  status_class TEXT NOT NULL CHECK (status_class IN ('success', 'redirect', 'client_error', 'server_error', 'network_error')),
+  headers TEXT NOT NULL DEFAULT '{}',
+  redirect_chain TEXT NOT NULL DEFAULT '[]',
+  fetched_at TEXT NOT NULL,
+  error_message TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_url_fetch_results_discovered_url ON url_fetch_results(discovered_url_id, fetched_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS url_indexability_assessments (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  discovered_url_id TEXT NOT NULL REFERENCES discovered_urls(id) ON DELETE CASCADE,
+  fetch_result_id TEXT REFERENCES url_fetch_results(id) ON DELETE SET NULL,
+  url TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('indexable', 'blocked_by_status', 'blocked_by_meta', 'blocked_by_x_robots', 'canonicalized')),
+  is_indexable INTEGER NOT NULL CHECK (is_indexable IN (0, 1)),
+  reasons TEXT NOT NULL DEFAULT '[]',
+  canonical_url TEXT,
+  assessed_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_url_indexability_discovered_url ON url_indexability_assessments(discovered_url_id, assessed_at DESC);
+
 CREATE TABLE IF NOT EXISTS integration_accounts (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

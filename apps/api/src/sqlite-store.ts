@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuthUser, type FoundationJob, type HealthSnapshot, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UserRole } from "@seo-tool/domain-model";
+import { makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuthUser, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
 import { hashPassword, hashToken, verifyPassword } from "./password.js";
 import { sqliteFoundationSchema } from "./sqlite-schema.js";
@@ -48,6 +48,12 @@ export interface BackendStore {
   createProject(input: Partial<Project>): Project;
   listSites(projectId: string): Site[];
   createSite(projectId: string, input: Partial<Site>): Site;
+  listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
+  recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
+  listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[];
+  recordFetchResult(projectId: string, siteId: string, discoveredUrlId: string, result: Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): UrlFetchRecord;
+  listIndexabilityAssessments(projectId: string, siteId: string, discoveredUrlId: string): IndexabilityRecord[];
+  recordIndexabilityAssessment(projectId: string, siteId: string, discoveredUrlId: string, assessment: Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): IndexabilityRecord;
   listIntegrations(): IntegrationAccount[];
   createIntegration(projectId: string, provider: IntegrationProvider): IntegrationAccount;
   listJobs(): FoundationJob[];
@@ -201,6 +207,135 @@ class SQLiteStore implements BackendStore {
     return site;
   }
 
+  listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[] {
+    const sql = siteId
+      ? `SELECT * FROM discovered_urls WHERE project_id = ? AND site_id = ? ORDER BY discovered_at ASC, normalized_url ASC`
+      : `SELECT * FROM discovered_urls WHERE project_id = ? ORDER BY discovered_at ASC, normalized_url ASC`;
+    const rows = siteId
+      ? this.db.prepare(sql).all(projectId, siteId)
+      : this.db.prepare(sql).all(projectId);
+    return rows.map(mapDiscoveredUrl);
+  }
+
+  recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number } {
+    const site = this.db.prepare(`SELECT id FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId);
+    if (!site) {
+      throw new RequestError(404, "unknown_site", "Referenced site does not exist", { projectId, siteId });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    const now = new Date().toISOString();
+
+    for (const url of urls) {
+      if (url.projectId !== projectId || url.siteId !== siteId) {
+        throw new RequestError(400, "url_scope_mismatch", "Discovered URL projectId/siteId must match the route scope", { url: url.normalizedUrl });
+      }
+      const existing = this.db.prepare(`SELECT id FROM discovered_urls WHERE project_id = ? AND site_id = ? AND normalized_url = ?`)
+        .get(projectId, siteId, url.normalizedUrl);
+      this.db.prepare(`
+        INSERT INTO discovered_urls (id, project_id, site_id, url, normalized_url, source, discovered_from, depth, discovered_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(project_id, site_id, normalized_url) DO UPDATE SET
+          url = excluded.url,
+          source = excluded.source,
+          discovered_from = excluded.discovered_from,
+          depth = excluded.depth,
+          discovered_at = excluded.discovered_at,
+          updated_at = excluded.updated_at
+      `).run(url.id, projectId, siteId, url.url, url.normalizedUrl, url.source, url.discoveredFrom, url.depth, url.discoveredAt, now);
+      if (existing) {
+        updated += 1;
+      } else {
+        inserted += 1;
+      }
+    }
+
+    const stored = this.listDiscoveredUrls(projectId, siteId);
+    this.audit("system", "crawl.discovery.record", "site", siteId, { projectId, inserted, updated, total: stored.length });
+    return { urls: stored, inserted, updated };
+  }
+
+  listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[] {
+    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
+    return this.db.prepare(`
+      SELECT * FROM url_fetch_results
+      WHERE project_id = ? AND site_id = ? AND discovered_url_id = ?
+      ORDER BY fetched_at DESC, created_at DESC
+    `).all(projectId, siteId, discoveredUrlId).map(mapUrlFetchRecord);
+  }
+
+  recordFetchResult(projectId: string, siteId: string, discoveredUrlId: string, result: Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): UrlFetchRecord {
+    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
+    const id = `fetch-${randomUUID()}`;
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO url_fetch_results (id, project_id, site_id, discovered_url_id, url, final_url, status_code, status_class, headers, redirect_chain, fetched_at, error_message, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      projectId,
+      siteId,
+      discoveredUrlId,
+      result.url,
+      result.finalUrl,
+      result.statusCode,
+      result.statusClass,
+      JSON.stringify(result.headers),
+      JSON.stringify(result.redirectChain),
+      result.fetchedAt,
+      result.errorMessage ?? null,
+      now
+    );
+    this.audit("system", "crawl.fetch.record", "discovered_url", discoveredUrlId, { projectId, siteId, statusClass: result.statusClass, statusCode: result.statusCode });
+    const row = this.db.prepare(`SELECT * FROM url_fetch_results WHERE id = ?`).get(id);
+    if (!row) {
+      throw new RequestError(400, "fetch_result_write_failed", "Fetch result could not be stored");
+    }
+    return mapUrlFetchRecord(row);
+  }
+
+  listIndexabilityAssessments(projectId: string, siteId: string, discoveredUrlId: string): IndexabilityRecord[] {
+    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
+    return this.db.prepare(`
+      SELECT * FROM url_indexability_assessments
+      WHERE project_id = ? AND site_id = ? AND discovered_url_id = ?
+      ORDER BY assessed_at DESC, created_at DESC
+    `).all(projectId, siteId, discoveredUrlId).map(mapIndexabilityRecord);
+  }
+
+  recordIndexabilityAssessment(projectId: string, siteId: string, discoveredUrlId: string, assessment: Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): IndexabilityRecord {
+    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
+    if (assessment.fetchResultId) {
+      this.assertFetchResultScope(projectId, siteId, discoveredUrlId, assessment.fetchResultId);
+    }
+    const id = `index-${randomUUID()}`;
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO url_indexability_assessments (id, project_id, site_id, discovered_url_id, fetch_result_id, url, state, is_indexable, reasons, canonical_url, assessed_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      projectId,
+      siteId,
+      discoveredUrlId,
+      assessment.fetchResultId,
+      assessment.url,
+      assessment.state,
+      assessment.isIndexable ? 1 : 0,
+      JSON.stringify(assessment.reasons),
+      assessment.canonicalUrl,
+      assessment.assessedAt,
+      now
+    );
+    this.audit("system", "crawl.indexability.record", "discovered_url", discoveredUrlId, { projectId, siteId, state: assessment.state, isIndexable: assessment.isIndexable });
+    const row = this.db.prepare(`SELECT * FROM url_indexability_assessments WHERE id = ?`).get(id);
+    if (!row) {
+      throw new RequestError(400, "indexability_write_failed", "Indexability assessment could not be stored");
+    }
+    return mapIndexabilityRecord(row);
+  }
+
   listIntegrations(): IntegrationAccount[] {
     return this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all().map(mapIntegration);
   }
@@ -257,7 +392,6 @@ class SQLiteStore implements BackendStore {
     return { job, idempotent: false };
   }
 
-
   claimNextJob(): FoundationJob | null {
     const row = this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get();
     if (!row) return null;
@@ -291,6 +425,23 @@ class SQLiteStore implements BackendStore {
 
   close(): void {
     this.db.close();
+  }
+
+  private assertDiscoveredUrlScope(projectId: string, siteId: string, discoveredUrlId: string): void {
+    const row = this.db.prepare(`SELECT id FROM discovered_urls WHERE id = ? AND project_id = ? AND site_id = ?`).get(discoveredUrlId, projectId, siteId);
+    if (!row) {
+      throw new RequestError(404, "unknown_discovered_url", "Referenced discovered URL does not exist", { projectId, siteId, discoveredUrlId });
+    }
+  }
+
+  private assertFetchResultScope(projectId: string, siteId: string, discoveredUrlId: string, fetchResultId: string): void {
+    const row = this.db.prepare(`
+      SELECT id FROM url_fetch_results
+      WHERE id = ? AND project_id = ? AND site_id = ? AND discovered_url_id = ?
+    `).get(fetchResultId, projectId, siteId, discoveredUrlId);
+    if (!row) {
+      throw new RequestError(404, "unknown_fetch_result", "Referenced fetch result does not exist", { projectId, siteId, discoveredUrlId, fetchResultId });
+    }
   }
 
   private audit(actorId: string, action: string, entityType: string, entityId: string, metadata: Record<string, unknown>): void {
@@ -385,6 +536,53 @@ function mapSite(row: Record<string, unknown>): Site {
     baseUrl: String(row.base_url),
     crawlFrequency: row.crawl_frequency as Site["crawlFrequency"],
     businessValue: Number(row.business_value)
+  };
+}
+
+function mapDiscoveredUrl(row: Record<string, unknown>): DiscoveredUrl {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    url: String(row.url),
+    normalizedUrl: String(row.normalized_url),
+    source: row.source as DiscoveredUrl["source"],
+    discoveredFrom: row.discovered_from === null ? null : String(row.discovered_from),
+    depth: Number(row.depth),
+    discoveredAt: String(row.discovered_at)
+  };
+}
+
+function mapUrlFetchRecord(row: Record<string, unknown>): UrlFetchRecord {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    discoveredUrlId: String(row.discovered_url_id),
+    url: String(row.url),
+    finalUrl: String(row.final_url),
+    statusCode: row.status_code === null ? null : Number(row.status_code),
+    statusClass: row.status_class as UrlFetchRecord["statusClass"],
+    headers: JSON.parse(String(row.headers)) as Record<string, string>,
+    redirectChain: JSON.parse(String(row.redirect_chain)) as string[],
+    fetchedAt: String(row.fetched_at),
+    errorMessage: row.error_message === null ? undefined : String(row.error_message)
+  };
+}
+
+function mapIndexabilityRecord(row: Record<string, unknown>): IndexabilityRecord {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    discoveredUrlId: String(row.discovered_url_id),
+    fetchResultId: row.fetch_result_id === null ? null : String(row.fetch_result_id),
+    url: String(row.url),
+    state: row.state as IndexabilityRecord["state"],
+    isIndexable: Number(row.is_indexable) === 1,
+    reasons: JSON.parse(String(row.reasons)) as string[],
+    canonicalUrl: row.canonical_url === null ? null : String(row.canonical_url),
+    assessedAt: String(row.assessed_at)
   };
 }
 

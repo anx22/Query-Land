@@ -1,23 +1,22 @@
-import { describe, expect, it } from "vitest";
-import { appRoutes, demoOpportunities } from "./index";
-import { hasRequiredEvidence } from "@seo/domain-model";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { hasRequiredEvidence } from "@seo-tool/domain-model";
+import { appRoutes, demoOpportunities } from "./index.js";
 
-describe("foundation routing and fixtures", () => {
-  it("matches the documented main navigation order", () => {
-    expect(appRoutes.map((route) => route.label)).toEqual([
-      "Overview",
-      "Projects",
-      "Technical Audit",
-      "Keywords & Rank",
-      "Content & Opportunities",
-      "Backlinks",
-      "Reports",
-      "AI Visibility",
-      "Settings",
-    ]);
-  });
+test("matches the documented main navigation order", () => {
+  assert.deepEqual(appRoutes.map((route) => route.label), [
+    "Overview",
+    "Projects",
+    "Technical Audit",
+    "Keywords & Rank",
+    "Content & Opportunities",
+    "Backlinks",
+    "Reports",
+    "AI Visibility",
+    "Settings"
+  ]);
+});
 
-  it("keeps demo opportunities evidence-first", () => {
-    expect(demoOpportunities.every(hasRequiredEvidence)).toBe(true);
-  });
+test("keeps demo opportunities evidence-first", () => {
+  assert.equal(demoOpportunities.every(hasRequiredEvidence), true);
 });
