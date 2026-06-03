@@ -201,47 +201,6 @@ export interface AuditIssue {
   message: string;
 }
 
-export interface AuditIssueRecord extends AuditIssue {
-  projectId: string;
-  siteId: string;
-  discoveredUrlId: string | null;
-  detectedAt: string;
-  resolvedAt: string | null;
-}
-
-
-export type CrawlRunStatus = "queued" | "running" | "succeeded" | "failed";
-
-export interface CrawlRunSummary {
-  discoveredUrls: number;
-  fetchedUrls: number;
-  indexabilityAssessments: number;
-  openIssues: number;
-  healthScore: number | null;
-}
-
-export interface CrawlRun {
-  id: string;
-  projectId: string;
-  siteId: string;
-  status: CrawlRunStatus;
-  trigger: "manual" | "scheduled" | "deploy";
-  startedAt: string;
-  finishedAt: string | null;
-  summary: CrawlRunSummary;
-  errorMessage?: string;
-}
-
-export interface CrawlHealthScore {
-  id: string;
-  projectId: string;
-  siteId: string;
-  score: number;
-  totalIssues: number;
-  issueCounts: Record<AuditIssueSeverity, number>;
-  generatedAt: string;
-}
-
 const confidenceByProvider: Record<IntegrationProvider, SourceConfidence> = {
   gsc: "B",
   ga4: "A",

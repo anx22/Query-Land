@@ -1,19 +1,4 @@
 import { appRoutes, demoIntegrations, demoJobs, demoOpportunities, demoProject, demoSourceMap, seoMemory } from "@seo-tool/shared-config";
-import { InfoCard } from "./info-card.js";
-import { StatusList } from "./status-list.js";
-
-const moduleStats = [
-  { label: "Projekt", value: demoProject.name },
-  { label: "Connectors", value: String(demoIntegrations.length) },
-  { label: "Jobs", value: String(demoJobs.length) }
-];
-
-const sourceMapItems = demoSourceMap.map((mapping) => ({
-  id: mapping.id,
-  label: mapping.routePattern,
-  status: mapping.confidence,
-  statusClassName: "badge primary"
-}));
 
 export function ModulePage({ href }: { href: string }) {
   const route = appRoutes.find((item) => item.href === href) ?? appRoutes[0];

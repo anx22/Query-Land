@@ -1,6 +1,4 @@
 import { appRoutes, demoIntegrations, demoJobs, demoOpportunities, demoProject, demoSourceMap, seoMemory } from "@seo-tool/shared-config";
-import { MetricCard } from "./metric-card.js";
-import { StatusList } from "./status-list.js";
 
 const activeOpportunity = demoOpportunities[0];
 const dashboardMetrics = [

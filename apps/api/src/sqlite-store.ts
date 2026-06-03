@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { calculateHealthScore, makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuditIssueRecord, type AuthUser, type CrawlHealthScore, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
+import { makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuthUser, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
 import { hashPassword, hashToken, verifyPassword } from "./password.js";
 import { sqliteFoundationSchema } from "./sqlite-schema.js";
@@ -49,19 +49,12 @@ export interface BackendStore {
   createProject(input: Partial<Project>): Project;
   listSites(projectId: string): Site[];
   createSite(projectId: string, input: Partial<Site>): Site;
-  listCrawlRuns(projectId: string, siteId: string): CrawlRun[];
-  createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): CrawlRun;
-  completeCrawlRun(projectId: string, siteId: string, runId: string, status: Extract<CrawlRunStatus, "succeeded" | "failed">, errorMessage?: string): CrawlRun;
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
   listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[];
   recordFetchResult(projectId: string, siteId: string, discoveredUrlId: string, result: Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): UrlFetchRecord;
   listIndexabilityAssessments(projectId: string, siteId: string, discoveredUrlId: string): IndexabilityRecord[];
   recordIndexabilityAssessment(projectId: string, siteId: string, discoveredUrlId: string, assessment: Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): IndexabilityRecord;
-  listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[];
-  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number };
-  listHealthScores(projectId: string, siteId: string): CrawlHealthScore[];
-  computeHealthScore(projectId: string, siteId: string): CrawlHealthScore;
   listIntegrations(): IntegrationAccount[];
   createIntegration(projectId: string, provider: IntegrationProvider): IntegrationAccount;
   listJobs(): FoundationJob[];
@@ -215,53 +208,6 @@ class SQLiteStore implements BackendStore {
     return site;
   }
 
-  listCrawlRuns(projectId: string, siteId: string): CrawlRun[] {
-    this.assertSiteScope(projectId, siteId);
-    return this.db.prepare(`
-      SELECT * FROM crawl_runs
-      WHERE project_id = ? AND site_id = ?
-      ORDER BY started_at DESC, created_at DESC
-    `).all(projectId, siteId).map(mapCrawlRun);
-  }
-
-  createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): CrawlRun {
-    this.assertSiteScope(projectId, siteId);
-    const now = new Date().toISOString();
-    const run: CrawlRun = {
-      id: `crawl-${randomUUID()}`,
-      projectId,
-      siteId,
-      status: "running",
-      trigger,
-      startedAt: now,
-      finishedAt: null,
-      summary: emptyCrawlRunSummary()
-    };
-    this.db.prepare(`
-      INSERT INTO crawl_runs (id, project_id, site_id, status, trigger, started_at, finished_at, summary, error_message, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(run.id, projectId, siteId, run.status, run.trigger, run.startedAt, null, JSON.stringify(run.summary), null, now, now);
-    this.audit("system", "crawl.run.create", "crawl_run", run.id, { projectId, siteId, trigger });
-    return run;
-  }
-
-  completeCrawlRun(projectId: string, siteId: string, runId: string, status: Extract<CrawlRunStatus, "succeeded" | "failed">, errorMessage?: string): CrawlRun {
-    this.assertCrawlRunScope(projectId, siteId, runId);
-    const now = new Date().toISOString();
-    const summary = this.computeCrawlRunSummary(projectId, siteId);
-    this.db.prepare(`
-      UPDATE crawl_runs
-      SET status = ?, finished_at = ?, summary = ?, error_message = ?, updated_at = ?
-      WHERE id = ? AND project_id = ? AND site_id = ?
-    `).run(status, now, JSON.stringify(summary), errorMessage ?? null, now, runId, projectId, siteId);
-    this.audit("system", "crawl.run.complete", "crawl_run", runId, { projectId, siteId, status, summary });
-    const row = this.db.prepare(`SELECT * FROM crawl_runs WHERE id = ?`).get(runId);
-    if (!row) {
-      throw new RequestError(404, "crawl_run_not_found", "Crawl run not found", { projectId, siteId, runId });
-    }
-    return mapCrawlRun(row);
-  }
-
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[] {
     const sql = siteId
       ? `SELECT * FROM discovered_urls WHERE project_id = ? AND site_id = ? ORDER BY discovered_at ASC, normalized_url ASC`
@@ -391,86 +337,6 @@ class SQLiteStore implements BackendStore {
     return mapIndexabilityRecord(row);
   }
 
-  listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[] {
-    this.assertSiteScope(projectId, siteId);
-    return this.db.prepare(`
-      SELECT * FROM crawl_audit_issues
-      WHERE project_id = ? AND site_id = ?
-      ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, detected_at DESC, url ASC
-    `).all(projectId, siteId).map(mapAuditIssueRecord);
-  }
-
-  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number } {
-    this.assertSiteScope(projectId, siteId);
-    let inserted = 0;
-    let updated = 0;
-    const now = new Date().toISOString();
-
-    for (const issue of issues) {
-      if (issue.projectId !== projectId || issue.siteId !== siteId) {
-        throw new RequestError(400, "issue_scope_mismatch", "Audit issue projectId/siteId must match the route scope", { issue: issue.id });
-      }
-      if (issue.discoveredUrlId) {
-        this.assertDiscoveredUrlScope(projectId, siteId, issue.discoveredUrlId);
-      }
-      const existing = this.db.prepare(`
-        SELECT id FROM crawl_audit_issues
-        WHERE project_id = ? AND site_id = ? AND url = ? AND rule = ? AND message = ?
-      `).get(projectId, siteId, issue.url, issue.rule, issue.message);
-      this.db.prepare(`
-        INSERT INTO crawl_audit_issues (id, project_id, site_id, discovered_url_id, url, rule, severity, message, detected_at, resolved_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(project_id, site_id, url, rule, message) DO UPDATE SET
-          discovered_url_id = excluded.discovered_url_id,
-          severity = excluded.severity,
-          detected_at = excluded.detected_at,
-          resolved_at = excluded.resolved_at,
-          updated_at = excluded.updated_at
-      `).run(issue.id, projectId, siteId, issue.discoveredUrlId, issue.url, issue.rule, issue.severity, issue.message, issue.detectedAt, issue.resolvedAt, now);
-      if (existing) updated += 1;
-      else inserted += 1;
-    }
-
-    const stored = this.listAuditIssues(projectId, siteId);
-    this.audit("system", "crawl.issue.record", "site", siteId, { projectId, inserted, updated, total: stored.length });
-    return { issues: stored, inserted, updated };
-  }
-
-  listHealthScores(projectId: string, siteId: string): CrawlHealthScore[] {
-    this.assertSiteScope(projectId, siteId);
-    return this.db.prepare(`
-      SELECT * FROM crawl_health_scores
-      WHERE project_id = ? AND site_id = ?
-      ORDER BY generated_at DESC
-    `).all(projectId, siteId).map(mapCrawlHealthScore);
-  }
-
-  computeHealthScore(projectId: string, siteId: string): CrawlHealthScore {
-    this.assertSiteScope(projectId, siteId);
-    const activeIssues = this.db.prepare(`
-      SELECT * FROM crawl_audit_issues
-      WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL
-    `).all(projectId, siteId).map(mapAuditIssueRecord);
-    const issueCounts = countIssueSeverities(activeIssues);
-    const now = new Date().toISOString();
-    const healthScore: CrawlHealthScore = {
-      id: `health-${randomUUID()}`,
-      projectId,
-      siteId,
-      score: calculateHealthScore(activeIssues),
-      totalIssues: activeIssues.length,
-      issueCounts,
-      generatedAt: now
-    };
-
-    this.db.prepare(`
-      INSERT INTO crawl_health_scores (id, project_id, site_id, score, total_issues, issue_counts, generated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(healthScore.id, projectId, siteId, healthScore.score, healthScore.totalIssues, JSON.stringify(healthScore.issueCounts), healthScore.generatedAt);
-    this.audit("system", "crawl.health.compute", "site", siteId, { projectId, score: healthScore.score, totalIssues: healthScore.totalIssues });
-    return healthScore;
-  }
-
   listIntegrations(): IntegrationAccount[] {
     return this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all().map(mapIntegration);
   }
@@ -562,35 +428,6 @@ class SQLiteStore implements BackendStore {
     this.db.close();
   }
 
-  private assertCrawlRunScope(projectId: string, siteId: string, runId: string): void {
-    const row = this.db.prepare(`SELECT id FROM crawl_runs WHERE id = ? AND project_id = ? AND site_id = ?`).get(runId, projectId, siteId);
-    if (!row) {
-      throw new RequestError(404, "crawl_run_not_found", "Crawl run not found", { projectId, siteId, runId });
-    }
-  }
-
-  private computeCrawlRunSummary(projectId: string, siteId: string): CrawlRun["summary"] {
-    const discoveredUrls = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM discovered_urls WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
-    const fetchedUrls = Number(this.db.prepare(`SELECT COUNT(DISTINCT discovered_url_id) AS count FROM url_fetch_results WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
-    const indexabilityAssessments = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM url_indexability_assessments WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
-    const openIssues = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM crawl_audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL`).get(projectId, siteId)?.count ?? 0);
-    const latestHealth = this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? AND site_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId, siteId);
-    return {
-      discoveredUrls,
-      fetchedUrls,
-      indexabilityAssessments,
-      openIssues,
-      healthScore: latestHealth ? Number(latestHealth.score) : null
-    };
-  }
-
-  private assertSiteScope(projectId: string, siteId: string): void {
-    const row = this.db.prepare(`SELECT id FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId);
-    if (!row) {
-      throw new RequestError(404, "unknown_site", "Referenced site does not exist", { projectId, siteId });
-    }
-  }
-
   private assertDiscoveredUrlScope(projectId: string, siteId: string, discoveredUrlId: string): void {
     const row = this.db.prepare(`SELECT id FROM discovered_urls WHERE id = ? AND project_id = ? AND site_id = ?`).get(discoveredUrlId, projectId, siteId);
     if (!row) {
@@ -665,4 +502,124 @@ function seedFoundation(db: SQLiteDatabase): void {
     .run("srcmap-home-demo", "proj-demo", "/", "tpl-home-demo", "exact", now);
   db.prepare(`INSERT INTO feature_flags (key, enabled, description) VALUES (?, ?, ?)`)
     .run("auth.email_password", 1, "Enable local backend-owned email/password sessions.");
+}
+
+function mapUser(row: Record<string, unknown>): AuthUser {
+  return {
+    id: String(row.id),
+    email: String(row.email),
+    name: String(row.name),
+    role: row.role as UserRole,
+    status: row.status as AuthUser["status"],
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
+  };
+}
+
+function mapProject(row: Record<string, unknown>): Project {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    slug: String(row.slug),
+    status: row.status as Project["status"],
+    defaultLocale: String(row.default_locale),
+    markets: JSON.parse(String(row.markets)) as Project["markets"],
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
+  };
+}
+
+function mapSite(row: Record<string, unknown>): Site {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    scopeType: row.scope_type as Site["scopeType"],
+    baseUrl: String(row.base_url),
+    crawlFrequency: row.crawl_frequency as Site["crawlFrequency"],
+    businessValue: Number(row.business_value)
+  };
+}
+
+function mapDiscoveredUrl(row: Record<string, unknown>): DiscoveredUrl {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    url: String(row.url),
+    normalizedUrl: String(row.normalized_url),
+    source: row.source as DiscoveredUrl["source"],
+    discoveredFrom: row.discovered_from === null ? null : String(row.discovered_from),
+    depth: Number(row.depth),
+    discoveredAt: String(row.discovered_at)
+  };
+}
+
+function mapUrlFetchRecord(row: Record<string, unknown>): UrlFetchRecord {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    discoveredUrlId: String(row.discovered_url_id),
+    url: String(row.url),
+    finalUrl: String(row.final_url),
+    statusCode: row.status_code === null ? null : Number(row.status_code),
+    statusClass: row.status_class as UrlFetchRecord["statusClass"],
+    headers: JSON.parse(String(row.headers)) as Record<string, string>,
+    redirectChain: JSON.parse(String(row.redirect_chain)) as string[],
+    fetchedAt: String(row.fetched_at),
+    errorMessage: row.error_message === null ? undefined : String(row.error_message)
+  };
+}
+
+function mapIndexabilityRecord(row: Record<string, unknown>): IndexabilityRecord {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    discoveredUrlId: String(row.discovered_url_id),
+    fetchResultId: row.fetch_result_id === null ? null : String(row.fetch_result_id),
+    url: String(row.url),
+    state: row.state as IndexabilityRecord["state"],
+    isIndexable: Number(row.is_indexable) === 1,
+    reasons: JSON.parse(String(row.reasons)) as string[],
+    canonicalUrl: row.canonical_url === null ? null : String(row.canonical_url),
+    assessedAt: String(row.assessed_at)
+  };
+}
+
+function mapIntegration(row: Record<string, unknown>): IntegrationAccount {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    provider: row.provider as IntegrationProvider,
+    status: row.status as IntegrationAccount["status"],
+    sourceConfidence: row.source_confidence as IntegrationAccount["sourceConfidence"],
+    quotaRemaining: row.quota_remaining === null ? null : Number(row.quota_remaining),
+    freshness: row.freshness === null ? null : String(row.freshness)
+  };
+}
+
+function mapJob(row: Record<string, unknown>): FoundationJob {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    type: row.job_type as FoundationJob["type"],
+    status: row.status as FoundationJob["status"],
+    idempotencyKey: String(row.idempotency_key),
+    attempts: Number(row.attempts),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at)
+  };
+}
+
+function mapSourceMapEntry(row: Record<string, unknown>): SourceMapEntry {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    urlPattern: String(row.url_pattern),
+    template: String(row.template),
+    component: String(row.component),
+    repoPath: String(row.repo_path),
+    confidence: row.confidence as SourceMapEntry["confidence"]
+  };
 }
