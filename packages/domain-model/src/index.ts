@@ -1,28 +1,13 @@
 export type SourceConfidence = "A" | "B" | "C" | "D" | "E";
-
-export type OpportunityStatus =
-  | "open"
-  | "planned"
-  | "in_progress"
-  | "implemented"
-  | "validated"
-  | "reopened"
-  | "dismissed"
-  | "expired";
-
-export type IntegrationSourceType =
-  | "gsc"
-  | "ga4"
-  | "matomo"
-  | "server_logs"
-  | "crawler"
-  | "sitemap"
-  | "robots"
-  | "psi"
-  | "lighthouse"
-  | "cms"
-  | "serp_provider"
-  | "backlink_provider";
+export type ProjectStatus = "draft" | "active" | "archived";
+export type SiteScopeType = "domain" | "subdomain" | "folder";
+export type IntegrationProvider = "gsc" | "ga4" | "matomo" | "pagespeed" | "lighthouse" | "serverlogs" | "sitemap" | "robots" | "crawler" | "cms" | "serp" | "backlink" | "keyword";
+export type IntegrationStatus = "disconnected" | "pending" | "connected" | "degraded" | "error";
+export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type MappingConfidence = "exact" | "manifest" | "heuristic" | "unknown";
+export type UserRole = "owner" | "editor" | "viewer";
+export type UserStatus = "active" | "disabled";
+export type OpportunityStatus = "open" | "planned" | "in_progress" | "implemented" | "validated" | "reopened" | "dismissed" | "expired";
 
 export interface Evidence {
   source: string;
@@ -65,88 +50,12 @@ export interface Opportunity {
   expiresAt: string;
 }
 
-export interface SiteScope {
-  id: string;
-  hostname: string;
-  pathScope: string;
-  market: {
-    country: string;
-    language: string;
-    device: "desktop" | "mobile";
-    searchEngine: "google" | "bing";
-  };
+export interface Market {
+  country: string;
+  language: string;
+  device: "desktop" | "mobile";
+  searchEngine: "google" | "bing";
 }
-
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  owner: string;
-  sites: SiteScope[];
-  competitors: string[];
-  keywordGroups: string[];
-  businessPriorities: Array<{ label: string; value: number; urlPattern: string }>;
-}
-
-export interface IntegrationAccount {
-  id: string;
-  projectId: string;
-  sourceType: IntegrationSourceType;
-  displayName: string;
-  status: "connected" | "needs_review" | "not_connected";
-  sourceConfidence: SourceConfidence;
-  quotaUsed: number;
-  quotaLimit: number;
-  lastSyncAt?: string;
-}
-
-export interface JobRun {
-  id: string;
-  projectId: string;
-  kind: "crawl" | "gsc_import" | "ga4_import" | "source_map" | "report";
-  status: "queued" | "running" | "succeeded" | "failed" | "blocked";
-  idempotencyKey: string;
-  startedAt?: string;
-  finishedAt?: string;
-  errorMessage?: string;
-}
-
-export interface SourceTemplateMap {
-  id: string;
-  routePattern: string;
-  templateName: string;
-  repositoryPath: string;
-  confidence: SourceAnchor["confidence"];
-  lastVerifiedAt: string;
-}
-
-export interface SeoMemorySnapshot {
-  principles: string[];
-  foundationGate: string[];
-  deliveryWave: "foundation";
-  sourceOfTruth: string[];
-}
-
-export function scoreOpportunity(input: Pick<Opportunity, "expectedImpact" | "confidence" | "businessValue" | "urgency" | "effort">): number {
-  if (input.effort <= 0) {
-    throw new Error("Opportunity effort must be greater than zero.");
-  }
-
-  return Math.round(
-    (input.expectedImpact * input.confidence * input.businessValue * input.urgency * 100) / input.effort,
-  );
-}
-
-export function hasRequiredEvidence(opportunity: Pick<Opportunity, "evidence">): boolean {
-  return opportunity.evidence.some((item) => ["A", "B", "C"].includes(item.sourceConfidence));
-export type ProjectStatus = "draft" | "active" | "archived";
-export type SiteScopeType = "domain" | "subdomain" | "folder";
-export type IntegrationProvider = "gsc" | "ga4" | "matomo" | "pagespeed" | "lighthouse" | "serverlogs" | "sitemap" | "robots" | "crawler" | "cms" | "serp" | "backlink" | "keyword";
-export type IntegrationStatus = "disconnected" | "pending" | "connected" | "degraded" | "error";
-export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-export type MappingConfidence = "exact" | "manifest" | "heuristic" | "unknown";
-export type UserRole = "owner" | "editor" | "viewer";
-export type UserStatus = "active" | "disabled";
 
 export interface Project {
   id: string;
@@ -157,13 +66,6 @@ export interface Project {
   markets: Market[];
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Market {
-  country: string;
-  language: string;
-  device: "desktop" | "mobile";
-  searchEngine: "google" | "bing";
 }
 
 export interface Site {
@@ -232,6 +134,114 @@ export interface HealthSnapshot {
   checks: Array<{ name: string; status: "ok" | "warn" | "fail"; details?: string }>;
 }
 
+export interface SeoMemorySnapshot {
+  principles: string[];
+  foundationGate: string[];
+  deliveryWave: "foundation" | "audit-core";
+  sourceOfTruth: string[];
+}
+
+export type UrlDiscoverySource = "seed" | "sitemap" | "link";
+export type FetchStatusClass = "success" | "redirect" | "client_error" | "server_error" | "network_error";
+export type IndexabilityState = "indexable" | "blocked_by_status" | "blocked_by_meta" | "blocked_by_x_robots" | "canonicalized";
+export type AuditIssueSeverity = "critical" | "high" | "medium" | "low";
+
+export interface DiscoveredUrl {
+  id: string;
+  projectId: string;
+  siteId: string;
+  url: string;
+  normalizedUrl: string;
+  source: UrlDiscoverySource;
+  discoveredFrom: string | null;
+  depth: number;
+  discoveredAt: string;
+}
+
+export interface FetchResult {
+  url: string;
+  finalUrl: string;
+  statusCode: number | null;
+  statusClass: FetchStatusClass;
+  headers: Record<string, string>;
+  redirectChain: string[];
+  fetchedAt: string;
+  errorMessage?: string;
+}
+
+export interface UrlFetchRecord extends FetchResult {
+  id: string;
+  projectId: string;
+  siteId: string;
+  discoveredUrlId: string;
+}
+
+export interface IndexabilityAssessment {
+  url: string;
+  state: IndexabilityState;
+  isIndexable: boolean;
+  reasons: string[];
+  canonicalUrl: string | null;
+}
+
+export interface IndexabilityRecord extends IndexabilityAssessment {
+  id: string;
+  projectId: string;
+  siteId: string;
+  discoveredUrlId: string;
+  fetchResultId: string | null;
+  assessedAt: string;
+}
+
+export interface AuditIssue {
+  id: string;
+  url: string;
+  rule: "http_error" | "redirect_chain" | "missing_title" | "duplicate_title" | "canonical_mismatch" | "broken_link";
+  severity: AuditIssueSeverity;
+  message: string;
+}
+
+export interface AuditIssueRecord extends AuditIssue {
+  projectId: string;
+  siteId: string;
+  discoveredUrlId: string | null;
+  detectedAt: string;
+  resolvedAt: string | null;
+}
+
+
+export type CrawlRunStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface CrawlRunSummary {
+  discoveredUrls: number;
+  fetchedUrls: number;
+  indexabilityAssessments: number;
+  openIssues: number;
+  healthScore: number | null;
+}
+
+export interface CrawlRun {
+  id: string;
+  projectId: string;
+  siteId: string;
+  status: CrawlRunStatus;
+  trigger: "manual" | "scheduled" | "deploy";
+  startedAt: string;
+  finishedAt: string | null;
+  summary: CrawlRunSummary;
+  errorMessage?: string;
+}
+
+export interface CrawlHealthScore {
+  id: string;
+  projectId: string;
+  siteId: string;
+  score: number;
+  totalIssues: number;
+  issueCounts: Record<AuditIssueSeverity, number>;
+  generatedAt: string;
+}
+
 const confidenceByProvider: Record<IntegrationProvider, SourceConfidence> = {
   gsc: "B",
   ga4: "A",
@@ -246,6 +256,13 @@ const confidenceByProvider: Record<IntegrationProvider, SourceConfidence> = {
   serp: "C",
   backlink: "D",
   keyword: "D"
+};
+
+const issueSeverityWeights: Record<AuditIssueSeverity, number> = {
+  critical: 18,
+  high: 10,
+  medium: 5,
+  low: 2
 };
 
 export function sourceConfidenceForProvider(provider: IntegrationProvider): SourceConfidence {
@@ -276,4 +293,21 @@ export function validatePassword(password: string): string {
     throw new Error("password must contain at least 12 characters");
   }
   return password;
+}
+
+export function scoreOpportunity(input: Pick<Opportunity, "expectedImpact" | "confidence" | "businessValue" | "urgency" | "effort">): number {
+  if (input.effort <= 0) {
+    throw new Error("Opportunity effort must be greater than zero.");
+  }
+
+  return Math.round((input.expectedImpact * input.confidence * input.businessValue * input.urgency * 100) / input.effort);
+}
+
+export function hasRequiredEvidence(opportunity: Pick<Opportunity, "evidence">): boolean {
+  return opportunity.evidence.some((item) => ["A", "B", "C"].includes(item.sourceConfidence));
+}
+
+export function calculateHealthScore(issues: Array<Pick<AuditIssue, "severity">>): number {
+  const penalty = issues.reduce((sum, issue) => sum + issueSeverityWeights[issue.severity], 0);
+  return Math.max(0, Math.min(100, 100 - penalty));
 }

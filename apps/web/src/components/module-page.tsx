@@ -1,4 +1,4 @@
-import { appRoutes, demoIntegrations, demoJobs, demoOpportunities, demoProject, demoSourceMap, seoMemory } from "@seo/shared-config";
+import { appRoutes, demoIntegrations, demoJobs, demoOpportunities, demoProject, demoSourceMap, seoMemory } from "@seo-tool/shared-config";
 
 export function ModulePage({ href }: { href: string }) {
   const route = appRoutes.find((item) => item.href === href) ?? appRoutes[0];

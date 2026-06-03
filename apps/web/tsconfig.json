@@ -1,11 +1,4 @@
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "baseUrl": "../..",
-    "plugins": [{ "name": "next" }]
-  },
-  "include": ["next-env.d.ts", ".next/types/**/*.ts", "**/*.ts", "**/*.tsx", "../../packages/**/*.ts"],
-  "exclude": ["node_modules"]
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "preserve",

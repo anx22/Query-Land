@@ -1,4 +1,52 @@
-import type { IntegrationAccount, JobRun, Opportunity, Project, SeoMemorySnapshot, SourceTemplateMap } from "@seo/domain-model";
+import type { Evidence, Opportunity, SeoMemorySnapshot } from "@seo-tool/domain-model";
+
+export interface DemoProject {
+  id: string;
+  name: string;
+  description: string;
+  owner: string;
+  sites: Array<{
+    id: string;
+    hostname: string;
+    pathScope: string;
+    market: { country: string; language: string; device: "desktop" | "mobile"; searchEngine: "google" | "bing" };
+  }>;
+  competitors: string[];
+  keywordGroups: string[];
+  businessPriorities: Array<{ label: string; value: number; urlPattern: string }>;
+}
+
+export interface DemoIntegrationAccount {
+  id: string;
+  projectId: string;
+  sourceType: string;
+  displayName: string;
+  status: "connected" | "needs_review" | "not_connected";
+  sourceConfidence: Evidence["sourceConfidence"];
+  quotaUsed: number;
+  quotaLimit: number;
+  lastSyncAt?: string;
+}
+
+export interface DemoJobRun {
+  id: string;
+  projectId: string;
+  kind: "crawl" | "gsc_import" | "ga4_import" | "source_map" | "report";
+  status: "queued" | "running" | "succeeded" | "failed" | "blocked";
+  idempotencyKey: string;
+  startedAt?: string;
+  finishedAt?: string;
+  errorMessage?: string;
+}
+
+export interface DemoSourceTemplateMap {
+  id: string;
+  routePattern: string;
+  templateName: string;
+  repositoryPath: string;
+  confidence: "exact" | "manifest" | "heuristic";
+  lastVerifiedAt: string;
+}
 
 export interface AppRoute {
   label: string;
@@ -34,7 +82,7 @@ export const seoMemory: SeoMemorySnapshot = {
   foundationGate: ["Domain anlegen", "Crawl starten", "GSC/GA4 verbinden", "Fehler und Jobs sichtbar machen"],
 };
 
-export const demoProject: Project = {
+export const demoProject: DemoProject = {
   id: "project-owned-web",
   name: "Owned Web Platform",
   description: "Welle-1-Demo für eine eigene Property mit First-Party-Daten und Source-Map-Gerüst.",
@@ -55,19 +103,19 @@ export const demoProject: Project = {
   ],
 };
 
-export const demoIntegrations: IntegrationAccount[] = [
+export const demoIntegrations: DemoIntegrationAccount[] = [
   { id: "int-gsc", projectId: demoProject.id, sourceType: "gsc", displayName: "Google Search Console", status: "connected", sourceConfidence: "B", quotaUsed: 18, quotaLimit: 100, lastSyncAt: "2026-06-02T07:45:00Z" },
   { id: "int-ga4", projectId: demoProject.id, sourceType: "ga4", displayName: "GA4 Property", status: "needs_review", sourceConfidence: "A", quotaUsed: 11, quotaLimit: 100, lastSyncAt: "2026-06-01T22:15:00Z" },
   { id: "int-crawler", projectId: demoProject.id, sourceType: "crawler", displayName: "Internal Crawl", status: "connected", sourceConfidence: "A", quotaUsed: 35, quotaLimit: 100, lastSyncAt: "2026-06-02T06:30:00Z" },
 ];
 
-export const demoJobs: JobRun[] = [
+export const demoJobs: DemoJobRun[] = [
   { id: "job-crawl-001", projectId: demoProject.id, kind: "crawl", status: "succeeded", idempotencyKey: "crawl:project-owned-web:2026-06-02", startedAt: "2026-06-02T06:00:00Z", finishedAt: "2026-06-02T06:30:00Z" },
   { id: "job-gsc-001", projectId: demoProject.id, kind: "gsc_import", status: "running", idempotencyKey: "gsc:project-owned-web:2026-06-02", startedAt: "2026-06-02T07:45:00Z" },
   { id: "job-source-map-001", projectId: demoProject.id, kind: "source_map", status: "queued", idempotencyKey: "source-map:project-owned-web:main" },
 ];
 
-export const demoSourceMap: SourceTemplateMap[] = [
+export const demoSourceMap: DemoSourceTemplateMap[] = [
   { id: "map-home", routePattern: "/", templateName: "HomeTemplate", repositoryPath: "apps/web/src/app/page.tsx", confidence: "exact", lastVerifiedAt: "2026-06-02T06:35:00Z" },
   { id: "map-pricing", routePattern: "/pricing", templateName: "PricingTemplate", repositoryPath: "apps/web/src/app/(marketing)/pricing/page.tsx", confidence: "heuristic", lastVerifiedAt: "2026-06-02T06:35:00Z" },
 ];

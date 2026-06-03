@@ -174,6 +174,275 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Site'
+
+
+  /projects/{projectId}/sites/{siteId}/crawl-runs:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      summary: List crawl runs for a site scope
+      operationId: listCrawlRuns
+      responses:
+        '200':
+          description: Crawl run list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CrawlRun'
+    post:
+      summary: Create a crawl run for a site scope
+      operationId: createCrawlRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCrawlRunRequest'
+      responses:
+        '201':
+          description: Crawl run created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CrawlRun'
+  /projects/{projectId}/sites/{siteId}/crawl-runs/{crawlRunId}/complete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - $ref: '#/components/parameters/CrawlRunId'
+    post:
+      summary: Complete a crawl run with the latest crawl artifact summary
+      operationId: completeCrawlRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteCrawlRunRequest'
+      responses:
+        '200':
+          description: Crawl run completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CrawlRun'
+  /projects/{projectId}/sites/{siteId}/health-scores:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      summary: List crawl health score snapshots for a site scope
+      operationId: listHealthScores
+      responses:
+        '200':
+          description: Health score list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CrawlHealthScore'
+  /projects/{projectId}/sites/{siteId}/health-scores/compute:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    post:
+      summary: Compute and persist the current crawl health score for a site scope
+      operationId: computeHealthScore
+      responses:
+        '201':
+          description: Health score computed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CrawlHealthScore'
+  /projects/{projectId}/sites/{siteId}/audit-issues:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      summary: List crawl audit issues for a site scope
+      operationId: listAuditIssues
+      responses:
+        '200':
+          description: Audit issue list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditIssueRecord'
+    post:
+      summary: Record crawl audit issues for a site scope
+      operationId: recordAuditIssues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordAuditIssuesRequest'
+      responses:
+        '201':
+          description: Audit issues stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditIssueRecord'
+                  meta:
+                    type: object
+                    properties:
+                      inserted: { type: integer }
+                      updated: { type: integer }
+  /projects/{projectId}/sites/{siteId}/discovered-urls:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      summary: List discovered URLs for a site scope
+      operationId: listDiscoveredUrls
+      responses:
+        '200':
+          description: Discovered URL list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DiscoveredUrl'
+    post:
+      summary: Record discovered crawl URLs for a site scope
+      operationId: recordDiscoveredUrls
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordDiscoveredUrlsRequest'
+      responses:
+        '201':
+          description: Discovered URLs stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DiscoveredUrl'
+                  meta:
+                    type: object
+                    properties:
+                      inserted: { type: integer }
+                      updated: { type: integer }
+  /projects/{projectId}/sites/{siteId}/discovered-urls/{discoveredUrlId}/fetch-results:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - $ref: '#/components/parameters/DiscoveredUrlId'
+    get:
+      summary: List fetch results for a discovered URL
+      operationId: listFetchResults
+      responses:
+        '200':
+          description: Fetch result list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UrlFetchRecord'
+    post:
+      summary: Record a normalized HTTP fetch result
+      operationId: recordFetchResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordFetchResultRequest'
+      responses:
+        '201':
+          description: Fetch result stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UrlFetchRecord'
+
+  /projects/{projectId}/sites/{siteId}/discovered-urls/{discoveredUrlId}/indexability:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - $ref: '#/components/parameters/DiscoveredUrlId'
+    get:
+      summary: List indexability assessments for a discovered URL
+      operationId: listIndexabilityAssessments
+      responses:
+        '200':
+          description: Indexability assessment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IndexabilityRecord'
+    post:
+      summary: Record an indexability assessment
+      operationId: recordIndexabilityAssessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordIndexabilityRequest'
+      responses:
+        '201':
+          description: Indexability assessment stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/IndexabilityRecord'
   /integrations:
     get:
       summary: List integration accounts
@@ -270,6 +539,26 @@ components:
   parameters:
     ProjectId:
       name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    SiteId:
+      name: siteId
+      in: path
+      required: true
+      schema:
+        type: string
+    DiscoveredUrlId:
+      name: discoveredUrlId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    CrawlRunId:
+      name: crawlRunId
       in: path
       required: true
       schema:
@@ -372,6 +661,153 @@ components:
         scopeType: { type: string, enum: [domain, subdomain, folder] }
         crawlFrequency: { type: string, enum: [manual, daily, weekly] }
         businessValue: { type: integer, minimum: 1, maximum: 100 }
+
+
+    CrawlRunSummary:
+      type: object
+      required: [discoveredUrls, fetchedUrls, indexabilityAssessments, openIssues, healthScore]
+      properties:
+        discoveredUrls: { type: integer, minimum: 0 }
+        fetchedUrls: { type: integer, minimum: 0 }
+        indexabilityAssessments: { type: integer, minimum: 0 }
+        openIssues: { type: integer, minimum: 0 }
+        healthScore: { type: integer, minimum: 0, maximum: 100, nullable: true }
+    CrawlRun:
+      type: object
+      required: [id, projectId, siteId, status, trigger, startedAt, finishedAt, summary]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        trigger: { type: string, enum: [manual, scheduled, deploy] }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        summary:
+          $ref: '#/components/schemas/CrawlRunSummary'
+        errorMessage: { type: string }
+    CreateCrawlRunRequest:
+      type: object
+      required: [trigger]
+      properties:
+        trigger: { type: string, enum: [manual, scheduled, deploy] }
+    CompleteCrawlRunRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [succeeded, failed] }
+        errorMessage: { type: string }
+    CrawlHealthScore:
+      type: object
+      required: [id, projectId, siteId, score, totalIssues, issueCounts, generatedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        totalIssues: { type: integer, minimum: 0 }
+        issueCounts:
+          type: object
+          required: [critical, high, medium, low]
+          properties:
+            critical: { type: integer, minimum: 0 }
+            high: { type: integer, minimum: 0 }
+            medium: { type: integer, minimum: 0 }
+            low: { type: integer, minimum: 0 }
+        generatedAt: { type: string, format: date-time }
+    AuditIssueRecord:
+      type: object
+      required: [id, projectId, siteId, discoveredUrlId, url, rule, severity, message, detectedAt, resolvedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        discoveredUrlId: { type: string, nullable: true }
+        url: { type: string, format: uri }
+        rule: { type: string, enum: [http_error, redirect_chain, missing_title, duplicate_title, canonical_mismatch, broken_link] }
+        severity: { type: string, enum: [critical, high, medium, low] }
+        message: { type: string }
+        detectedAt: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+    RecordAuditIssuesRequest:
+      type: object
+      required: [issues]
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditIssueRecord'
+    DiscoveredUrl:
+      type: object
+      required: [id, projectId, siteId, url, normalizedUrl, source, discoveredFrom, depth, discoveredAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        url: { type: string, format: uri }
+        normalizedUrl: { type: string, format: uri }
+        source: { type: string, enum: [seed, sitemap, link] }
+        discoveredFrom: { type: string, format: uri, nullable: true }
+        depth: { type: integer, minimum: 0 }
+        discoveredAt: { type: string, format: date-time }
+    RecordDiscoveredUrlsRequest:
+      type: object
+      required: [urls]
+      properties:
+        urls:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscoveredUrl'
+    RecordFetchResultRequest:
+      type: object
+      required: [url, finalUrl, statusCode, statusClass, headers, redirectChain, fetchedAt]
+      properties:
+        url: { type: string, format: uri }
+        finalUrl: { type: string, format: uri }
+        statusCode: { type: integer, nullable: true, minimum: 100, maximum: 599 }
+        statusClass: { type: string, enum: [success, redirect, client_error, server_error, network_error] }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+        redirectChain:
+          type: array
+          items: { type: string, format: uri }
+        fetchedAt: { type: string, format: date-time }
+        errorMessage: { type: string }
+    UrlFetchRecord:
+      allOf:
+        - $ref: '#/components/schemas/RecordFetchResultRequest'
+        - type: object
+          required: [id, projectId, siteId, discoveredUrlId]
+          properties:
+            id: { type: string }
+            projectId: { type: string }
+            siteId: { type: string }
+            discoveredUrlId: { type: string }
+
+    RecordIndexabilityRequest:
+      type: object
+      required: [url, state, isIndexable, reasons, canonicalUrl, fetchResultId, assessedAt]
+      properties:
+        url: { type: string, format: uri }
+        state: { type: string, enum: [indexable, blocked_by_status, blocked_by_meta, blocked_by_x_robots, canonicalized] }
+        isIndexable: { type: boolean }
+        reasons:
+          type: array
+          items: { type: string }
+        canonicalUrl: { type: string, format: uri, nullable: true }
+        fetchResultId: { type: string, nullable: true }
+        assessedAt: { type: string, format: date-time }
+    IndexabilityRecord:
+      allOf:
+        - $ref: '#/components/schemas/RecordIndexabilityRequest'
+        - type: object
+          required: [id, projectId, siteId, discoveredUrlId]
+          properties:
+            id: { type: string }
+            projectId: { type: string }
+            siteId: { type: string }
+            discoveredUrlId: { type: string }
     IntegrationAccount:
       type: object
       required: [id, projectId, provider, status, sourceConfidence]
