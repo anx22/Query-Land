@@ -25,3 +25,5 @@ Vor Sprintstart abgeschlossen:
 - Decisions-Backlog: `tasks/decisions-backlog.md`
 - Welle-1 Reststories: `tasks/welle-1-rest-stories.md`
 - Welle-2 Audit-Core Story Seeds: `tasks/welle-2-audit-core-stories.md`
+- Roadmap-/Status-Tracking: `tasks/roadmap-tracking.md`
+- Übergabe nächste Sprint-Session: `tasks/next-session-handoff.md`

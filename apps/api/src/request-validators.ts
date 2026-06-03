@@ -1,31 +1,15 @@
-import { randomUUID } from "node:crypto";
-import type { DiscoveredUrl, FetchStatusClass, FoundationJob, IndexabilityRecord, IndexabilityState, IntegrationProvider, ProjectStatus, SiteScopeType, UrlDiscoverySource, UrlFetchRecord } from "@seo-tool/domain-model";
-import { createSQLiteStore, RequestError, type BackendStore } from "./sqlite-store.js";
-
-export interface ApiResponse {
-  status: number;
-  body: unknown;
-}
-
-export interface RequestContext {
-  headers?: Record<string, string | undefined>;
-}
-
-export interface ApiErrorBody {
-  error: {
-    code: string;
-    message: string;
-    details?: unknown;
-    requestId: string;
-  };
-}
+import type { AuditIssueRecord, AuditIssueSeverity, CrawlRun, CrawlRunStatus, DiscoveredUrl, FetchStatusClass, FoundationJob, IndexabilityRecord, IndexabilityState, IntegrationProvider, ProjectStatus, SiteScopeType, UrlDiscoverySource, UrlFetchRecord } from "@seo-tool/domain-model";
+import { RequestError } from "./sqlite-store.js";
 
 type MarketInput = { country: string; language: string; device: "desktop" | "mobile"; searchEngine: "google" | "bing" };
 type CreateProjectRequest = { name: string; slug: string; status?: ProjectStatus; defaultLocale?: string; markets?: MarketInput[] };
 type CreateSiteRequest = { baseUrl: string; scopeType: SiteScopeType; crawlFrequency?: "manual" | "daily" | "weekly"; businessValue?: number };
+type CreateCrawlRunRequest = { trigger: CrawlRun["trigger"] };
+type CompleteCrawlRunRequest = { status: Extract<CrawlRunStatus, "succeeded" | "failed">; errorMessage?: string };
 type RecordDiscoveredUrlsRequest = { urls: DiscoveredUrl[] };
 type RecordFetchResultRequest = Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
 type RecordIndexabilityRequest = Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
+type RecordAuditIssuesRequest = { issues: AuditIssueRecord[] };
 type CreateIntegrationRequest = { projectId: string; provider: IntegrationProvider };
 type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string };
 type AuthRequest = { email: string; password: string; name?: string };
@@ -36,99 +20,14 @@ const crawlFrequencies = new Set<Exclude<CreateSiteRequest["crawlFrequency"], un
 const urlDiscoverySources = new Set<UrlDiscoverySource>(["seed", "sitemap", "link"]);
 const fetchStatusClasses = new Set<FetchStatusClass>(["success", "redirect", "client_error", "server_error", "network_error"]);
 const indexabilityStates = new Set<IndexabilityState>(["indexable", "blocked_by_status", "blocked_by_meta", "blocked_by_x_robots", "canonicalized"]);
+const auditIssueSeverities = new Set<AuditIssueSeverity>(["critical", "high", "medium", "low"]);
+const auditIssueRules = new Set<AuditIssueRecord["rule"]>(["http_error", "redirect_chain", "missing_title", "duplicate_title", "canonical_mismatch", "broken_link"]);
+const crawlRunTriggers = new Set<CrawlRun["trigger"]>(["manual", "scheduled", "deploy"]);
+const crawlRunCompletionStatuses = new Set<CompleteCrawlRunRequest["status"]>(["succeeded", "failed"]);
 const integrationProviders = new Set<IntegrationProvider>(["gsc", "ga4", "matomo", "pagespeed", "lighthouse", "serverlogs", "sitemap", "robots", "crawler", "cms", "serp", "backlink", "keyword"]);
 const jobTypes = new Set<FoundationJob["type"]>(["connector_sync", "crawl_seed", "source_map_refresh", "health_check"]);
 
-export function createApp(store: BackendStore = createSQLiteStore()) {
-  return async function appHandleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
-    return routeRequest(store, method, pathname, body, context);
-  };
-}
-
-const defaultHandleRequest = createApp();
-
-export async function handleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
-  return defaultHandleRequest(method, pathname, body, context);
-}
-
-async function routeRequest(store: BackendStore, method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
-  const requestId = context.headers?.["x-request-id"] ?? context.headers?.["X-Request-Id"] ?? `req-${randomUUID()}`;
-
-  try {
-    const response = await routeTopLevel(store, method, pathname, body, context, requestId);
-    logRequest(method, pathname, response.status, requestId);
-    return response;
-  } catch (error) {
-    const response = error instanceof RequestError
-      ? apiError(error.status, error.code, error.message, requestId, error.details)
-      : error instanceof Error
-        ? apiError(400, "validation_error", error.message, requestId)
-        : apiError(500, "internal_error", "Internal error", requestId);
-    logRequest(method, pathname, response.status, requestId);
-    return response;
-  }
-}
-
-async function routeProjectChildren(store: BackendStore, method: string, pathname: string, body: unknown, requestId: string): Promise<ApiResponse> {
-  const siteMatch = pathname.match(/^\/projects\/([^/]+)\/sites$/);
-  if (method === "GET" && siteMatch) {
-    return json(200, { data: store.listSites(siteMatch[1]) });
-  }
-  if (method === "POST" && siteMatch) {
-    return json(201, { data: store.createSite(siteMatch[1], createSiteRequest(body)) });
-  }
-
-  const discoveredUrlsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls$/);
-  if (method === "GET" && discoveredUrlsMatch) {
-    return json(200, { data: store.listDiscoveredUrls(discoveredUrlsMatch[1], discoveredUrlsMatch[2]) });
-  }
-  if (method === "POST" && discoveredUrlsMatch) {
-    const input = recordDiscoveredUrlsRequest(body);
-    const result = store.recordDiscoveredUrls(discoveredUrlsMatch[1], discoveredUrlsMatch[2], input.urls);
-    return json(201, { data: result.urls, meta: { inserted: result.inserted, updated: result.updated } });
-  }
-
-  const fetchResultsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls\/([^/]+)\/fetch-results$/);
-  if (method === "GET" && fetchResultsMatch) {
-    return json(200, { data: store.listFetchResults(fetchResultsMatch[1], fetchResultsMatch[2], fetchResultsMatch[3]) });
-  }
-  if (method === "POST" && fetchResultsMatch) {
-    const input = recordFetchResultRequest(body);
-    return json(201, { data: store.recordFetchResult(fetchResultsMatch[1], fetchResultsMatch[2], fetchResultsMatch[3], input) });
-  }
-
-  const indexabilityMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls\/([^/]+)\/indexability$/);
-  if (method === "GET" && indexabilityMatch) {
-    return json(200, { data: store.listIndexabilityAssessments(indexabilityMatch[1], indexabilityMatch[2], indexabilityMatch[3]) });
-  }
-  if (method === "POST" && indexabilityMatch) {
-    const input = recordIndexabilityRequest(body);
-    return json(201, { data: store.recordIndexabilityAssessment(indexabilityMatch[1], indexabilityMatch[2], indexabilityMatch[3], input) });
-  }
-
-  if (method === "GET" && pathname === "/integrations") {
-    return json(200, { data: store.listIntegrations() });
-  }
-  if (method === "POST" && pathname === "/integrations") {
-    const input = createIntegrationRequest(body);
-    return json(201, { data: store.createIntegration(input.projectId, input.provider) });
-  }
-  if (method === "POST" && pathname === "/auth/register") {
-    const input = authRequest(body, true);
-    return json(201, { data: store.registerUser(input) });
-  }
-  if (method === "POST" && pathname === "/auth/login") {
-    const input = authRequest(body, false);
-    const result = store.login(input.email, input.password);
-    return result ? json(200, { data: result }) : apiError(401, "invalid_credentials", "Invalid credentials", requestId);
-  }
-  if (method === "GET" && pathname === "/source-map") {
-    return json(200, { data: store.listSourceMapEntries() });
-  }
-  return apiError(404, "not_found", "Route not found", requestId);
-}
-
-function authRequest(body: unknown, allowName: boolean): AuthRequest {
+export function authRequest(body: unknown, allowName: boolean): AuthRequest {
   const input = objectBody(body);
   const email = stringField(input, "email");
   const password = stringField(input, "password");
@@ -136,7 +35,7 @@ function authRequest(body: unknown, allowName: boolean): AuthRequest {
   return { email, password, name };
 }
 
-function createProjectRequest(body: unknown): CreateProjectRequest {
+export function createProjectRequest(body: unknown): CreateProjectRequest {
   const input = objectBody(body);
   const status = optionalEnum(input.status, projectStatuses, "status");
   return {
@@ -148,7 +47,7 @@ function createProjectRequest(body: unknown): CreateProjectRequest {
   };
 }
 
-function createSiteRequest(body: unknown): CreateSiteRequest {
+export function createSiteRequest(body: unknown): CreateSiteRequest {
   const input = objectBody(body);
   const baseUrl = stringField(input, "baseUrl");
   try {
@@ -164,7 +63,47 @@ function createSiteRequest(body: unknown): CreateSiteRequest {
   };
 }
 
-function recordDiscoveredUrlsRequest(body: unknown): RecordDiscoveredUrlsRequest {
+export function createCrawlRunRequest(body: unknown): CreateCrawlRunRequest {
+  const input = objectBody(body);
+  return { trigger: enumField(input, crawlRunTriggers, "trigger") };
+}
+
+export function completeCrawlRunRequest(body: unknown): CompleteCrawlRunRequest {
+  const input = objectBody(body);
+  return {
+    status: enumField(input, crawlRunCompletionStatuses, "status"),
+    errorMessage: input.errorMessage === undefined ? undefined : stringField(input, "errorMessage")
+  };
+}
+
+export function recordAuditIssuesRequest(body: unknown): RecordAuditIssuesRequest {
+  const input = objectBody(body);
+  if (!Array.isArray(input.issues)) {
+    throw new RequestError(400, "missing_field", "issues is required", { field: "issues" });
+  }
+  return { issues: input.issues.map((item, index) => auditIssueField(item, index)) };
+}
+
+function auditIssueField(value: unknown, index: number): AuditIssueRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new RequestError(400, "invalid_audit_issue", "Each audit issue must be an object", { index });
+  }
+  const input = value as Record<string, unknown>;
+  return {
+    id: stringField(input, "id"),
+    projectId: stringField(input, "projectId"),
+    siteId: stringField(input, "siteId"),
+    discoveredUrlId: input.discoveredUrlId === null || input.discoveredUrlId === undefined ? null : stringField(input, "discoveredUrlId"),
+    url: urlField(input, "url"),
+    rule: enumField(input, auditIssueRules, "rule"),
+    severity: enumField(input, auditIssueSeverities, "severity"),
+    message: stringField(input, "message"),
+    detectedAt: stringField(input, "detectedAt"),
+    resolvedAt: input.resolvedAt === null || input.resolvedAt === undefined ? null : stringField(input, "resolvedAt")
+  };
+}
+
+export function recordDiscoveredUrlsRequest(body: unknown): RecordDiscoveredUrlsRequest {
   const input = objectBody(body);
   if (!Array.isArray(input.urls)) {
     throw new RequestError(400, "missing_field", "urls is required", { field: "urls" });
@@ -193,7 +132,7 @@ function discoveredUrlField(value: unknown, index: number): DiscoveredUrl {
   };
 }
 
-function recordFetchResultRequest(body: unknown): RecordFetchResultRequest {
+export function recordFetchResultRequest(body: unknown): RecordFetchResultRequest {
   const input = objectBody(body);
   return {
     url: urlField(input, "url"),
@@ -207,7 +146,7 @@ function recordFetchResultRequest(body: unknown): RecordFetchResultRequest {
   };
 }
 
-function recordIndexabilityRequest(body: unknown): RecordIndexabilityRequest {
+export function recordIndexabilityRequest(body: unknown): RecordIndexabilityRequest {
   const input = objectBody(body);
   return {
     url: urlField(input, "url"),
@@ -220,7 +159,7 @@ function recordIndexabilityRequest(body: unknown): RecordIndexabilityRequest {
   };
 }
 
-function createIntegrationRequest(body: unknown): CreateIntegrationRequest {
+export function createIntegrationRequest(body: unknown): CreateIntegrationRequest {
   const input = objectBody(body);
   return {
     projectId: stringField(input, "projectId"),
@@ -228,7 +167,7 @@ function createIntegrationRequest(body: unknown): CreateIntegrationRequest {
   };
 }
 
-function createJobRequest(body: unknown): CreateJobRequest {
+export function createJobRequest(body: unknown): CreateJobRequest {
   const input = objectBody(body);
   return {
     projectId: stringField(input, "projectId"),
@@ -332,12 +271,14 @@ function enumField<T extends string>(input: Record<string, unknown>, allowed: Se
   if (!allowed.has(value)) {
     throw new RequestError(400, "invalid_enum", `${field} is invalid`, { field, allowed: [...allowed] });
   }
-  if (method === "GET" && pathname === "/projects") {
-    return json(200, { data: store.listProjects() });
-  }
-  if (method === "POST" && pathname === "/projects") {
-    return json(201, { data: store.createProject(createProjectRequest(body)) });
-  }
-
-  return routeProjectChildren(store, method, pathname, body, requestId);
+  return value;
 }
+
+function optionalEnum<T extends string>(value: unknown, allowed: Set<T>, field: string): T | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !allowed.has(value as T)) {
+    throw new RequestError(400, "invalid_enum", `${field} is invalid`, { field, allowed: [...allowed] });
+  }
+  return value as T;
+}
+

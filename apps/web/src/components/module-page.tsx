@@ -3,6 +3,7 @@ import { appRoutes, demoIntegrations, demoJobs, demoOpportunities, demoProject, 
 export function ModulePage({ href }: { href: string }) {
   const route = appRoutes.find((item) => item.href === href) ?? appRoutes[0];
   const isFoundation = route.wave === 1;
+  const primaryOpportunity = demoOpportunities[0];
 
   return (
     <>
@@ -25,43 +26,27 @@ export function ModulePage({ href }: { href: string }) {
             Die App legt die komplette UX-Navigation bereits an, hält aber nur Foundation-Daten produktiv aktiv. Spätere Module werden über dieselben Domain-Modelle, Jobs und Evidence-Regeln erweitert.
           </p>
           <div className="module-grid">
-            <Info label="Projekt" value={demoProject.name} />
-            <Info label="Connectors" value={String(demoIntegrations.length)} />
-            <Info label="Jobs" value={String(demoJobs.length)} />
+            {moduleStats.map((stat) => (
+              <InfoCard key={stat.label} label={stat.label} value={stat.value} />
+            ))}
           </div>
         </div>
         <div className="card">
           <p className="kicker">Source Map</p>
-          <ul className="status-list">
-            {demoSourceMap.map((mapping) => (
-              <li key={mapping.id}>
-                <span>{mapping.routePattern}</span>
-                <span className="badge primary">{mapping.confidence}</span>
-              </li>
-            ))}
-          </ul>
+          <StatusList items={sourceMapItems} />
         </div>
       </section>
 
       <section className="card">
         <p className="kicker">Evidence-first Beispiel</p>
-        <h2>{demoOpportunities[0].recommendedAction}</h2>
-        <p>{demoOpportunities[0].validationMetric}</p>
+        <h2>{primaryOpportunity.recommendedAction}</h2>
+        <p>{primaryOpportunity.validationMetric}</p>
         <div className="badge-row">
-          <span className="badge primary">Priority {demoOpportunities[0].priority}</span>
-          <span className="badge">Source {demoOpportunities[0].evidence[0]?.source}</span>
-          <span className="badge">Anchor {demoOpportunities[0].sourceAnchor?.templateName}</span>
+          <span className="badge primary">Priority {primaryOpportunity.priority}</span>
+          <span className="badge">Source {primaryOpportunity.evidence[0]?.source}</span>
+          <span className="badge">Anchor {primaryOpportunity.sourceAnchor?.templateName}</span>
         </div>
       </section>
     </>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="card">
-      <p className="kicker">{label}</p>
-      <span className="metric-value">{value}</span>
-    </div>
   );
 }

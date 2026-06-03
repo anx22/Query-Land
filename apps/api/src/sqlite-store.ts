@@ -6,6 +6,7 @@ import { makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, valida
 import { apiDefaults } from "@seo-tool/shared-config";
 import { hashPassword, hashToken, verifyPassword } from "./password.js";
 import { sqliteFoundationSchema } from "./sqlite-schema.js";
+import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapIntegration, mapJob, mapProject, mapSite, mapSourceMapEntry, mapUrlFetchRecord, mapUser } from "./sqlite-mappers.js";
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require("node:sqlite") as {
