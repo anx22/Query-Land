@@ -1,19 +1,54 @@
 import { appRoutes, demoIntegrations, demoJobs, demoOpportunities, demoProject, demoSourceMap, seoMemory } from "@seo-tool/shared-config";
+import { MetricCard } from "./metric-card.js";
+import { StatusList } from "./status-list.js";
+
+const activeOpportunity = demoOpportunities[0];
+const dashboardMetrics = [
+  { label: "Health Score", value: "82", note: "Crawler A-Daten" },
+  { label: "Project Visibility", value: "14.8", note: "Keyword-Set basiert" },
+  { label: "Opportunity Score", value: String(activeOpportunity.priority), note: "Impact × Confidence ÷ Effort" },
+  { label: "Source Anchors", value: String(demoSourceMap.length), note: "Template-Mappings" }
+];
+
+const foundationGateItems = seoMemory.foundationGate.map((item) => ({
+  id: item,
+  label: item,
+  status: "bereit",
+  statusClassName: "status running"
+}));
+
+const connectorItems = demoIntegrations.map((integration) => ({
+  id: integration.id,
+  label: integration.displayName,
+  status: integration.status,
+  statusClassName: `status ${integration.status}`
+}));
+
+const jobItems = demoJobs.map((job) => ({
+  id: job.id,
+  label: job.kind,
+  status: job.status,
+  statusClassName: `status ${job.status}`
+}));
 
 export function Dashboard() {
-  const activeOpportunity = demoOpportunities[0];
-
   return (
     <>
-      <section className="hero">
+      <section className="hero-grid">
         <div className="card hero-card">
-          <p className="kicker">Project Overview · Source of Truth</p>
-          <h1>Ein entscheidungsfähiger SEO-Workflow statt isolierter Dashboards.</h1>
+          <p className="kicker">Internal SEO OS</p>
+          <h1>Foundation Console für SEO-Operations</h1>
           <p>
-            Diese Foundation verbindet Projekt-Scope, Connector-Status, Job-Monitoring, Source-Map-Gerüst und ein erstes evidence-first Opportunity-Objekt zu einem vertikalen Schnitt.
+            Master-Spec, UX-Flows, KPI-Definitionen und Child-Specs wurden in ein vertikal geschnittenes Monorepo übertragen. Diese Konsole zeigt den startklaren Foundation-Slice.
           </p>
-          <div className="cta-row">
-            <button className="button">Domain anlegen</button>
+          <div className="badge-row">
+            <span className="badge primary">Wave 1</span>
+            <span className="badge">Evidence-first</span>
+            <span className="badge">SQLite ready</span>
+            <span className="badge">API contracts</span>
+          </div>
+          <div className="action-row">
+            <button className="button">Projekt anlegen</button>
             <button className="button secondary">Crawl starten</button>
             <button className="button secondary">GSC/GA4 verbinden</button>
           </div>
@@ -21,22 +56,14 @@ export function Dashboard() {
         <div className="card">
           <p className="kicker">Foundation Gate</p>
           <h2>{demoProject.name}</h2>
-          <ul className="status-list">
-            {seoMemory.foundationGate.map((item) => (
-              <li key={item}>
-                <span>{item}</span>
-                <span className="status running">bereit</span>
-              </li>
-            ))}
-          </ul>
+          <StatusList items={foundationGateItems} />
         </div>
       </section>
 
       <section className="metric-grid">
-        <Metric label="Health Score" value="82" note="Crawler A-Daten" />
-        <Metric label="Project Visibility" value="14.8" note="Keyword-Set basiert" />
-        <Metric label="Opportunity Score" value={String(activeOpportunity.priority)} note="Impact × Confidence ÷ Effort" />
-        <Metric label="Source Anchors" value={String(demoSourceMap.length)} note="Template-Mappings" />
+        {dashboardMetrics.map((metric) => (
+          <MetricCard key={metric.label} label={metric.label} value={metric.value} note={metric.note} />
+        ))}
       </section>
 
       <section className="content-grid">
@@ -52,14 +79,7 @@ export function Dashboard() {
         </div>
         <div className="card">
           <p className="kicker">Connectors</p>
-          <ul className="status-list">
-            {demoIntegrations.map((integration) => (
-              <li key={integration.id}>
-                <span>{integration.displayName}</span>
-                <span className={`status ${integration.status}`}>{integration.status}</span>
-              </li>
-            ))}
-          </ul>
+          <StatusList items={connectorItems} />
         </div>
       </section>
 
@@ -79,26 +99,9 @@ export function Dashboard() {
         </div>
         <div className="card">
           <p className="kicker">Job Monitor</p>
-          <ul className="status-list">
-            {demoJobs.map((job) => (
-              <li key={job.id}>
-                <span>{job.kind}</span>
-                <span className={`status ${job.status}`}>{job.status}</span>
-              </li>
-            ))}
-          </ul>
+          <StatusList items={jobItems} />
         </div>
       </section>
     </>
-  );
-}
-
-function Metric({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <div className="card">
-      <p className="kicker">{label}</p>
-      <span className="metric-value">{value}</span>
-      <p>{note}</p>
-    </div>
   );
 }

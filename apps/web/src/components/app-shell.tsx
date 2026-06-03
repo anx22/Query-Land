@@ -1,4 +1,4 @@
-import { Navigation } from "./navigation";
+import { Navigation } from "./navigation.js";
 
 export function AppShell({ activePath, children }: { activePath: string; children: React.ReactNode }) {
   return (

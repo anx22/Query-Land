@@ -11,7 +11,14 @@
       }
     ],
     "resolveJsonModule": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": [
+      "node",
+      "react",
+      "react-dom"
+    ]
   },
   "include": [
     "next-env.d.ts",

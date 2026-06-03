@@ -1,5 +1,5 @@
-import { AppShell } from "../../components/app-shell";
-import { ModulePage } from "../../components/module-page";
+import { AppShell } from "../../components/app-shell.js";
+import { ModulePage } from "../../components/module-page.js";
 
 export default function Page() {
   return (
