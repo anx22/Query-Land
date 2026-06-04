@@ -359,7 +359,7 @@ test("crawl run API records issues, computes health, and completes run summaries
     ]
   });
   assert.equal(issues.status, 201);
-  assert.deepEqual((issues.body as { meta: { inserted: number; updated: number } }).meta, { inserted: 2, updated: 0 });
+  assert.deepEqual((issues.body as { meta: { inserted: number; updated: number; resolved: number } }).meta, { inserted: 2, updated: 0, resolved: 0 });
 
   const health = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute");
   assert.equal(health.status, 201);
@@ -375,6 +375,64 @@ test("crawl run API records issues, computes health, and completes run summaries
     openIssues: 2,
     healthScore: 80
   });
+  store.close();
+});
+
+
+test("audit issue recording resolves stale open issues on recrawl", async () => {
+  const { app, store } = testApp();
+  await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-recrawl-critical",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/down",
+        rule: "http_error",
+        severity: "critical",
+        message: "URL returns 500",
+        detectedAt: "2026-06-04T08:00:00.000Z",
+        resolvedAt: null
+      },
+      {
+        id: "issue-recrawl-low",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/title",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-04T08:01:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+
+  const recrawl = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-recrawl-low",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/title",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-04T08:02:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+  assert.equal(recrawl.status, 201);
+  assert.deepEqual((recrawl.body as { meta: { inserted: number; updated: number; resolved: number } }).meta, { inserted: 0, updated: 1, resolved: 1 });
+
+  const health = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute", {});
+  assert.equal(health.status, 201);
+  assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.totalIssues, 1);
+  assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.score, 98);
   store.close();
 });
 

@@ -169,6 +169,42 @@ test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end
   store.close();
 });
 
+test("crawl worker accepts a valid sitemap that only contains the seed URL", async () => {
+  const store = createSQLiteStore("sqlite::memory:");
+  const app = createApp(store);
+  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  await app("POST", "/jobs", {
+    projectId: "proj-demo",
+    type: "crawl_seed",
+    subject: "https://example.com",
+    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+  });
+
+  const fetched: string[] = [];
+  const result = await runCrawlWorkerCycle({
+    apiClient: apiClientForStore(store),
+    fetchImpl: async (url: string | URL | Request) => {
+      const requestedUrl = String(url);
+      fetched.push(requestedUrl);
+      if (requestedUrl.endsWith("/robots.txt")) {
+        return new Response("User-agent: *\nAllow: /\n", { status: 200 });
+      }
+      if (requestedUrl.endsWith("/sitemap.xml")) {
+        return new Response("<urlset><url><loc>https://example.com</loc></url></urlset>", { status: 200 });
+      }
+      return new Response("<html><head><title>Seed</title></head></html>", { status: 200 });
+    },
+    now: () => "2026-06-03T10:00:00.000Z"
+  });
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.discoveredUrls, 1);
+  assert.equal(result.fetchedUrls, 1);
+  assert.equal(fetched.includes("https://example.com/"), true);
+  store.close();
+});
+
+
 test("crawl worker marks invalid successful sitemap jobs as failed", async () => {
   const store = createSQLiteStore("sqlite::memory:");
   const app = createApp(store);

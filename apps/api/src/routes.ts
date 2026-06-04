@@ -43,7 +43,7 @@ export async function routeProjectChildren(store: BackendStore, method: string, 
   if (method === "POST" && auditIssuesMatch) {
     const input = recordAuditIssuesRequest(body);
     const result = store.recordAuditIssues(auditIssuesMatch[1], auditIssuesMatch[2], input.issues);
-    return json(201, { data: result.issues, meta: { inserted: result.inserted, updated: result.updated } });
+    return json(201, { data: result.issues, meta: { inserted: result.inserted, updated: result.updated, resolved: result.resolved } });
   }
 
   const resolveAuditIssueMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/audit-issues\/([^/]+)\/resolve$/);
