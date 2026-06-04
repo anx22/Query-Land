@@ -299,7 +299,7 @@ export interface CrawlWorkerApiClient {
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): Promise<DiscoveredUrl[]>;
   recordFetchResult(projectId: string, siteId: string, discoveredUrlId: string, result: FetchResult): Promise<FetchResult & { id: string }>;
   recordIndexabilityAssessment(projectId: string, siteId: string, discoveredUrlId: string, assessment: IndexabilityAssessment & { fetchResultId: string | null; assessedAt: string }): Promise<unknown>;
-  recordAuditIssues(projectId: string, siteId: string, issues: Array<AuditIssue & { projectId: string; siteId: string; discoveredUrlId: string | null; detectedAt: string; resolvedAt: string | null }>): Promise<unknown>;
+  recordAuditIssues(projectId: string, siteId: string, issues: Array<AuditIssue & { projectId: string; siteId: string; discoveredUrlId: string | null; detectedAt: string; resolvedAt: string | null }>, checkedDiscoveredUrlIds: string[]): Promise<unknown>;
   computeHealthScore(projectId: string, siteId: string): Promise<unknown>;
   completeCrawlRun(projectId: string, siteId: string, crawlRunId: string, status: "succeeded" | "failed", errorMessage?: string): Promise<unknown>;
   completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): Promise<FoundationJob>;
@@ -365,10 +365,12 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     const scopedDiscovered = filterInScopeUrls(discovered, baseUrl);
     const storedUrls = (await options.apiClient.recordDiscoveredUrls(job.projectId, siteId, scopedDiscovered)).slice(0, options.maxUrls ?? 25);
     const pages: AuditPageInput[] = [];
+    const checkedDiscoveredUrlIds: string[] = [];
     const detectedAt = now();
     let fetchedUrls = 0;
 
     for (const discoveredUrl of storedUrls) {
+      checkedDiscoveredUrlIds.push(discoveredUrl.id);
       if (!isRobotsAllowed(discoveredUrl.normalizedUrl, robotsPolicy)) {
         await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, discoveredUrl.id, {
           url: discoveredUrl.normalizedUrl,
@@ -410,7 +412,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
       detectedAt,
       resolvedAt: null
     }));
-    await options.apiClient.recordAuditIssues(job.projectId, siteId, issues);
+    await options.apiClient.recordAuditIssues(job.projectId, siteId, issues, checkedDiscoveredUrlIds);
     await options.apiClient.computeHealthScore(job.projectId, siteId);
     await options.apiClient.completeCrawlRun(job.projectId, siteId, crawlRunId, "succeeded");
     const completed = await options.apiClient.completeJob(job.id, "succeeded");

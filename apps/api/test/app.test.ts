@@ -166,6 +166,30 @@ test("API errors use stable code/message/requestId format", async () => {
   assert.equal(notFound.status, 404);
   assert.equal((notFound.body as { error: { code: string; requestId: string } }).error.code, "not_found");
   assert.equal((notFound.body as { error: { code: string; requestId: string } }).error.requestId, "req-404");
+
+  const invalidDomainInput = await app("POST", "/auth/register", { email: "not-an-email", password: "very-long-password" }, { headers: { "x-request-id": "req-domain" } });
+  assert.equal(invalidDomainInput.status, 400);
+  assert.deepEqual((invalidDomainInput.body as { error: { code: string; message: string; requestId: string } }).error, {
+    code: "validation_error",
+    message: "email must be valid",
+    requestId: "req-domain"
+  });
+  store.close();
+});
+
+test("API maps unexpected store errors to internal error responses", async () => {
+  const { app, store } = testApp();
+  store.listProjects = () => {
+    throw new Error("unexpected store failure");
+  };
+
+  const response = await app("GET", "/projects", undefined, { headers: { "x-request-id": "req-store" } });
+  assert.equal(response.status, 500);
+  assert.deepEqual((response.body as { error: { code: string; message: string; requestId: string } }).error, {
+    code: "internal_error",
+    message: "Internal error",
+    requestId: "req-store"
+  });
   store.close();
 });
 
@@ -381,13 +405,40 @@ test("crawl run API records issues, computes health, and completes run summaries
 
 test("audit issue recording resolves stale open issues on recrawl", async () => {
   const { app, store } = testApp();
+  await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", {
+    urls: [
+      {
+        id: "url-recrawl-down",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        url: "https://example.com/down",
+        normalizedUrl: "https://example.com/down",
+        source: "sitemap",
+        discoveredFrom: "https://example.com/sitemap.xml",
+        depth: 1,
+        discoveredAt: "2026-06-04T07:59:00.000Z"
+      },
+      {
+        id: "url-recrawl-title",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        url: "https://example.com/title",
+        normalizedUrl: "https://example.com/title",
+        source: "sitemap",
+        discoveredFrom: "https://example.com/sitemap.xml",
+        depth: 1,
+        discoveredAt: "2026-06-04T07:59:00.000Z"
+      }
+    ]
+  });
   await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    checkedDiscoveredUrlIds: ["url-recrawl-down", "url-recrawl-title"],
     issues: [
       {
         id: "issue-recrawl-critical",
         projectId: "proj-demo",
         siteId: "site-demo",
-        discoveredUrlId: null,
+        discoveredUrlId: "url-recrawl-down",
         url: "https://example.com/down",
         rule: "http_error",
         severity: "critical",
@@ -399,7 +450,7 @@ test("audit issue recording resolves stale open issues on recrawl", async () => 
         id: "issue-recrawl-low",
         projectId: "proj-demo",
         siteId: "site-demo",
-        discoveredUrlId: null,
+        discoveredUrlId: "url-recrawl-title",
         url: "https://example.com/title",
         rule: "missing_title",
         severity: "low",
@@ -411,12 +462,13 @@ test("audit issue recording resolves stale open issues on recrawl", async () => 
   });
 
   const recrawl = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    checkedDiscoveredUrlIds: ["url-recrawl-down", "url-recrawl-title"],
     issues: [
       {
         id: "issue-recrawl-low",
         projectId: "proj-demo",
         siteId: "site-demo",
-        discoveredUrlId: null,
+        discoveredUrlId: "url-recrawl-title",
         url: "https://example.com/title",
         rule: "missing_title",
         severity: "low",
@@ -433,6 +485,80 @@ test("audit issue recording resolves stale open issues on recrawl", async () => 
   assert.equal(health.status, 201);
   assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.totalIssues, 1);
   assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.score, 98);
+  store.close();
+});
+
+
+test("audit issue recording keeps issues for unchecked discovered URLs open", async () => {
+  const { app, store } = testApp();
+  await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", {
+    urls: [
+      {
+        id: "url-scope-checked",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        url: "https://example.com/checked",
+        normalizedUrl: "https://example.com/checked",
+        source: "sitemap",
+        discoveredFrom: "https://example.com/sitemap.xml",
+        depth: 1,
+        discoveredAt: "2026-06-04T08:00:00.000Z"
+      },
+      {
+        id: "url-scope-unchecked",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        url: "https://example.com/unchecked",
+        normalizedUrl: "https://example.com/unchecked",
+        source: "sitemap",
+        discoveredFrom: "https://example.com/sitemap.xml",
+        depth: 1,
+        discoveredAt: "2026-06-04T08:00:00.000Z"
+      }
+    ]
+  });
+  await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    checkedDiscoveredUrlIds: ["url-scope-checked", "url-scope-unchecked"],
+    issues: [
+      {
+        id: "issue-scope-checked",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: "url-scope-checked",
+        url: "https://example.com/checked",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-04T08:01:00.000Z",
+        resolvedAt: null
+      },
+      {
+        id: "issue-scope-unchecked",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: "url-scope-unchecked",
+        url: "https://example.com/unchecked",
+        rule: "http_error",
+        severity: "critical",
+        message: "URL returns 500",
+        detectedAt: "2026-06-04T08:02:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+
+  const recrawl = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    checkedDiscoveredUrlIds: ["url-scope-checked"],
+    issues: []
+  });
+  assert.equal(recrawl.status, 201);
+  assert.deepEqual((recrawl.body as { meta: { inserted: number; updated: number; resolved: number } }).meta, { inserted: 0, updated: 0, resolved: 1 });
+
+  const issues = (await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues")).body as { data: Array<{ id: string; resolvedAt: string | null }> };
+  const checked = issues.data.find((issue) => issue.id === "issue-scope-checked");
+  const unchecked = issues.data.find((issue) => issue.id === "issue-scope-unchecked");
+  assert.equal(checked?.resolvedAt !== null, true);
+  assert.equal(unchecked?.resolvedAt, null);
   store.close();
 });
 

@@ -26,9 +26,7 @@ async function routeRequest(store: BackendStore, method: string, pathname: strin
   } catch (error) {
     const response = error instanceof RequestError
       ? apiError(error.status, error.code, error.message, requestId, error.details)
-      : error instanceof Error
-        ? apiError(400, "validation_error", error.message, requestId)
-        : apiError(500, "internal_error", "Internal error", requestId);
+      : apiError(500, "internal_error", "Internal error", requestId);
     logRequest(method, pathname, response.status, requestId);
     return response;
   }
