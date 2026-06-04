@@ -21,10 +21,17 @@ export interface SitemapDiscoveryInput extends CrawlSeedInput {
   discoveredAt?: string;
 }
 
+export interface FetchRetryPolicy {
+  maxAttempts: number;
+  delayMs?: number;
+}
+
 export interface FetchWorkerInput {
   url: string;
   fetchImpl?: typeof fetch;
   fetchedAt?: string;
+  timeoutMs?: number;
+  retry?: FetchRetryPolicy;
 }
 
 export interface AuditPageInput {
@@ -44,6 +51,8 @@ export function createCrawlSeedJob(input: CrawlSeedInput): FoundationJob {
     type: "crawl_seed",
     status: "queued",
     idempotencyKey: makeIdempotencyKey(input.projectId, "crawl_seed", input.baseUrl),
+    subject: input.baseUrl,
+    payload: { baseUrl: input.baseUrl, siteId: input.siteId, subject: input.baseUrl },
     attempts: 0,
     createdAt: now,
     updatedAt: now
@@ -95,35 +104,51 @@ export function discoverUrlsFromSitemap(input: SitemapDiscoveryInput): Discovere
 export async function fetchUrl(input: FetchWorkerInput): Promise<FetchResult> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const fetchedAt = input.fetchedAt ?? new Date().toISOString();
+  const maxAttempts = Math.max(1, input.retry?.maxAttempts ?? 1);
+  let lastError: unknown;
 
-  try {
-    const response = await fetchImpl(input.url, { redirect: "manual" });
-    const headers = normalizeHeaders(response.headers);
-    const statusCode = response.status;
-    const location = response.headers.get("location");
-    const finalUrl = location ? normalizeCrawlUrl(location, input.url) : response.url || input.url;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = input.timeoutMs ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), input.timeoutMs) : null;
 
-    return {
-      url: input.url,
-      finalUrl,
-      statusCode,
-      statusClass: classifyStatus(statusCode),
-      headers,
-      redirectChain: statusCode >= 300 && statusCode < 400 && location ? [input.url, finalUrl] : [],
-      fetchedAt
-    };
-  } catch (error) {
-    return {
-      url: input.url,
-      finalUrl: input.url,
-      statusCode: null,
-      statusClass: "network_error",
-      headers: {},
-      redirectChain: [],
-      fetchedAt,
-      errorMessage: error instanceof Error ? error.message : "Unknown fetch error"
-    };
+    try {
+      const response = await fetchImpl(input.url, { redirect: "manual", signal: controller?.signal });
+      if (timeout) clearTimeout(timeout);
+      const headers = normalizeHeaders(response.headers);
+      const statusCode = response.status;
+      const location = response.headers.get("location");
+      const finalUrl = location ? normalizeCrawlUrl(location, input.url) : response.url || input.url;
+      const responseBody = await response.text().catch(() => "");
+
+      return {
+        url: input.url,
+        finalUrl,
+        statusCode,
+        statusClass: classifyStatus(statusCode),
+        headers,
+        redirectChain: statusCode >= 300 && statusCode < 400 && location ? [input.url, finalUrl] : [],
+        fetchedAt,
+        responseBody
+      };
+    } catch (error) {
+      if (timeout) clearTimeout(timeout);
+      lastError = error;
+      if (attempt < maxAttempts) {
+        await sleep(input.retry?.delayMs ?? 0);
+      }
+    }
   }
+
+  return {
+    url: input.url,
+    finalUrl: input.url,
+    statusCode: null,
+    statusClass: "network_error",
+    headers: {},
+    redirectChain: [],
+    fetchedAt,
+    errorMessage: networkErrorMessage(lastError, maxAttempts)
+  };
 }
 
 export function assessIndexability(input: AuditPageInput): IndexabilityAssessment {
@@ -251,4 +276,152 @@ function stableSlug(value: string): string {
     hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
   }
   return hash.toString(36);
+}
+
+export interface CrawlWorkerApiClient {
+  claimNextJob(): Promise<FoundationJob | null>;
+  createCrawlRun(projectId: string, siteId: string, trigger: "manual" | "scheduled" | "deploy"): Promise<{ id: string }>;
+  recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): Promise<DiscoveredUrl[]>;
+  recordFetchResult(projectId: string, siteId: string, discoveredUrlId: string, result: FetchResult): Promise<FetchResult & { id: string }>;
+  recordIndexabilityAssessment(projectId: string, siteId: string, discoveredUrlId: string, assessment: IndexabilityAssessment & { fetchResultId: string | null; assessedAt: string }): Promise<unknown>;
+  recordAuditIssues(projectId: string, siteId: string, issues: Array<AuditIssue & { projectId: string; siteId: string; discoveredUrlId: string | null; detectedAt: string; resolvedAt: string | null }>): Promise<unknown>;
+  computeHealthScore(projectId: string, siteId: string): Promise<unknown>;
+  completeCrawlRun(projectId: string, siteId: string, crawlRunId: string, status: "succeeded" | "failed", errorMessage?: string): Promise<unknown>;
+  completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): Promise<FoundationJob>;
+}
+
+export interface CrawlWorkerCycleOptions {
+  apiClient: CrawlWorkerApiClient;
+  fetchImpl?: typeof fetch;
+  now?: () => string;
+  maxUrls?: number;
+  fetchTimeoutMs?: number;
+  retry?: FetchRetryPolicy;
+}
+
+export interface CrawlWorkerCycleResult {
+  claimed: boolean;
+  jobId?: string;
+  status?: FoundationJob["status"];
+  crawlRunId?: string;
+  discoveredUrls?: number;
+  fetchedUrls?: number;
+  issues?: number;
+  errorMessage?: string;
+}
+
+export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Promise<CrawlWorkerCycleResult> {
+  const job = await options.apiClient.claimNextJob();
+  if (!job) {
+    return { claimed: false };
+  }
+
+  if (job.type !== "crawl_seed") {
+    const completed = await options.apiClient.completeJob(job.id, "succeeded");
+    return { claimed: true, jobId: job.id, status: completed.status };
+  }
+
+  const payload = job.payload ?? {};
+  const siteId = stringPayload(payload, "siteId");
+  const baseUrl = stringPayload(payload, "baseUrl") || job.subject;
+  const sitemapUrl = stringPayload(payload, "sitemapUrl") || normalizeCrawlUrl("/sitemap.xml", baseUrl);
+  let crawlRunId = stringPayload(payload, "crawlRunId");
+
+  try {
+    if (!siteId || !baseUrl) {
+      throw new Error("crawl_seed job payload requires siteId and baseUrl");
+    }
+    if (!crawlRunId) {
+      crawlRunId = (await options.apiClient.createCrawlRun(job.projectId, siteId, "manual")).id;
+    }
+
+    const now = options.now ?? (() => new Date().toISOString());
+    const sitemapFetch = await fetchUrl({ url: sitemapUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
+    const sitemapXml = sitemapFetch.responseBody ?? "";
+    const discovered = sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300
+      ? discoverUrlsFromSitemap({ projectId: job.projectId, siteId, baseUrl, sitemapUrl, sitemapXml, discoveredAt: now() })
+      : [createDiscoveredUrl({ projectId: job.projectId, siteId, baseUrl, url: baseUrl, source: "seed", depth: 0, discoveredAt: now() })];
+
+    if (sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300 && discovered.length <= 1) {
+      throw new Error(`invalid sitemap: ${sitemapUrl}`);
+    }
+
+    const scopedDiscovered = filterInScopeUrls(discovered, baseUrl);
+    const storedUrls = (await options.apiClient.recordDiscoveredUrls(job.projectId, siteId, scopedDiscovered)).slice(0, options.maxUrls ?? 25);
+    const pages: AuditPageInput[] = [];
+    const detectedAt = now();
+    let fetchedUrls = 0;
+
+    for (const discoveredUrl of storedUrls) {
+      const fetchResult = await fetchUrl({ url: discoveredUrl.normalizedUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
+      const storedFetch = await options.apiClient.recordFetchResult(job.projectId, siteId, discoveredUrl.id, fetchResult);
+      const page: AuditPageInput = {
+        url: discoveredUrl.normalizedUrl,
+        finalUrl: fetchResult.finalUrl,
+        statusCode: fetchResult.statusCode,
+        headers: fetchResult.headers,
+        html: fetchResult.responseBody ?? ""
+      };
+      pages.push(page);
+      const assessment = assessIndexability(page);
+      await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, discoveredUrl.id, {
+        ...assessment,
+        fetchResultId: storedFetch.id,
+        assessedAt: now()
+      });
+      fetchedUrls += 1;
+    }
+
+    const discoveredByUrl = new Map(storedUrls.map((url) => [url.normalizedUrl, url]));
+    const issues = evaluateAuditIssues(pages).map((auditIssue) => ({
+      ...auditIssue,
+      projectId: job.projectId,
+      siteId,
+      discoveredUrlId: discoveredByUrl.get(normalizeCrawlUrl(auditIssue.url, baseUrl))?.id ?? null,
+      detectedAt,
+      resolvedAt: null
+    }));
+    await options.apiClient.recordAuditIssues(job.projectId, siteId, issues);
+    await options.apiClient.computeHealthScore(job.projectId, siteId);
+    await options.apiClient.completeCrawlRun(job.projectId, siteId, crawlRunId, "succeeded");
+    const completed = await options.apiClient.completeJob(job.id, "succeeded");
+
+    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, discoveredUrls: storedUrls.length, fetchedUrls, issues: issues.length };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown crawl worker error";
+    if (siteId && crawlRunId) {
+      await options.apiClient.completeCrawlRun(job.projectId, siteId, crawlRunId, "failed", errorMessage).catch(() => undefined);
+    }
+    const completed = await options.apiClient.completeJob(job.id, "failed", errorMessage);
+    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, errorMessage };
+  }
+}
+
+function stringPayload(payload: Record<string, unknown>, key: string): string {
+  const value = payload[key];
+  return typeof value === "string" ? value : "";
+}
+
+
+export function isInCrawlScope(candidateUrl: string, baseUrl: string): boolean {
+  try {
+    const candidate = new URL(candidateUrl);
+    const base = new URL(baseUrl);
+    return candidate.protocol === base.protocol && candidate.hostname === base.hostname;
+  } catch {
+    return false;
+  }
+}
+
+function filterInScopeUrls(urls: DiscoveredUrl[], baseUrl: string): DiscoveredUrl[] {
+  return urls.filter((url) => isInCrawlScope(url.normalizedUrl, baseUrl));
+}
+
+function networkErrorMessage(error: unknown, attempts: number): string {
+  const message = error instanceof Error ? error.message : "Unknown fetch error";
+  return attempts > 1 ? `${message} after ${attempts} attempts` : message;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

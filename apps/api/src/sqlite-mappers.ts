@@ -148,16 +148,31 @@ export function mapIntegration(row: Record<string, unknown>): IntegrationAccount
 }
 
 export function mapJob(row: Record<string, unknown>): FoundationJob {
+  const payload = parseJobPayload(row.payload);
   return {
     id: String(row.id),
     projectId: String(row.project_id),
     type: row.job_type as FoundationJob["type"],
     status: row.status as FoundationJob["status"],
     idempotencyKey: String(row.idempotency_key),
+    subject: typeof payload.subject === "string" ? payload.subject : "",
+    payload,
     attempts: Number(row.attempts),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   };
+}
+
+function parseJobPayload(value: unknown): Record<string, unknown> {
+  if (typeof value !== "string" || value.trim() === "") {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
 }
 
 export function mapSourceMapEntry(row: Record<string, unknown>): SourceMapEntry {

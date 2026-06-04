@@ -75,8 +75,9 @@ Failure Modes, die vor Gate abzudecken sind:
 
 - Network Error → Fetch Result `network_error`, Job/Run bleibt nachvollziehbar.
 - Ungültige Sitemap → Job/Run `failed` mit `last_error`/`errorMessage`.
-- Out-of-scope URL → nicht crawlen, aber optional als verworfene Discovery zählen.
+- Out-of-scope URL → nicht crawlen; der Worker filtert aktuell auf gleiche Protocol-/Host-Scope vor Persistenz.
 - Duplicate URL → Upsert über normalisierte URL.
+- Network Retry/Timeout → `fetchUrl` unterstützt deterministische Retry-/Timeout-Optionen; der HTTP-Worker setzt Default-Timeout/Retry per Environment.
 
 ## Scoring / Classification
 
@@ -167,6 +168,7 @@ Welle-2 Gate:
 
 - Fixture-Crawl erzeugt Crawl Run, URLs, Fetch Results, Indexability, Issues und Health Score.
 - Network Error und ungültige Sitemap sind deterministisch getestet.
+- Out-of-scope Sitemap-URLs werden nicht persistiert/gefetches.
 - Duplicate URLs werden idempotent verarbeitet.
 - Technical-Audit-UI zeigt Run, URLs, Issues und Health Score aus echter API.
 - Wiederholter Crawl auf eigener Site ist stabil genug für das Master-Gate: 95 % stabile Vollcrawls auf eigenen Sites.

@@ -1,7 +1,8 @@
+import type { FoundationJob } from "@seo-tool/domain-model";
 import type { ApiResponse } from "./http.js";
 import { apiError, json } from "./http.js";
 import type { BackendStore } from "./sqlite-store.js";
-import { completeCrawlRunRequest, createCrawlRunRequest, createIntegrationRequest, createJobRequest, createSiteRequest, recordAuditIssuesRequest, recordDiscoveredUrlsRequest, recordFetchResultRequest, recordIndexabilityRequest } from "./request-validators.js";
+import { completeCrawlRunRequest, completeJobRequest, createCrawlRunRequest, createIntegrationRequest, createJobRequest, createSiteRequest, recordAuditIssuesRequest, recordDiscoveredUrlsRequest, recordFetchResultRequest, recordIndexabilityRequest } from "./request-validators.js";
 
 export async function routeProjectChildren(store: BackendStore, method: string, pathname: string, body: unknown, requestId: string): Promise<ApiResponse> {
   const siteMatch = pathname.match(/^\/projects\/([^/]+)\/sites$/);
@@ -85,8 +86,17 @@ export async function routeProjectChildren(store: BackendStore, method: string, 
   }
   if (method === "POST" && pathname === "/jobs") {
     const input = createJobRequest(body);
-    const result = store.createJob(input.projectId, input.type, input.subject);
+    const result = store.createJob(input.projectId, input.type, input.subject, input.payload);
     return json(result.idempotent ? 200 : 201, { data: result.job, idempotent: result.idempotent });
+  }
+  if (method === "POST" && pathname === "/jobs/claim") {
+    const input = body && typeof body === "object" && !Array.isArray(body) ? body as { type?: FoundationJob["type"] } : {};
+    return json(200, { data: store.claimNextJob(input.type) });
+  }
+  const completeJobMatch = pathname.match(/^\/jobs\/([^/]+)\/complete$/);
+  if (method === "POST" && completeJobMatch) {
+    const input = completeJobRequest(body);
+    return json(200, { data: store.completeJob(completeJobMatch[1], input.status, input.lastError) });
   }
   if (method === "GET" && pathname === "/source-map") {
     return json(200, { data: store.listSourceMapEntries() });

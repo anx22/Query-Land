@@ -254,3 +254,57 @@ test("crawl indexability API stores deterministic assessment state", async () =>
   assert.equal(data[0]?.canonicalUrl, null);
   store.close();
 });
+
+test("crawl run API records issues, computes health, and completes run summaries", async () => {
+  const { app, store } = testApp();
+  const run = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" });
+  assert.equal(run.status, 201);
+  const runId = (run.body as { data: { id: string } }).data.id;
+
+  const issues = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-health-critical",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/broken",
+        rule: "http_error",
+        severity: "critical",
+        message: "URL returns 500",
+        detectedAt: "2026-06-02T08:10:00.000Z",
+        resolvedAt: null
+      },
+      {
+        id: "issue-health-low",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/title",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-02T08:11:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+  assert.equal(issues.status, 201);
+  assert.deepEqual((issues.body as { meta: { inserted: number; updated: number } }).meta, { inserted: 2, updated: 0 });
+
+  const health = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute");
+  assert.equal(health.status, 201);
+  assert.equal((health.body as { data: { score: number; totalIssues: number } }).data.score, 80);
+  assert.equal((health.body as { data: { score: number; totalIssues: number } }).data.totalIssues, 2);
+
+  const complete = await app("POST", `/projects/proj-demo/sites/site-demo/crawl-runs/${runId}/complete`, { status: "succeeded" });
+  assert.equal(complete.status, 200);
+  assert.deepEqual((complete.body as { data: { summary: { openIssues: number; healthScore: number } } }).data.summary, {
+    discoveredUrls: 0,
+    fetchedUrls: 0,
+    indexabilityAssessments: 0,
+    openIssues: 2,
+    healthScore: 80
+  });
+  store.close();
+});

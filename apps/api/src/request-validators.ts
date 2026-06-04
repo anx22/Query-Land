@@ -11,7 +11,7 @@ type RecordFetchResultRequest = Omit<UrlFetchRecord, "id" | "projectId" | "siteI
 type RecordIndexabilityRequest = Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
 type RecordAuditIssuesRequest = { issues: AuditIssueRecord[] };
 type CreateIntegrationRequest = { projectId: string; provider: IntegrationProvider };
-type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string };
+type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string; payload?: Record<string, unknown> };
 type AuthRequest = { email: string; password: string; name?: string };
 
 const projectStatuses = new Set<ProjectStatus>(["draft", "active", "archived"]);
@@ -172,7 +172,17 @@ export function createJobRequest(body: unknown): CreateJobRequest {
   return {
     projectId: stringField(input, "projectId"),
     type: enumField(input, jobTypes, "type"),
-    subject: stringField(input, "subject")
+    subject: stringField(input, "subject"),
+    payload: optionalRecordField(input, "payload")
+  };
+}
+
+export function completeJobRequest(body: unknown): { status: Extract<FoundationJob["status"], "succeeded" | "failed">; lastError?: string } {
+  const input = objectBody(body);
+  const status = enumField(input, new Set<Extract<FoundationJob["status"], "succeeded" | "failed">>(["succeeded", "failed"]), "status");
+  return {
+    status,
+    lastError: input.lastError === undefined ? undefined : stringField(input, "lastError")
   };
 }
 
@@ -238,6 +248,15 @@ function nullableStatusCodeField(input: Record<string, unknown>, field: string):
     throw new RequestError(400, "invalid_status_code", `${field} must be between 100 and 599`, { field });
   }
   return value;
+}
+
+function optionalRecordField(input: Record<string, unknown>, field: string): Record<string, unknown> | undefined {
+  if (input[field] === undefined) return undefined;
+  const value = input[field];
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new RequestError(400, "invalid_object", `${field} must be an object`, { field });
+  }
+  return value as Record<string, unknown>;
 }
 
 function stringRecordField(input: Record<string, unknown>, field: string): Record<string, string> {

@@ -31,3 +31,11 @@
 - **Recommendation:** read-only + create tickets for Welle 1-3; PR proposals only after Source Map validation in Welle 4.
 - **Impact:** Affects security roles and MCP tools.
 - **Decide by:** Before Welle-4 Opportunity Engine.
+
+## DEC-005 — Open-Source- und Souveränitätsstrategie
+
+- **Status:** ready for decision
+- **Options:** Proprietary-managed only; open-source-first self-hostable core; hybrid core with replaceable providers.
+- **Recommendation:** Open-source-first self-hostable Foundation Core with hybrid, replaceable provider adapters for optional external services. The current EU digital-sovereignty and Open-Source strategy signal (June 2026) reinforces this as a product guardrail, not as a late procurement checkbox.
+- **Impact:** Keeps Foundation data, crawl/audit evidence and connector contracts portable; requires dependency/license review before production hardening and avoids mandatory SaaS lock-in in Welle 1-2.
+- **Decide by:** Before production connector credentials, hosted deployments or paid provider adapters are introduced.

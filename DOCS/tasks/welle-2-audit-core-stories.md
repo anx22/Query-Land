@@ -52,8 +52,10 @@
 
 ## W2-AUDIT-007 — Crawl Worker v0
 
-- **Status:** ready
+- **Status:** in_progress
 - **Scope:** Claim crawl jobs, execute fixture/seed/sitemap pipeline, persist artifacts, compute health, complete run.
+- **Umgesetzt:** `crawl_seed` Jobs transportieren jetzt `subject`/`payload`; die API kann Jobs claimen und abschließen; `services/crawler` hat einen Worker-Cycle und einen HTTP-Worker-Prozess (`npm --workspace @seo-tool/crawler run start:once`), der Fixture-Sitemap, Fetch, Indexability, Issues, Health und Run-Completion end-to-end gegen die API ausführt. Retry/Timeout und Same-Host-Scope-Filter sind für den Worker-Slice abgedeckt.
+- **Offene Lücke:** Robots.txt-Policy, breitere Network-Error-Klassifikation und Smoke gegen eine echte eigene Site.
 - **Acceptance:** A fixture crawl creates a crawl run and persists discovered URLs, fetch results, indexability assessments, audit issues and health score without manual API calls.
 - **Test gate:** Worker integration test against `sqlite::memory:` plus failure-mode tests for network error and invalid sitemap.
 

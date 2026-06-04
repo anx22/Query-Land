@@ -54,6 +54,8 @@ export const jobs: FoundationJob[] = [
     type: "source_map_refresh",
     status: "queued",
     idempotencyKey: "proj-demo:source_map_refresh:demo-property",
+    subject: "demo-property",
+    payload: { subject: "demo-property" },
     attempts: 0,
     createdAt: now,
     updatedAt: now
