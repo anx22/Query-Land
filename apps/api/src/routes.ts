@@ -44,7 +44,7 @@ export async function routeProjectChildren(store: ProjectChildStore, method: str
   }
   if (method === "POST" && auditIssuesMatch) {
     const input = recordAuditIssuesRequest(body);
-    const result = store.recordAuditIssues(auditIssuesMatch[1], auditIssuesMatch[2], input.issues);
+    const result = store.recordAuditIssues(auditIssuesMatch[1], auditIssuesMatch[2], input.issues, { checkedDiscoveredUrlIds: input.checkedDiscoveredUrlIds });
     return json(201, { data: result.issues, meta: { inserted: result.inserted, updated: result.updated, resolved: result.resolved } });
   }
 
