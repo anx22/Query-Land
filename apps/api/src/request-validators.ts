@@ -9,7 +9,7 @@ type CompleteCrawlRunRequest = { status: Extract<CrawlRunStatus, "succeeded" | "
 type RecordDiscoveredUrlsRequest = { urls: DiscoveredUrl[] };
 type RecordFetchResultRequest = Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
 type RecordIndexabilityRequest = Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
-type RecordAuditIssuesRequest = { issues: AuditIssueRecord[] };
+type RecordAuditIssuesRequest = { issues: AuditIssueRecord[]; checkedDiscoveredUrlIds: string[] };
 type CreateIntegrationRequest = { projectId: string; provider: IntegrationProvider };
 type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string; payload?: Record<string, unknown> };
 type AuthRequest = { email: string; password: string; name?: string };
@@ -81,7 +81,10 @@ export function recordAuditIssuesRequest(body: unknown): RecordAuditIssuesReques
   if (!Array.isArray(input.issues)) {
     throw new RequestError(400, "missing_field", "issues is required", { field: "issues" });
   }
-  return { issues: input.issues.map((item, index) => auditIssueField(item, index)) };
+  return {
+    issues: input.issues.map((item, index) => auditIssueField(item, index)),
+    checkedDiscoveredUrlIds: input.checkedDiscoveredUrlIds === undefined ? [] : stringArrayField(input, "checkedDiscoveredUrlIds")
+  };
 }
 
 function auditIssueField(value: unknown, index: number): AuditIssueRecord {

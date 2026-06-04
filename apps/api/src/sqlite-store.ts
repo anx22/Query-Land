@@ -38,6 +38,10 @@ export interface LoginResult {
   expiresAt: string;
 }
 
+export interface RecordAuditIssuesScope {
+  checkedDiscoveredUrlIds: string[];
+}
+
 export interface BackendStore {
   health(): HealthSnapshot;
   registerUser(input: RegisterInput): AuthUser;
@@ -55,7 +59,7 @@ export interface BackendStore {
   listHealthScores(projectId: string, siteId: string): CrawlHealthScore[];
   computeHealthScore(projectId: string, siteId: string): CrawlHealthScore;
   listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[];
-  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number };
+  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number };
   resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord;
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
@@ -286,14 +290,26 @@ class SQLiteStore implements BackendStore {
     return this.db.prepare(`SELECT * FROM audit_issues WHERE project_id = ? AND site_id = ? ORDER BY detected_at DESC, severity ASC`).all(projectId, siteId).map(mapAuditIssueRecord);
   }
 
-  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number } {
+  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number } {
     this.assertSiteScope(projectId, siteId);
+    const checkedDiscoveredUrlIds = [...new Set(scope.checkedDiscoveredUrlIds)];
+    for (const discoveredUrlId of checkedDiscoveredUrlIds) {
+      this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
+    }
+    const checkedDiscoveredUrlIdSet = new Set(checkedDiscoveredUrlIds);
+    const checkedUrlRows = checkedDiscoveredUrlIds.map((discoveredUrlId) => this.db.prepare(`SELECT url, normalized_url FROM discovered_urls WHERE id = ? AND project_id = ? AND site_id = ?`).get(discoveredUrlId, projectId, siteId));
+    const checkedUrlSet = new Set(checkedUrlRows.flatMap((row) => row ? [String(row.url), String(row.normalized_url)] : []));
     for (const issue of issues) {
       if (issue.projectId !== projectId || issue.siteId !== siteId) {
         throw new RequestError(400, "issue_scope_mismatch", "Audit issue projectId/siteId must match the route scope", { issueId: issue.id });
       }
       if (issue.discoveredUrlId) {
         this.assertDiscoveredUrlScope(projectId, siteId, issue.discoveredUrlId);
+        if (!checkedDiscoveredUrlIdSet.has(issue.discoveredUrlId)) {
+          throw new RequestError(400, "issue_scope_mismatch", "Audit issue discoveredUrlId must be included in checkedDiscoveredUrlIds", { issueId: issue.id, discoveredUrlId: issue.discoveredUrlId });
+        }
+      } else if (checkedDiscoveredUrlIds.length > 0 && !checkedUrlSet.has(issue.url)) {
+        throw new RequestError(400, "issue_scope_mismatch", "Audit issue URL must be included in checkedDiscoveredUrlIds scope when discoveredUrlId is null", { issueId: issue.id, url: issue.url });
       }
     }
 
@@ -302,13 +318,18 @@ class SQLiteStore implements BackendStore {
     let resolved = 0;
     const now = new Date().toISOString();
     const submittedIssueIds = new Set(issues.map((issue) => issue.id));
-    const openIssueIds = this.db.prepare(`SELECT id FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL`).all(projectId, siteId).map((row) => String(row.id));
-    const staleIssueIds = openIssueIds.filter((id) => !submittedIssueIds.has(id));
-    if (staleIssueIds.length > 0) {
-      const resolveStaleIssue = this.db.prepare(`UPDATE audit_issues SET resolved_at = ?, updated_at = ? WHERE id = ? AND project_id = ? AND site_id = ? AND resolved_at IS NULL`);
-      for (const issueId of staleIssueIds) {
-        const result = resolveStaleIssue.run(now, now, issueId, projectId, siteId);
-        resolved += Number(result.changes ?? 0);
+    if (checkedDiscoveredUrlIds.length > 0) {
+      const openScopedIssues = this.db.prepare(`SELECT id FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL AND (discovered_url_id = ? OR url = ? OR url = ?)`);
+      const staleIssueIds = [...new Set(checkedDiscoveredUrlIds.flatMap((discoveredUrlId, index) => {
+        const checkedUrlRow = checkedUrlRows[index];
+        return openScopedIssues.all(projectId, siteId, discoveredUrlId, String(checkedUrlRow?.url ?? ""), String(checkedUrlRow?.normalized_url ?? "")).map((row) => String(row.id));
+      }))].filter((id) => !submittedIssueIds.has(id));
+      if (staleIssueIds.length > 0) {
+        const resolveStaleIssue = this.db.prepare(`UPDATE audit_issues SET resolved_at = ?, updated_at = ? WHERE id = ? AND project_id = ? AND site_id = ? AND resolved_at IS NULL`);
+        for (const issueId of staleIssueIds) {
+          const result = resolveStaleIssue.run(now, now, issueId, projectId, siteId);
+          resolved += Number(result.changes ?? 0);
+        }
       }
     }
 
@@ -330,7 +351,7 @@ class SQLiteStore implements BackendStore {
       existing ? updated += 1 : inserted += 1;
     }
     const stored = this.listAuditIssues(projectId, siteId);
-    this.audit("system", "crawl.issues.record", "site", siteId, { projectId, inserted, updated, resolved, total: stored.length });
+    this.audit("system", "crawl.issues.record", "site", siteId, { projectId, checkedDiscoveredUrlIds, inserted, updated, resolved, total: stored.length });
     return { issues: stored, inserted, updated, resolved };
   }
 
