@@ -1,4 +1,5 @@
-import { appRoutes, demoOpportunities, seoMemory } from "@seo-tool/shared-config";
+import { demoOpportunities, seoMemory } from "@seo-tool/shared-config";
+import { moduleRoutes } from "../app/module-routes";
 import type { FoundationDashboardData } from "../lib/foundation-api";
 import { MetricCard } from "./metric-card";
 import { StatusList } from "./status-list";
@@ -125,9 +126,9 @@ export function Dashboard({ data }: { data: FoundationDashboardData }) {
           <p className="kicker">Routing Memory</p>
           <h2>Hauptnavigation aus UX-Flows</h2>
           <div className="module-grid">
-            {appRoutes.map((route) => (
-              <article key={route.href} className="card">
-                <span className="badge primary">W{route.wave}</span>
+            {moduleRoutes.map((route) => (
+              <article key={route.path} className="card">
+                <span className="badge primary">W{route.plannedWave}</span>
                 <h3>{route.label}</h3>
                 <p>{route.description}</p>
               </article>
