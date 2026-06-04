@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assessIndexability, calculateHealthScore, discoverUrlsFromSitemap, evaluateAuditIssues, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
+import { assessIndexability, calculateHealthScore, discoverUrlsFromSitemap, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
   const urls = discoverUrlsFromSitemap({
@@ -42,6 +42,16 @@ test("normalizes 200, 3xx and 4xx fixture fetch responses", async () => {
   assert.equal(missing.headers["x-robots-tag"], "noindex");
 });
 
+
+
+test("extracts and normalizes outgoing links", () => {
+  const links = extractOutgoingLinks(
+    `<a href="/a#section">A</a><a href='https://example.com/b/'>B</a><a href="mailto:test@example.com">Mail</a><a href="https://outside.example/c">C</a>`,
+    "https://example.com/base/page"
+  );
+
+  assert.deepEqual(links, ["https://example.com/a", "https://example.com/b", "https://outside.example/c"]);
+});
 
 
 test("fetchUrl retries deterministic network errors before classifying the fetch", async () => {
@@ -166,6 +176,45 @@ test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end
 
   const issues = envelopeData<Array<{ rule: string; severity: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues"));
   assert.equal(issues.some((issue) => issue.rule === "http_error" && issue.severity === "critical"), true);
+  store.close();
+});
+
+test("crawl worker checks limited in-scope outgoing links and records broken_link issues", async () => {
+  const store = createSQLiteStore("sqlite::memory:");
+  const app = createApp(store);
+  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  await app("POST", "/jobs", {
+    projectId: "proj-demo",
+    type: "crawl_seed",
+    subject: "https://example.com",
+    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+  });
+
+  const fetched: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const requestedUrl = String(url);
+    fetched.push(requestedUrl);
+    if (requestedUrl.endsWith("/robots.txt")) {
+      return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    }
+    if (requestedUrl.endsWith("/sitemap.xml")) {
+      return new Response("<urlset><url><loc>https://example.com</loc></url></urlset>", { status: 200, headers: { "content-type": "application/xml" } });
+    }
+    if (requestedUrl.endsWith("/missing")) {
+      return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    }
+    return new Response('<html><head><title>Seed</title></head><body><a href="/missing">Missing</a><a href="https://outside.example/missing">External</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+  };
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", maxOutgoingLinkChecks: 5 });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.discoveredUrls, 1);
+  assert.equal(result.fetchedUrls, 1);
+  assert.equal(fetched.includes("https://example.com/missing"), true);
+  assert.equal(fetched.includes("https://outside.example/missing"), false);
+
+  const issues = envelopeData<Array<{ rule: string; url: string; message: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues"));
+  assert.equal(issues.some((issue) => issue.rule === "broken_link" && issue.url === "https://example.com/" && issue.message.includes("https://example.com/missing")), true);
   store.close();
 });
 
