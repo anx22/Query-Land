@@ -98,7 +98,7 @@ export function createDiscoveredUrl(input: CrawlSeedInput & { url: string; sourc
 }
 
 export function discoverUrlsFromSitemap(input: SitemapDiscoveryInput): DiscoveredUrl[] {
-  const locs = [...input.sitemapXml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((match) => decodeXml(match[1] ?? ""));
+  const locs = extractSitemapLocations(input.sitemapXml);
   const uniqueUrls = [...new Set([input.baseUrl, ...locs])];
   return uniqueUrls.map((url, index) => createDiscoveredUrl({
     projectId: input.projectId,
@@ -277,6 +277,10 @@ function extractRobotsMeta(html: string): string {
   return match?.[1] ?? "";
 }
 
+function extractSitemapLocations(sitemapXml: string): string[] {
+  return [...sitemapXml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map((match) => decodeXml(match[1] ?? ""));
+}
+
 function decodeXml(value: string): string {
   return value.replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').replaceAll("&apos;", "'");
 }
@@ -354,7 +358,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
       ? discoverUrlsFromSitemap({ projectId: job.projectId, siteId, baseUrl, sitemapUrl, sitemapXml, discoveredAt: now() })
       : [createDiscoveredUrl({ projectId: job.projectId, siteId, baseUrl, url: baseUrl, source: "seed", depth: 0, discoveredAt: now() })];
 
-    if (sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300 && discovered.length <= 1) {
+    if (sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300 && extractSitemapLocations(sitemapXml).length === 0) {
       throw new Error(`invalid sitemap: ${sitemapUrl}`);
     }
 

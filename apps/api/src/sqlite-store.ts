@@ -55,7 +55,7 @@ export interface BackendStore {
   listHealthScores(projectId: string, siteId: string): CrawlHealthScore[];
   computeHealthScore(projectId: string, siteId: string): CrawlHealthScore;
   listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[];
-  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number };
+  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number };
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
   listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[];
@@ -285,11 +285,8 @@ class SQLiteStore implements BackendStore {
     return this.db.prepare(`SELECT * FROM audit_issues WHERE project_id = ? AND site_id = ? ORDER BY detected_at DESC, severity ASC`).all(projectId, siteId).map(mapAuditIssueRecord);
   }
 
-  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number } {
+  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number } {
     this.assertSiteScope(projectId, siteId);
-    let inserted = 0;
-    let updated = 0;
-    const now = new Date().toISOString();
     for (const issue of issues) {
       if (issue.projectId !== projectId || issue.siteId !== siteId) {
         throw new RequestError(400, "issue_scope_mismatch", "Audit issue projectId/siteId must match the route scope", { issueId: issue.id });
@@ -297,6 +294,22 @@ class SQLiteStore implements BackendStore {
       if (issue.discoveredUrlId) {
         this.assertDiscoveredUrlScope(projectId, siteId, issue.discoveredUrlId);
       }
+    }
+    let inserted = 0;
+    let updated = 0;
+    const now = new Date().toISOString();
+    const submittedIssueIds = new Set(issues.map((issue) => issue.id));
+    const openIssueIds = this.db.prepare(`SELECT id FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL`).all(projectId, siteId).map((row) => String(row.id));
+    const resolvedIssueIds = openIssueIds.filter((id) => !submittedIssueIds.has(id));
+    let resolved = 0;
+    if (resolvedIssueIds.length > 0) {
+      const resolveIssue = this.db.prepare(`UPDATE audit_issues SET resolved_at = ?, updated_at = ? WHERE id = ? AND project_id = ? AND site_id = ? AND resolved_at IS NULL`);
+      for (const issueId of resolvedIssueIds) {
+        const result = resolveIssue.run(now, now, issueId, projectId, siteId);
+        resolved += Number(result.changes ?? 0);
+      }
+    }
+    for (const issue of issues) {
       const existing = this.db.prepare(`SELECT id FROM audit_issues WHERE id = ?`).get(issue.id);
       this.db.prepare(`
         INSERT INTO audit_issues (id, project_id, site_id, discovered_url_id, url, rule, severity, message, detected_at, resolved_at, updated_at)
@@ -314,8 +327,8 @@ class SQLiteStore implements BackendStore {
       existing ? updated += 1 : inserted += 1;
     }
     const stored = this.listAuditIssues(projectId, siteId);
-    this.audit("system", "crawl.issues.record", "site", siteId, { projectId, inserted, updated, total: stored.length });
-    return { issues: stored, inserted, updated };
+    this.audit("system", "crawl.issues.record", "site", siteId, { projectId, inserted, updated, resolved, total: stored.length });
+    return { issues: stored, inserted, updated, resolved };
   }
 
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[] {

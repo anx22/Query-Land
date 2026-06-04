@@ -13,7 +13,7 @@ export async function startCrawlAction(formData: FormData) {
     await createFoundationJob({
       projectId,
       type: "crawl_seed",
-      subject: baseUrl,
+      subject: `${baseUrl}#${crawlRun.id}`,
       payload: { siteId, baseUrl, crawlRunId: crawlRun.id }
     });
   } catch (error) {

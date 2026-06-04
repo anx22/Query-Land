@@ -290,12 +290,36 @@ test("crawl run API records issues, computes health, and completes run summaries
     ]
   });
   assert.equal(issues.status, 201);
-  assert.deepEqual((issues.body as { meta: { inserted: number; updated: number } }).meta, { inserted: 2, updated: 0 });
+  assert.deepEqual((issues.body as { meta: { inserted: number; updated: number; resolved: number } }).meta, { inserted: 2, updated: 0, resolved: 0 });
 
   const health = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute");
   assert.equal(health.status, 201);
   assert.equal((health.body as { data: { score: number; totalIssues: number } }).data.score, 80);
   assert.equal((health.body as { data: { score: number; totalIssues: number } }).data.totalIssues, 2);
+
+
+  const recrawl = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-health-low",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/title",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-02T08:12:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+  assert.equal(recrawl.status, 201);
+  assert.deepEqual((recrawl.body as { meta: { inserted: number; updated: number; resolved: number } }).meta, { inserted: 0, updated: 1, resolved: 1 });
+
+  const postRecrawlHealth = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute");
+  assert.equal(postRecrawlHealth.status, 201);
+  assert.equal((postRecrawlHealth.body as { data: { totalIssues: number } }).data.totalIssues, 1);
 
   const complete = await app("POST", `/projects/proj-demo/sites/site-demo/crawl-runs/${runId}/complete`, { status: "succeeded" });
   assert.equal(complete.status, 200);
@@ -303,8 +327,8 @@ test("crawl run API records issues, computes health, and completes run summaries
     discoveredUrls: 0,
     fetchedUrls: 0,
     indexabilityAssessments: 0,
-    openIssues: 2,
-    healthScore: 80
+    openIssues: 1,
+    healthScore: 98
   });
   store.close();
 });
