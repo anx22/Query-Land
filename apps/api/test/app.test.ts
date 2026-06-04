@@ -166,6 +166,30 @@ test("API errors use stable code/message/requestId format", async () => {
   assert.equal(notFound.status, 404);
   assert.equal((notFound.body as { error: { code: string; requestId: string } }).error.code, "not_found");
   assert.equal((notFound.body as { error: { code: string; requestId: string } }).error.requestId, "req-404");
+
+  const invalidDomainInput = await app("POST", "/auth/register", { email: "not-an-email", password: "very-long-password" }, { headers: { "x-request-id": "req-domain" } });
+  assert.equal(invalidDomainInput.status, 400);
+  assert.deepEqual((invalidDomainInput.body as { error: { code: string; message: string; requestId: string } }).error, {
+    code: "validation_error",
+    message: "email must be valid",
+    requestId: "req-domain"
+  });
+  store.close();
+});
+
+test("API maps unexpected store errors to internal error responses", async () => {
+  const { app, store } = testApp();
+  store.listProjects = () => {
+    throw new Error("unexpected store failure");
+  };
+
+  const response = await app("GET", "/projects", undefined, { headers: { "x-request-id": "req-store" } });
+  assert.equal(response.status, 500);
+  assert.deepEqual((response.body as { error: { code: string; message: string; requestId: string } }).error, {
+    code: "internal_error",
+    message: "Internal error",
+    requestId: "req-store"
+  });
   store.close();
 });
 

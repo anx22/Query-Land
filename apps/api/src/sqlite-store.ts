@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { calculateHealthScore, makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuditIssueRecord, type AuthUser, type CrawlHealthScore, type CrawlRun, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
+import { calculateHealthScore, DomainValidationError, makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuditIssueRecord, type AuthUser, type CrawlHealthScore, type CrawlRun, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
 import { hashPassword, hashToken, verifyPassword } from "./password.js";
 import { runSQLiteMigrations } from "./sqlite-migrations.js";
@@ -103,8 +103,8 @@ class SQLiteStore implements BackendStore {
   }
 
   registerUser(input: RegisterInput): AuthUser {
-    const email = normalizeEmail(input.email);
-    const password = validatePassword(input.password);
+    const email = validateDomainInput(() => normalizeEmail(input.email));
+    const password = validateDomainInput(() => validatePassword(input.password));
     const now = new Date().toISOString();
     const user: AuthUser = {
       id: `usr-${randomUUID()}`,
@@ -126,7 +126,7 @@ class SQLiteStore implements BackendStore {
   }
 
   login(email: string, password: string): LoginResult | null {
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedEmail = validateDomainInput(() => normalizeEmail(email));
     const row = this.db.prepare(`SELECT * FROM users WHERE email = ? AND status = 'active'`).get(normalizedEmail);
     if (!row || !verifyPassword(password, String(row.password_hash))) {
       return null;
@@ -204,7 +204,7 @@ class SQLiteStore implements BackendStore {
       baseUrl: input.baseUrl,
       scopeType: input.scopeType,
       crawlFrequency: input.crawlFrequency ?? "weekly",
-      businessValue: validateBusinessValue(input.businessValue ?? 50)
+      businessValue: validateDomainInput(() => validateBusinessValue(input.businessValue ?? 50))
     };
     try {
       this.db.prepare(`INSERT INTO sites (id, project_id, scope_type, base_url, crawl_frequency, business_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
@@ -617,6 +617,18 @@ class SQLiteStore implements BackendStore {
 export class RequestError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly details?: unknown) {
     super(message);
+    this.name = "RequestError";
+  }
+}
+
+function validateDomainInput<T>(validator: () => T): T {
+  try {
+    return validator();
+  } catch (error) {
+    if (error instanceof DomainValidationError) {
+      throw new RequestError(400, "validation_error", error.message);
+    }
+    throw error;
   }
 }
 
