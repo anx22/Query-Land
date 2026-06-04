@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { appRoutes } from "@seo-tool/shared-config";
+import { moduleRoutes } from "../app/module-routes";
 
 function initials(label: string) {
   return label
@@ -19,10 +19,10 @@ export function Navigation({ activePath }: { activePath: string }) {
         <p>First-party, source-anchored SEO Workflows.</p>
       </div>
       <nav className="nav-list" aria-label="Hauptnavigation">
-        {appRoutes.map((route) => {
-          const isActive = activePath === route.href;
+        {moduleRoutes.map((route) => {
+          const isActive = activePath === route.path;
           return (
-            <Link key={route.href} className={`nav-item${isActive ? " active" : ""}`} href={route.href}>
+            <Link key={route.path} className={`nav-item${isActive ? " active" : ""}`} href={route.path}>
               <span className="nav-icon" aria-hidden="true">{initials(route.label)}</span>
               <span>{route.label}</span>
             </Link>

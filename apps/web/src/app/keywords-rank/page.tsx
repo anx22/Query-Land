@@ -1,10 +1,3 @@
-import { AppShell } from "../../components/app-shell";
-import { ModulePage } from "../../components/module-page";
+import { createPlannedModulePage } from "../planned-module-page";
 
-export default function Page() {
-  return (
-    <AppShell activePath="/keywords-rank">
-      <ModulePage href="/keywords-rank" />
-    </AppShell>
-  );
-}
+export default createPlannedModulePage("/keywords-rank");
