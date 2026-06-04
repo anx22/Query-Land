@@ -19,16 +19,59 @@ test("SQLite migrations are versioned and idempotent", () => {
   const db = new DatabaseSync(":memory:");
   try {
     const first = runSQLiteMigrations(db);
-    assert.deepEqual(first.applied.map((migration) => migration.filename), ["001_foundation_auth.sql"]);
+    assert.deepEqual(first.applied.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql"]);
     assert.deepEqual(first.skipped, []);
 
     const recorded = db.prepare(`SELECT version, name FROM schema_migrations ORDER BY version`).all()
       .map((row) => ({ version: row.version, name: row.name }));
-    assert.deepEqual(recorded, [{ version: 1, name: "foundation_auth" }]);
+    assert.deepEqual(recorded, [
+      { version: 1, name: "foundation_auth" },
+      { version: 2, name: "rebuild_indexability_state_constraint" }
+    ]);
 
     const second = runSQLiteMigrations(db);
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped.map((migration) => migration.filename), ["001_foundation_auth.sql"]);
+    assert.deepEqual(second.skipped.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql"]);
+  } finally {
+    db.close();
+  }
+});
+
+
+test("SQLite migrations rebuild legacy indexability CHECK constraint for robots state", () => {
+  const db = new DatabaseSync(":memory:");
+  try {
+    db.exec(`
+PRAGMA foreign_keys = ON;
+CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, status TEXT NOT NULL, default_locale TEXT NOT NULL, markets TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE sites (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, scope_type TEXT NOT NULL, base_url TEXT NOT NULL, crawl_frequency TEXT NOT NULL, business_value INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE discovered_urls (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE, url TEXT NOT NULL, normalized_url TEXT NOT NULL, source TEXT NOT NULL, discovered_from TEXT, depth INTEGER NOT NULL, discovered_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE url_fetch_results (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE, site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE, discovered_url_id TEXT NOT NULL REFERENCES discovered_urls(id) ON DELETE CASCADE, url TEXT NOT NULL, final_url TEXT NOT NULL, status_code INTEGER, status_class TEXT NOT NULL, headers TEXT NOT NULL, redirect_chain TEXT NOT NULL, fetched_at TEXT NOT NULL, error_message TEXT, created_at TEXT NOT NULL);
+CREATE TABLE url_indexability_assessments (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  discovered_url_id TEXT NOT NULL REFERENCES discovered_urls(id) ON DELETE CASCADE,
+  fetch_result_id TEXT REFERENCES url_fetch_results(id) ON DELETE SET NULL,
+  url TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('indexable', 'blocked_by_status', 'blocked_by_meta', 'blocked_by_x_robots', 'canonicalized')),
+  is_indexable INTEGER NOT NULL CHECK (is_indexable IN (0, 1)),
+  reasons TEXT NOT NULL DEFAULT '[]',
+  canonical_url TEXT,
+  assessed_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+`);
+    db.prepare(`INSERT INTO projects (id, name, slug, status, default_locale, markets, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run("proj-legacy", "Legacy", "legacy", "active", "de-DE", "[]", "2026-06-04T00:00:00.000Z", "2026-06-04T00:00:00.000Z");
+    db.prepare(`INSERT INTO sites (id, project_id, scope_type, base_url, crawl_frequency, business_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`).run("site-legacy", "proj-legacy", "domain", "https://example.com", "weekly", 80, "2026-06-04T00:00:00.000Z");
+    db.prepare(`INSERT INTO discovered_urls (id, project_id, site_id, url, normalized_url, source, discovered_from, depth, discovered_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run("url-legacy", "proj-legacy", "site-legacy", "https://example.com/robots-blocked", "https://example.com/robots-blocked", "sitemap", null, 1, "2026-06-04T00:00:00.000Z", "2026-06-04T00:00:00.000Z");
+    db.prepare(`INSERT INTO url_indexability_assessments (id, project_id, site_id, discovered_url_id, fetch_result_id, url, state, is_indexable, reasons, canonical_url, assessed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run("idx-existing", "proj-legacy", "site-legacy", "url-legacy", null, "https://example.com/", "indexable", 1, "[]", null, "2026-06-04T00:00:00.000Z", "2026-06-04T00:00:00.000Z");
+
+    runSQLiteMigrations(db);
+
+    db.prepare(`INSERT INTO url_indexability_assessments (id, project_id, site_id, discovered_url_id, fetch_result_id, url, state, is_indexable, reasons, canonical_url, assessed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run("idx-robots", "proj-legacy", "site-legacy", "url-legacy", null, "https://example.com/robots-blocked", "blocked_by_robots", 0, "[\"robots.txt disallows URL\"]", null, "2026-06-04T00:01:00.000Z", "2026-06-04T00:01:00.000Z");
+    const states = db.prepare(`SELECT state FROM url_indexability_assessments ORDER BY id`).all().map((row) => row.state);
+    assert.deepEqual(states, ["indexable", "blocked_by_robots"]);
   } finally {
     db.close();
   }
