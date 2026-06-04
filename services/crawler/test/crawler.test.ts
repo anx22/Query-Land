@@ -104,11 +104,11 @@ test("maps minimum issue rules and health-score penalties", () => {
   assert.equal(calculateHealthScore([]), 100);
 });
 
-import { createApp, createSQLiteStore, type BackendStore } from "@seo-tool/api";
+import { createApp, createSQLiteStore, type SQLiteStore } from "@seo-tool/api";
 import type { CrawlWorkerApiClient } from "../src/index.js";
 import { runCrawlWorkerCycle } from "../src/index.js";
 
-function apiClientForStore(store: BackendStore): CrawlWorkerApiClient {
+function apiClientForStore(store: SQLiteStore): CrawlWorkerApiClient {
   const app = createApp(store);
   const post = async <T>(path: string, body?: unknown): Promise<T> => {
     const response = await app("POST", path, body);

@@ -1,12 +1,17 @@
-import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { calculateHealthScore, DomainValidationError, makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuditIssueRecord, type AuthUser, type CrawlHealthScore, type CrawlRun, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
-import { hashPassword, hashToken, verifyPassword } from "./password.js";
+import { createAuditLog } from "./stores/audit-log.js";
+import { createAuthStore, type AuthStore } from "./stores/auth-store.js";
+import { createCrawlStore, type CrawlStore } from "./stores/crawl-store.js";
+import { createJobStore, type JobStore } from "./stores/job-store.js";
+import { createProjectStore, type ProjectStore } from "./stores/project-store.js";
+import { createSourceMapStore, type SourceMapStore } from "./stores/source-map-store.js";
+import { RequestError } from "./stores/store-errors.js";
+import type { SQLiteDatabase } from "./stores/sqlite-types.js";
+import { seedFoundation } from "./sqlite-seed.js";
 import { runSQLiteMigrations } from "./sqlite-migrations.js";
-import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapIntegration, mapJob, mapProject, mapSite, mapSourceMapEntry, mapUrlFetchRecord, mapUser } from "./sqlite-mappers.js";
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require("node:sqlite") as {
@@ -75,9 +80,16 @@ export interface BackendStore {
   completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): FoundationJob;
   listSourceMapEntries(): SourceMapEntry[];
   close(): void;
-}
+};
 
-export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): BackendStore {
+export { RequestError };
+export type { AuthStore, RegisterInput, LoginResult } from "./stores/auth-store.js";
+export type { CrawlStore } from "./stores/crawl-store.js";
+export type { JobStore } from "./stores/job-store.js";
+export type { ProjectStore } from "./stores/project-store.js";
+export type { SourceMapStore } from "./stores/source-map-store.js";
+
+export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): SQLiteStore {
   const location = sqliteLocation(databaseUrl);
   if (location !== ":memory:") {
     mkdirSync(dirname(location), { recursive: true });
@@ -332,23 +344,9 @@ class SQLiteStore implements BackendStore {
         }
       }
     }
-
-    for (const issue of issues) {
-      const existing = this.db.prepare(`SELECT id FROM audit_issues WHERE id = ?`).get(issue.id);
-      this.db.prepare(`
-        INSERT INTO audit_issues (id, project_id, site_id, discovered_url_id, url, rule, severity, message, detected_at, resolved_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          discovered_url_id = excluded.discovered_url_id,
-          url = excluded.url,
-          rule = excluded.rule,
-          severity = excluded.severity,
-          message = excluded.message,
-          detected_at = excluded.detected_at,
-          resolved_at = excluded.resolved_at,
-          updated_at = excluded.updated_at
-      `).run(issue.id, projectId, siteId, issue.discoveredUrlId, issue.url, issue.rule, issue.severity, issue.message, issue.detectedAt, issue.resolvedAt, now);
-      existing ? updated += 1 : inserted += 1;
+    const prototype = Object.getPrototypeOf(store) as object | null;
+    if (!prototype) {
+      continue;
     }
     const stored = this.listAuditIssues(projectId, siteId);
     this.audit("system", "crawl.issues.record", "site", siteId, { projectId, checkedDiscoveredUrlIds, inserted, updated, resolved, total: stored.length });
@@ -395,244 +393,11 @@ class SQLiteStore implements BackendStore {
       if (url.projectId !== projectId || url.siteId !== siteId) {
         throw new RequestError(400, "url_scope_mismatch", "Discovered URL projectId/siteId must match the route scope", { url: url.normalizedUrl });
       }
-      const existing = this.db.prepare(`SELECT id FROM discovered_urls WHERE project_id = ? AND site_id = ? AND normalized_url = ?`)
-        .get(projectId, siteId, url.normalizedUrl);
-      this.db.prepare(`
-        INSERT INTO discovered_urls (id, project_id, site_id, url, normalized_url, source, discovered_from, depth, discovered_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(project_id, site_id, normalized_url) DO UPDATE SET
-          url = excluded.url,
-          source = excluded.source,
-          discovered_from = excluded.discovered_from,
-          depth = excluded.depth,
-          discovered_at = excluded.discovered_at,
-          updated_at = excluded.updated_at
-      `).run(url.id, projectId, siteId, url.url, url.normalizedUrl, url.source, url.discoveredFrom, url.depth, url.discoveredAt, now);
-      if (existing) {
-        updated += 1;
-      } else {
-        inserted += 1;
-      }
-    }
-
-    const stored = this.listDiscoveredUrls(projectId, siteId);
-    this.audit("system", "crawl.discovery.record", "site", siteId, { projectId, inserted, updated, total: stored.length });
-    return { urls: stored, inserted, updated };
-  }
-
-  listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[] {
-    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
-    return this.db.prepare(`
-      SELECT * FROM url_fetch_results
-      WHERE project_id = ? AND site_id = ? AND discovered_url_id = ?
-      ORDER BY fetched_at DESC, created_at DESC
-    `).all(projectId, siteId, discoveredUrlId).map(mapUrlFetchRecord);
-  }
-
-  recordFetchResult(projectId: string, siteId: string, discoveredUrlId: string, result: Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): UrlFetchRecord {
-    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
-    const id = `fetch-${randomUUID()}`;
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      INSERT INTO url_fetch_results (id, project_id, site_id, discovered_url_id, url, final_url, status_code, status_class, headers, redirect_chain, fetched_at, error_message, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      projectId,
-      siteId,
-      discoveredUrlId,
-      result.url,
-      result.finalUrl,
-      result.statusCode,
-      result.statusClass,
-      JSON.stringify(result.headers),
-      JSON.stringify(result.redirectChain),
-      result.fetchedAt,
-      result.errorMessage ?? null,
-      now
-    );
-    this.audit("system", "crawl.fetch.record", "discovered_url", discoveredUrlId, { projectId, siteId, statusClass: result.statusClass, statusCode: result.statusCode });
-    const row = this.db.prepare(`SELECT * FROM url_fetch_results WHERE id = ?`).get(id);
-    if (!row) {
-      throw new RequestError(400, "fetch_result_write_failed", "Fetch result could not be stored");
-    }
-    return mapUrlFetchRecord(row);
-  }
-
-  listIndexabilityAssessments(projectId: string, siteId: string, discoveredUrlId: string): IndexabilityRecord[] {
-    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
-    return this.db.prepare(`
-      SELECT * FROM url_indexability_assessments
-      WHERE project_id = ? AND site_id = ? AND discovered_url_id = ?
-      ORDER BY assessed_at DESC, created_at DESC
-    `).all(projectId, siteId, discoveredUrlId).map(mapIndexabilityRecord);
-  }
-
-  recordIndexabilityAssessment(projectId: string, siteId: string, discoveredUrlId: string, assessment: Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): IndexabilityRecord {
-    this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
-    if (assessment.fetchResultId) {
-      this.assertFetchResultScope(projectId, siteId, discoveredUrlId, assessment.fetchResultId);
-    }
-    const id = `index-${randomUUID()}`;
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      INSERT INTO url_indexability_assessments (id, project_id, site_id, discovered_url_id, fetch_result_id, url, state, is_indexable, reasons, canonical_url, assessed_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      projectId,
-      siteId,
-      discoveredUrlId,
-      assessment.fetchResultId,
-      assessment.url,
-      assessment.state,
-      assessment.isIndexable ? 1 : 0,
-      JSON.stringify(assessment.reasons),
-      assessment.canonicalUrl,
-      assessment.assessedAt,
-      now
-    );
-    this.audit("system", "crawl.indexability.record", "discovered_url", discoveredUrlId, { projectId, siteId, state: assessment.state, isIndexable: assessment.isIndexable });
-    const row = this.db.prepare(`SELECT * FROM url_indexability_assessments WHERE id = ?`).get(id);
-    if (!row) {
-      throw new RequestError(400, "indexability_write_failed", "Indexability assessment could not be stored");
-    }
-    return mapIndexabilityRecord(row);
-  }
-
-  listIntegrations(): IntegrationAccount[] {
-    return this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all().map(mapIntegration);
-  }
-
-  createIntegration(projectId: string, provider: IntegrationProvider): IntegrationAccount {
-    const now = new Date().toISOString();
-    const integration: IntegrationAccount = {
-      id: `int-${provider}-${randomUUID()}`,
-      projectId,
-      provider,
-      status: "pending",
-      sourceConfidence: sourceConfidenceForProvider(provider),
-      quotaRemaining: null,
-      freshness: null
-    };
-    try {
-      this.db.prepare(`INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)`)
-        .run(integration.id, integration.projectId, integration.provider, integration.status, integration.sourceConfidence, integration.quotaRemaining, integration.freshness, now, now);
-    } catch (error) {
-      throw sqliteConstraintError(error, "duplicate_integration", "Integration already exists or project is unknown");
-    }
-    this.audit("system", "integration.create", "integration_account", integration.id, { projectId, provider });
-    return integration;
-  }
-
-  listJobs(): FoundationJob[] {
-    return this.db.prepare(`SELECT * FROM job_queue ORDER BY created_at ASC`).all().map(mapJob);
-  }
-
-  createJob(projectId: string, type: FoundationJob["type"], subject: string, payload: Record<string, unknown> = {}): { job: FoundationJob; idempotent: boolean } {
-    const idempotencyKey = makeIdempotencyKey(projectId, type, subject);
-    const existingJob = this.db.prepare(`SELECT * FROM job_queue WHERE idempotency_key = ?`).get(idempotencyKey);
-    if (existingJob) {
-      return { job: mapJob(existingJob), idempotent: true };
-    }
-    const now = new Date().toISOString();
-    const job: FoundationJob = {
-      id: `job-${randomUUID()}`,
-      projectId,
-      type,
-      status: "queued",
-      idempotencyKey,
-      subject,
-      payload: { ...payload, subject },
-      attempts: 0,
-      createdAt: now,
-      updatedAt: now
-    };
-    try {
-      this.db.prepare(`INSERT INTO job_queue (id, project_id, job_type, status, idempotency_key, payload, attempts, scheduled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(job.id, job.projectId, job.type, job.status, job.idempotencyKey, JSON.stringify(job.payload), job.attempts, now, job.createdAt, job.updatedAt);
-    } catch (error) {
-      throw sqliteConstraintError(error, "job_write_failed", "Job could not be stored");
-    }
-    this.audit("system", "job.create", "job_queue", job.id, { projectId, type, subject });
-    return { job, idempotent: false };
-  }
-
-  claimNextJob(type?: FoundationJob["type"]): FoundationJob | null {
-    const row = type
-      ? this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' AND job_type = ? ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get(type)
-      : this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get();
-    if (!row) return null;
-    const now = new Date().toISOString();
-    this.db.prepare(`UPDATE job_queue SET status = 'running', attempts = attempts + 1, started_at = ?, updated_at = ? WHERE id = ? AND status = 'queued'`)
-      .run(now, now, String(row.id));
-    const claimed = this.db.prepare(`SELECT * FROM job_queue WHERE id = ?`).get(String(row.id));
-    return claimed ? mapJob(claimed) : null;
-  }
-
-  completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): FoundationJob {
-    const now = new Date().toISOString();
-    this.db.prepare(`UPDATE job_queue SET status = ?, finished_at = ?, updated_at = ?, last_error = ? WHERE id = ?`)
-      .run(status, now, now, lastError ?? null, jobId);
-    const row = this.db.prepare(`SELECT * FROM job_queue WHERE id = ?`).get(jobId);
-    if (!row) {
-      throw new RequestError(404, "job_not_found", "Job not found", { jobId });
-    }
-    return mapJob(row);
-  }
-
-  listSourceMapEntries(): SourceMapEntry[] {
-    return this.db.prepare(`
-      SELECT url_template_map.id, url_template_map.project_id, url_template_map.url_pattern, templates.name AS template,
-             templates.component, templates.repo_path, url_template_map.confidence
-      FROM url_template_map
-      JOIN templates ON templates.id = url_template_map.template_id
-      ORDER BY url_template_map.created_at ASC
-    `).all().map(mapSourceMapEntry);
-  }
-
-  close(): void {
-    this.db.close();
-  }
-
-  private assertSiteScope(projectId: string, siteId: string): void {
-    const row = this.db.prepare(`SELECT id FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId);
-    if (!row) {
-      throw new RequestError(404, "unknown_site", "Referenced site does not exist", { projectId, siteId });
+      const value = (prototype as Record<string, unknown>)[key as string];
+      composed[key as string] = typeof value === "function" ? value.bind(store) : value;
     }
   }
-
-  private crawlRunSummary(projectId: string, siteId: string): CrawlRun["summary"] {
-    const discoveredUrls = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM discovered_urls WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
-    const fetchedUrls = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM url_fetch_results WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
-    const indexabilityAssessments = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM url_indexability_assessments WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
-    const openIssues = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL`).get(projectId, siteId)?.count ?? 0);
-    const healthRow = this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? AND site_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId, siteId);
-    return { discoveredUrls, fetchedUrls, indexabilityAssessments, openIssues, healthScore: healthRow ? Number(healthRow.score) : null };
-  }
-
-
-  private assertDiscoveredUrlScope(projectId: string, siteId: string, discoveredUrlId: string): void {
-    const row = this.db.prepare(`SELECT id FROM discovered_urls WHERE id = ? AND project_id = ? AND site_id = ?`).get(discoveredUrlId, projectId, siteId);
-    if (!row) {
-      throw new RequestError(404, "unknown_discovered_url", "Referenced discovered URL does not exist", { projectId, siteId, discoveredUrlId });
-    }
-  }
-
-  private assertFetchResultScope(projectId: string, siteId: string, discoveredUrlId: string, fetchResultId: string): void {
-    const row = this.db.prepare(`
-      SELECT id FROM url_fetch_results
-      WHERE id = ? AND project_id = ? AND site_id = ? AND discovered_url_id = ?
-    `).get(fetchResultId, projectId, siteId, discoveredUrlId);
-    if (!row) {
-      throw new RequestError(404, "unknown_fetch_result", "Referenced fetch result does not exist", { projectId, siteId, discoveredUrlId, fetchResultId });
-    }
-  }
-
-  private audit(actorId: string, action: string, entityType: string, entityId: string, metadata: Record<string, unknown>): void {
-    this.db.prepare(`INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(`aud-${randomUUID()}`, actorId, action, entityType, entityId, JSON.stringify(metadata), new Date().toISOString());
-  }
+  return composed as TStore;
 }
 
 export class RequestError extends Error {
@@ -672,30 +437,4 @@ export function sqliteLocation(databaseUrl: string): string {
     return resolve(databaseUrl.slice("sqlite:".length));
   }
   return resolve(databaseUrl);
-}
-
-function seedFoundation(db: SQLiteDatabase): void {
-  const now = "2026-06-02T00:00:00.000Z";
-  const projectCount = Number(db.prepare(`SELECT COUNT(*) AS count FROM projects`).get()?.count ?? 0);
-  if (projectCount > 0) {
-    return;
-  }
-  db.prepare(`INSERT INTO projects (id, name, slug, status, default_locale, markets, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run("proj-demo", "Demo Property", "demo-property", "active", "de-DE", JSON.stringify([{ country: "DE", language: "de", device: "desktop", searchEngine: "google" }]), now, now);
-  db.prepare(`INSERT INTO sites (id, project_id, scope_type, base_url, crawl_frequency, business_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run("site-demo", "proj-demo", "domain", "https://example.com", "weekly", 80, now);
-  db.prepare(`INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)`)
-    .run("int-gsc-demo", "proj-demo", "gsc", "pending", "B", null, null, now, now);
-  db.prepare(`INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)`)
-    .run("int-ga4-demo", "proj-demo", "ga4", "pending", "A", null, null, now, now);
-  db.prepare(`INSERT INTO job_queue (id, project_id, job_type, status, idempotency_key, payload, attempts, scheduled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run("job-source-map-refresh-demo", "proj-demo", "source_map_refresh", "queued", "proj-demo:source_map_refresh:demo-property", JSON.stringify({ subject: "demo-property" }), 0, now, now, now);
-  db.prepare(`INSERT INTO source_repos (id, project_id, repo_url, default_branch, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .run("repo-demo", "proj-demo", "file://.", "main", now);
-  db.prepare(`INSERT INTO templates (id, source_repo_id, name, component, repo_path) VALUES (?, ?, ?, ?, ?)`)
-    .run("tpl-home-demo", "repo-demo", "home-page", "HomePage", "apps/web/app/page.tsx");
-  db.prepare(`INSERT INTO url_template_map (id, project_id, url_pattern, template_id, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .run("srcmap-home-demo", "proj-demo", "/", "tpl-home-demo", "exact", now);
-  db.prepare(`INSERT INTO feature_flags (key, enabled, description) VALUES (?, ?, ?)`)
-    .run("auth.email_password", 1, "Enable local backend-owned email/password sessions.");
 }

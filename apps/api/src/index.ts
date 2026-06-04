@@ -9,4 +9,4 @@ export function getFoundationState() {
 }
 
 export { createApp, handleRequest } from "./app.js";
-export { createSQLiteStore, type BackendStore } from "./sqlite-store.js";
+export { createSQLiteStore, type SQLiteStore, type AuthStore, type ProjectStore, type CrawlStore, type JobStore, type SourceMapStore } from "./sqlite-store.js";
