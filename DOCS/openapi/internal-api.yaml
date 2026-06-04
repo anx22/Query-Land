@@ -299,6 +299,72 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/IndexabilityRecord'
+  /projects/{projectId}/sites/{siteId}/audit-issues:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      summary: List audit issues for a site scope
+      operationId: listAuditIssues
+      responses:
+        '200':
+          description: Audit issue list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditIssueRecord'
+    post:
+      summary: Record audit issues for a site scope
+      operationId: recordAuditIssues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordAuditIssuesRequest'
+      responses:
+        '201':
+          description: Audit issues stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditIssueRecord'
+                  meta:
+                    type: object
+                    properties:
+                      inserted: { type: integer }
+                      updated: { type: integer }
+  /projects/{projectId}/sites/{siteId}/audit-issues/{issueId}/resolve:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - name: issueId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Resolve an open audit issue
+      operationId: resolveAuditIssue
+      responses:
+        '200':
+          description: Audit issue resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AuditIssueRecord'
   /integrations:
     get:
       summary: List integration accounts
@@ -371,6 +437,55 @@ paths:
                     $ref: '#/components/schemas/FoundationJob'
         '200':
           description: Existing job returned by idempotency key
+  /jobs/claim:
+    post:
+      summary: Claim the next queued foundation job
+      operationId: claimJob
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type: { type: string, enum: [connector_sync, crawl_seed, source_map_refresh, health_check] }
+      responses:
+        '200':
+          description: Claimed job or null if queue is empty
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '#/components/schemas/FoundationJob'
+                      - type: 'null'
+  /jobs/{jobId}/complete:
+    post:
+      summary: Mark a claimed foundation job as completed
+      operationId: completeJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteJobRequest'
+      responses:
+        '200':
+          description: Completed job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FoundationJob'
   /source-map:
     get:
       summary: List source map anchors
@@ -564,7 +679,7 @@ components:
       required: [url, state, isIndexable, reasons, canonicalUrl, fetchResultId, assessedAt]
       properties:
         url: { type: string, format: uri }
-        state: { type: string, enum: [indexable, blocked_by_status, blocked_by_meta, blocked_by_x_robots, canonicalized] }
+        state: { type: string, enum: [indexable, blocked_by_status, blocked_by_meta, blocked_by_x_robots, blocked_by_robots, canonicalized] }
         isIndexable: { type: boolean }
         reasons:
           type: array
@@ -582,6 +697,28 @@ components:
             projectId: { type: string }
             siteId: { type: string }
             discoveredUrlId: { type: string }
+    AuditIssueRecord:
+      type: object
+      required: [id, projectId, siteId, discoveredUrlId, url, rule, severity, message, detectedAt, resolvedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        discoveredUrlId: { type: string, nullable: true }
+        url: { type: string, format: uri }
+        rule: { type: string, enum: [http_error, redirect_chain, missing_title, duplicate_title, canonical_mismatch, broken_link] }
+        severity: { type: string, enum: [critical, high, medium, low] }
+        message: { type: string }
+        detectedAt: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+    RecordAuditIssuesRequest:
+      type: object
+      required: [issues]
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditIssueRecord'
     IntegrationAccount:
       type: object
       required: [id, projectId, provider, status, sourceConfidence]
@@ -601,13 +738,15 @@ components:
         provider: { type: string }
     FoundationJob:
       type: object
-      required: [id, projectId, type, status, idempotencyKey, attempts, createdAt, updatedAt]
+      required: [id, projectId, type, status, idempotencyKey, subject, payload, attempts, createdAt, updatedAt]
       properties:
         id: { type: string }
         projectId: { type: string }
         type: { type: string, enum: [connector_sync, crawl_seed, source_map_refresh, health_check] }
         status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
         idempotencyKey: { type: string }
+        subject: { type: string }
+        payload: { type: object, additionalProperties: true }
         attempts: { type: integer }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -618,6 +757,13 @@ components:
         projectId: { type: string }
         type: { type: string, enum: [connector_sync, crawl_seed, source_map_refresh, health_check] }
         subject: { type: string }
+        payload: { type: object, additionalProperties: true }
+    CompleteJobRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [succeeded, failed] }
+        lastError: { type: string }
     SourceMapEntry:
       type: object
       required: [id, projectId, urlPattern, template, component, repoPath, confidence]

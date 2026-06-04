@@ -93,6 +93,8 @@ export interface FoundationJob {
   type: "connector_sync" | "crawl_seed" | "source_map_refresh" | "health_check";
   status: JobStatus;
   idempotencyKey: string;
+  subject: string;
+  payload: Record<string, unknown>;
   attempts: number;
   createdAt: string;
   updatedAt: string;
@@ -143,8 +145,10 @@ export interface SeoMemorySnapshot {
 
 export type UrlDiscoverySource = "seed" | "sitemap" | "link";
 export type FetchStatusClass = "success" | "redirect" | "client_error" | "server_error" | "network_error";
-export type IndexabilityState = "indexable" | "blocked_by_status" | "blocked_by_meta" | "blocked_by_x_robots" | "canonicalized";
+export type IndexabilityState = "indexable" | "blocked_by_status" | "blocked_by_meta" | "blocked_by_x_robots" | "blocked_by_robots" | "canonicalized";
 export type AuditIssueSeverity = "critical" | "high" | "medium" | "low";
+export type CrawlRunStatus = "running" | "succeeded" | "failed";
+
 
 export interface DiscoveredUrl {
   id: string;
@@ -166,6 +170,7 @@ export interface FetchResult {
   headers: Record<string, string>;
   redirectChain: string[];
   fetchedAt: string;
+  responseBody?: string;
   errorMessage?: string;
 }
 
@@ -199,6 +204,42 @@ export interface AuditIssue {
   rule: "http_error" | "redirect_chain" | "missing_title" | "duplicate_title" | "canonical_mismatch" | "broken_link";
   severity: AuditIssueSeverity;
   message: string;
+}
+
+export interface AuditIssueRecord extends AuditIssue {
+  projectId: string;
+  siteId: string;
+  discoveredUrlId: string | null;
+  detectedAt: string;
+  resolvedAt: string | null;
+}
+
+export interface CrawlRun {
+  id: string;
+  projectId: string;
+  siteId: string;
+  status: CrawlRunStatus;
+  trigger: "manual" | "scheduled" | "deploy";
+  startedAt: string;
+  finishedAt: string | null;
+  summary: {
+    discoveredUrls: number;
+    fetchedUrls: number;
+    indexabilityAssessments: number;
+    openIssues: number;
+    healthScore: number | null;
+  };
+  errorMessage?: string;
+}
+
+export interface CrawlHealthScore {
+  id: string;
+  projectId: string;
+  siteId: string;
+  score: number;
+  totalIssues: number;
+  issueCounts: Record<AuditIssueSeverity, number>;
+  generatedAt: string;
 }
 
 const confidenceByProvider: Record<IntegrationProvider, SourceConfidence> = {

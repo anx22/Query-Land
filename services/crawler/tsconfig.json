@@ -4,8 +4,19 @@
     "rootDir": ".",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ],
   "references": [
-    { "path": "../../packages/domain-model" }
+    {
+      "path": "../../packages/domain-model"
+    },
+    {
+      "path": "../../packages/shared-config"
+    },
+    {
+      "path": "../../apps/api"
+    }
   ]
 }

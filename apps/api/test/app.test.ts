@@ -1,12 +1,38 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createRequire } from "node:module";
 import { createApp } from "../src/app.js";
 import { createSQLiteStore } from "../src/sqlite-store.js";
+import { runSQLiteMigrations } from "../src/sqlite-migrations.js";
+
+const require = createRequire(import.meta.url);
+const { DatabaseSync } = require("node:sqlite") as {
+  DatabaseSync: new (location: string) => { exec(sql: string): void; prepare(sql: string): { run(...params: unknown[]): { changes: number; lastInsertRowid: number | bigint }; get(...params: unknown[]): Record<string, unknown> | undefined; all(...params: unknown[]): Array<Record<string, unknown>> }; close(): void };
+};
 
 function testApp() {
   const store = createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
+
+test("SQLite migrations are versioned and idempotent", () => {
+  const db = new DatabaseSync(":memory:");
+  try {
+    const first = runSQLiteMigrations(db);
+    assert.deepEqual(first.applied.map((migration) => migration.filename), ["001_foundation_auth.sql"]);
+    assert.deepEqual(first.skipped, []);
+
+    const recorded = db.prepare(`SELECT version, name FROM schema_migrations ORDER BY version`).all()
+      .map((row) => ({ version: row.version, name: row.name }));
+    assert.deepEqual(recorded, [{ version: 1, name: "foundation_auth" }]);
+
+    const second = runSQLiteMigrations(db);
+    assert.deepEqual(second.applied, []);
+    assert.deepEqual(second.skipped.map((migration) => migration.filename), ["001_foundation_auth.sql"]);
+  } finally {
+    db.close();
+  }
+});
 
 test("GET /health returns embedded SQLite foundation health snapshot", async () => {
   const { app, store } = testApp();
@@ -252,5 +278,106 @@ test("crawl indexability API stores deterministic assessment state", async () =>
   const data = (list.body as { data: Array<{ reasons: string[]; canonicalUrl: string | null }> }).data;
   assert.deepEqual(data[0]?.reasons, ["X-Robots-Tag contains noindex"]);
   assert.equal(data[0]?.canonicalUrl, null);
+  store.close();
+});
+
+test("crawl run API records issues, computes health, and completes run summaries", async () => {
+  const { app, store } = testApp();
+  const run = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" });
+  assert.equal(run.status, 201);
+  const runId = (run.body as { data: { id: string } }).data.id;
+
+  const issues = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-health-critical",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/broken",
+        rule: "http_error",
+        severity: "critical",
+        message: "URL returns 500",
+        detectedAt: "2026-06-02T08:10:00.000Z",
+        resolvedAt: null
+      },
+      {
+        id: "issue-health-low",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/title",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-02T08:11:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+  assert.equal(issues.status, 201);
+  assert.deepEqual((issues.body as { meta: { inserted: number; updated: number } }).meta, { inserted: 2, updated: 0 });
+
+  const health = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute");
+  assert.equal(health.status, 201);
+  assert.equal((health.body as { data: { score: number; totalIssues: number } }).data.score, 80);
+  assert.equal((health.body as { data: { score: number; totalIssues: number } }).data.totalIssues, 2);
+
+  const complete = await app("POST", `/projects/proj-demo/sites/site-demo/crawl-runs/${runId}/complete`, { status: "succeeded" });
+  assert.equal(complete.status, 200);
+  assert.deepEqual((complete.body as { data: { summary: { openIssues: number; healthScore: number } } }).data.summary, {
+    discoveredUrls: 0,
+    fetchedUrls: 0,
+    indexabilityAssessments: 0,
+    openIssues: 2,
+    healthScore: 80
+  });
+  store.close();
+});
+
+
+test("audit issue API resolves issues and health recompute ignores resolved issues", async () => {
+  const { app, store } = testApp();
+  await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-resolve-critical",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/down",
+        rule: "http_error",
+        severity: "critical",
+        message: "URL returns 500",
+        detectedAt: "2026-06-04T08:00:00.000Z",
+        resolvedAt: null
+      },
+      {
+        id: "issue-resolve-low",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/title",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-04T08:01:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+
+  const resolved = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-resolve-critical/resolve", {});
+  assert.equal(resolved.status, 200);
+  assert.equal((resolved.body as { data: { resolvedAt: string | null } }).data.resolvedAt !== null, true);
+
+  const health = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute", {});
+  assert.equal(health.status, 201);
+  assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.totalIssues, 1);
+  assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.score, 98);
+
+  const missing = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/missing/resolve", {});
+  assert.equal(missing.status, 404);
+  assert.equal((missing.body as { error: { code: string } }).error.code, "audit_issue_not_found");
   store.close();
 });

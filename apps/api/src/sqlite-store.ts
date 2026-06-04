@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import { makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuthUser, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
+import { calculateHealthScore, makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuditIssueRecord, type AuthUser, type CrawlHealthScore, type CrawlRun, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
 import { hashPassword, hashToken, verifyPassword } from "./password.js";
-import { sqliteFoundationSchema } from "./sqlite-schema.js";
+import { runSQLiteMigrations } from "./sqlite-migrations.js";
 import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapIntegration, mapJob, mapProject, mapSite, mapSourceMapEntry, mapUrlFetchRecord, mapUser } from "./sqlite-mappers.js";
 
 const require = createRequire(import.meta.url);
@@ -49,6 +49,14 @@ export interface BackendStore {
   createProject(input: Partial<Project>): Project;
   listSites(projectId: string): Site[];
   createSite(projectId: string, input: Partial<Site>): Site;
+  listCrawlRuns(projectId: string, siteId: string): CrawlRun[];
+  createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): CrawlRun;
+  completeCrawlRun(projectId: string, siteId: string, runId: string, status: Extract<CrawlRun["status"], "succeeded" | "failed">, errorMessage?: string): CrawlRun;
+  listHealthScores(projectId: string, siteId: string): CrawlHealthScore[];
+  computeHealthScore(projectId: string, siteId: string): CrawlHealthScore;
+  listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[];
+  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number };
+  resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord;
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
   listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[];
@@ -58,8 +66,8 @@ export interface BackendStore {
   listIntegrations(): IntegrationAccount[];
   createIntegration(projectId: string, provider: IntegrationProvider): IntegrationAccount;
   listJobs(): FoundationJob[];
-  createJob(projectId: string, type: FoundationJob["type"], subject: string): { job: FoundationJob; idempotent: boolean };
-  claimNextJob(): FoundationJob | null;
+  createJob(projectId: string, type: FoundationJob["type"], subject: string, payload?: Record<string, unknown>): { job: FoundationJob; idempotent: boolean };
+  claimNextJob(type?: FoundationJob["type"]): FoundationJob | null;
   completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): FoundationJob;
   listSourceMapEntries(): SourceMapEntry[];
   close(): void;
@@ -71,7 +79,7 @@ export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Backen
     mkdirSync(dirname(location), { recursive: true });
   }
   const db = new DatabaseSync(location);
-  db.exec(sqliteFoundationSchema);
+  runSQLiteMigrations(db);
   seedFoundation(db);
   return new SQLiteStore(db, location);
 }
@@ -206,6 +214,125 @@ class SQLiteStore implements BackendStore {
     }
     this.audit("system", "site.create", "site", site.id, { projectId, baseUrl: site.baseUrl });
     return site;
+  }
+
+  listCrawlRuns(projectId: string, siteId: string): CrawlRun[] {
+    return this.db.prepare(`SELECT * FROM crawl_runs WHERE project_id = ? AND site_id = ? ORDER BY started_at DESC`).all(projectId, siteId).map(mapCrawlRun);
+  }
+
+  createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): CrawlRun {
+    this.assertSiteScope(projectId, siteId);
+    const now = new Date().toISOString();
+    const run: CrawlRun = {
+      id: `crawl-${randomUUID()}`,
+      projectId,
+      siteId,
+      status: "running",
+      trigger,
+      startedAt: now,
+      finishedAt: null,
+      summary: emptyCrawlRunSummary()
+    };
+    this.db.prepare(`
+      INSERT INTO crawl_runs (id, project_id, site_id, status, trigger, started_at, finished_at, summary, error_message)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(run.id, projectId, siteId, run.status, run.trigger, run.startedAt, run.finishedAt, JSON.stringify(run.summary), null);
+    this.audit("system", "crawl.run.create", "crawl_run", run.id, { projectId, siteId, trigger });
+    return run;
+  }
+
+  completeCrawlRun(projectId: string, siteId: string, runId: string, status: Extract<CrawlRun["status"], "succeeded" | "failed">, errorMessage?: string): CrawlRun {
+    const summary = this.crawlRunSummary(projectId, siteId);
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE crawl_runs
+      SET status = ?, finished_at = ?, summary = ?, error_message = ?
+      WHERE id = ? AND project_id = ? AND site_id = ?
+    `).run(status, now, JSON.stringify(summary), errorMessage ?? null, runId, projectId, siteId);
+    const row = this.db.prepare(`SELECT * FROM crawl_runs WHERE id = ? AND project_id = ? AND site_id = ?`).get(runId, projectId, siteId);
+    if (!row) {
+      throw new RequestError(404, "crawl_run_not_found", "Crawl run not found", { projectId, siteId, runId });
+    }
+    this.audit("system", "crawl.run.complete", "crawl_run", runId, { projectId, siteId, status });
+    return mapCrawlRun(row);
+  }
+
+  listHealthScores(projectId: string, siteId: string): CrawlHealthScore[] {
+    return this.db.prepare(`SELECT * FROM crawl_health_scores WHERE project_id = ? AND site_id = ? ORDER BY generated_at DESC`).all(projectId, siteId).map(mapCrawlHealthScore);
+  }
+
+  computeHealthScore(projectId: string, siteId: string): CrawlHealthScore {
+    this.assertSiteScope(projectId, siteId);
+    const openIssues = this.listAuditIssues(projectId, siteId).filter((issue) => issue.resolvedAt === null);
+    const issueCounts = countIssueSeverities(openIssues);
+    const score: CrawlHealthScore = {
+      id: `health-${randomUUID()}`,
+      projectId,
+      siteId,
+      score: calculateHealthScore(openIssues),
+      totalIssues: openIssues.length,
+      issueCounts,
+      generatedAt: new Date().toISOString()
+    };
+    this.db.prepare(`
+      INSERT INTO crawl_health_scores (id, project_id, site_id, score, total_issues, issue_counts, generated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(score.id, projectId, siteId, score.score, score.totalIssues, JSON.stringify(score.issueCounts), score.generatedAt);
+    this.audit("system", "crawl.health.compute", "site", siteId, { projectId, score: score.score, totalIssues: score.totalIssues });
+    return score;
+  }
+
+  listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[] {
+    return this.db.prepare(`SELECT * FROM audit_issues WHERE project_id = ? AND site_id = ? ORDER BY detected_at DESC, severity ASC`).all(projectId, siteId).map(mapAuditIssueRecord);
+  }
+
+  recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number } {
+    this.assertSiteScope(projectId, siteId);
+    let inserted = 0;
+    let updated = 0;
+    const now = new Date().toISOString();
+    for (const issue of issues) {
+      if (issue.projectId !== projectId || issue.siteId !== siteId) {
+        throw new RequestError(400, "issue_scope_mismatch", "Audit issue projectId/siteId must match the route scope", { issueId: issue.id });
+      }
+      if (issue.discoveredUrlId) {
+        this.assertDiscoveredUrlScope(projectId, siteId, issue.discoveredUrlId);
+      }
+      const existing = this.db.prepare(`SELECT id FROM audit_issues WHERE id = ?`).get(issue.id);
+      this.db.prepare(`
+        INSERT INTO audit_issues (id, project_id, site_id, discovered_url_id, url, rule, severity, message, detected_at, resolved_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          discovered_url_id = excluded.discovered_url_id,
+          url = excluded.url,
+          rule = excluded.rule,
+          severity = excluded.severity,
+          message = excluded.message,
+          detected_at = excluded.detected_at,
+          resolved_at = excluded.resolved_at,
+          updated_at = excluded.updated_at
+      `).run(issue.id, projectId, siteId, issue.discoveredUrlId, issue.url, issue.rule, issue.severity, issue.message, issue.detectedAt, issue.resolvedAt, now);
+      existing ? updated += 1 : inserted += 1;
+    }
+    const stored = this.listAuditIssues(projectId, siteId);
+    this.audit("system", "crawl.issues.record", "site", siteId, { projectId, inserted, updated, total: stored.length });
+    return { issues: stored, inserted, updated };
+  }
+
+  resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord {
+    this.assertSiteScope(projectId, siteId);
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE audit_issues
+      SET resolved_at = COALESCE(resolved_at, ?), updated_at = ?
+      WHERE id = ? AND project_id = ? AND site_id = ?
+    `).run(now, now, issueId, projectId, siteId);
+    const row = this.db.prepare(`SELECT * FROM audit_issues WHERE id = ? AND project_id = ? AND site_id = ?`).get(issueId, projectId, siteId);
+    if (!row) {
+      throw new RequestError(404, "audit_issue_not_found", "Audit issue not found", { projectId, siteId, issueId });
+    }
+    this.audit("system", "crawl.issue.resolve", "audit_issue", issueId, { projectId, siteId });
+    return mapAuditIssueRecord(row);
   }
 
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[] {
@@ -366,7 +493,7 @@ class SQLiteStore implements BackendStore {
     return this.db.prepare(`SELECT * FROM job_queue ORDER BY created_at ASC`).all().map(mapJob);
   }
 
-  createJob(projectId: string, type: FoundationJob["type"], subject: string): { job: FoundationJob; idempotent: boolean } {
+  createJob(projectId: string, type: FoundationJob["type"], subject: string, payload: Record<string, unknown> = {}): { job: FoundationJob; idempotent: boolean } {
     const idempotencyKey = makeIdempotencyKey(projectId, type, subject);
     const existingJob = this.db.prepare(`SELECT * FROM job_queue WHERE idempotency_key = ?`).get(idempotencyKey);
     if (existingJob) {
@@ -379,13 +506,15 @@ class SQLiteStore implements BackendStore {
       type,
       status: "queued",
       idempotencyKey,
+      subject,
+      payload: { ...payload, subject },
       attempts: 0,
       createdAt: now,
       updatedAt: now
     };
     try {
-      this.db.prepare(`INSERT INTO job_queue (id, project_id, job_type, status, idempotency_key, payload, attempts, scheduled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)`)
-        .run(job.id, job.projectId, job.type, job.status, job.idempotencyKey, job.attempts, now, job.createdAt, job.updatedAt);
+      this.db.prepare(`INSERT INTO job_queue (id, project_id, job_type, status, idempotency_key, payload, attempts, scheduled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(job.id, job.projectId, job.type, job.status, job.idempotencyKey, JSON.stringify(job.payload), job.attempts, now, job.createdAt, job.updatedAt);
     } catch (error) {
       throw sqliteConstraintError(error, "job_write_failed", "Job could not be stored");
     }
@@ -393,8 +522,10 @@ class SQLiteStore implements BackendStore {
     return { job, idempotent: false };
   }
 
-  claimNextJob(): FoundationJob | null {
-    const row = this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get();
+  claimNextJob(type?: FoundationJob["type"]): FoundationJob | null {
+    const row = type
+      ? this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' AND job_type = ? ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get(type)
+      : this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get();
     if (!row) return null;
     const now = new Date().toISOString();
     this.db.prepare(`UPDATE job_queue SET status = 'running', attempts = attempts + 1, started_at = ?, updated_at = ? WHERE id = ? AND status = 'queued'`)
@@ -427,6 +558,23 @@ class SQLiteStore implements BackendStore {
   close(): void {
     this.db.close();
   }
+
+  private assertSiteScope(projectId: string, siteId: string): void {
+    const row = this.db.prepare(`SELECT id FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId);
+    if (!row) {
+      throw new RequestError(404, "unknown_site", "Referenced site does not exist", { projectId, siteId });
+    }
+  }
+
+  private crawlRunSummary(projectId: string, siteId: string): CrawlRun["summary"] {
+    const discoveredUrls = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM discovered_urls WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
+    const fetchedUrls = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM url_fetch_results WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
+    const indexabilityAssessments = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM url_indexability_assessments WHERE project_id = ? AND site_id = ?`).get(projectId, siteId)?.count ?? 0);
+    const openIssues = Number(this.db.prepare(`SELECT COUNT(*) AS count FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL`).get(projectId, siteId)?.count ?? 0);
+    const healthRow = this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? AND site_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId, siteId);
+    return { discoveredUrls, fetchedUrls, indexabilityAssessments, openIssues, healthScore: healthRow ? Number(healthRow.score) : null };
+  }
+
 
   private assertDiscoveredUrlScope(projectId: string, siteId: string, discoveredUrlId: string): void {
     const row = this.db.prepare(`SELECT id FROM discovered_urls WHERE id = ? AND project_id = ? AND site_id = ?`).get(discoveredUrlId, projectId, siteId);
@@ -468,7 +616,7 @@ function sqliteConstraintError(error: unknown, fallbackCode: string, fallbackMes
   return new RequestError(400, fallbackCode, fallbackMessage);
 }
 
-function sqliteLocation(databaseUrl: string): string {
+export function sqliteLocation(databaseUrl: string): string {
   if (databaseUrl === "sqlite::memory:" || databaseUrl === ":memory:") {
     return ":memory:";
   }
@@ -492,8 +640,8 @@ function seedFoundation(db: SQLiteDatabase): void {
     .run("int-gsc-demo", "proj-demo", "gsc", "pending", "B", null, null, now, now);
   db.prepare(`INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)`)
     .run("int-ga4-demo", "proj-demo", "ga4", "pending", "A", null, null, now, now);
-  db.prepare(`INSERT INTO job_queue (id, project_id, job_type, status, idempotency_key, payload, attempts, scheduled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)`)
-    .run("job-source-map-refresh-demo", "proj-demo", "source_map_refresh", "queued", "proj-demo:source_map_refresh:demo-property", 0, now, now, now);
+  db.prepare(`INSERT INTO job_queue (id, project_id, job_type, status, idempotency_key, payload, attempts, scheduled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run("job-source-map-refresh-demo", "proj-demo", "source_map_refresh", "queued", "proj-demo:source_map_refresh:demo-property", JSON.stringify({ subject: "demo-property" }), 0, now, now, now);
   db.prepare(`INSERT INTO source_repos (id, project_id, repo_url, default_branch, created_at) VALUES (?, ?, ?, ?, ?)`)
     .run("repo-demo", "proj-demo", "file://.", "main", now);
   db.prepare(`INSERT INTO templates (id, source_repo_id, name, component, repo_path) VALUES (?, ?, ?, ?, ?)`)
@@ -502,124 +650,4 @@ function seedFoundation(db: SQLiteDatabase): void {
     .run("srcmap-home-demo", "proj-demo", "/", "tpl-home-demo", "exact", now);
   db.prepare(`INSERT INTO feature_flags (key, enabled, description) VALUES (?, ?, ?)`)
     .run("auth.email_password", 1, "Enable local backend-owned email/password sessions.");
-}
-
-function mapUser(row: Record<string, unknown>): AuthUser {
-  return {
-    id: String(row.id),
-    email: String(row.email),
-    name: String(row.name),
-    role: row.role as UserRole,
-    status: row.status as AuthUser["status"],
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at)
-  };
-}
-
-function mapProject(row: Record<string, unknown>): Project {
-  return {
-    id: String(row.id),
-    name: String(row.name),
-    slug: String(row.slug),
-    status: row.status as Project["status"],
-    defaultLocale: String(row.default_locale),
-    markets: JSON.parse(String(row.markets)) as Project["markets"],
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at)
-  };
-}
-
-function mapSite(row: Record<string, unknown>): Site {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    scopeType: row.scope_type as Site["scopeType"],
-    baseUrl: String(row.base_url),
-    crawlFrequency: row.crawl_frequency as Site["crawlFrequency"],
-    businessValue: Number(row.business_value)
-  };
-}
-
-function mapDiscoveredUrl(row: Record<string, unknown>): DiscoveredUrl {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    siteId: String(row.site_id),
-    url: String(row.url),
-    normalizedUrl: String(row.normalized_url),
-    source: row.source as DiscoveredUrl["source"],
-    discoveredFrom: row.discovered_from === null ? null : String(row.discovered_from),
-    depth: Number(row.depth),
-    discoveredAt: String(row.discovered_at)
-  };
-}
-
-function mapUrlFetchRecord(row: Record<string, unknown>): UrlFetchRecord {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    siteId: String(row.site_id),
-    discoveredUrlId: String(row.discovered_url_id),
-    url: String(row.url),
-    finalUrl: String(row.final_url),
-    statusCode: row.status_code === null ? null : Number(row.status_code),
-    statusClass: row.status_class as UrlFetchRecord["statusClass"],
-    headers: JSON.parse(String(row.headers)) as Record<string, string>,
-    redirectChain: JSON.parse(String(row.redirect_chain)) as string[],
-    fetchedAt: String(row.fetched_at),
-    errorMessage: row.error_message === null ? undefined : String(row.error_message)
-  };
-}
-
-function mapIndexabilityRecord(row: Record<string, unknown>): IndexabilityRecord {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    siteId: String(row.site_id),
-    discoveredUrlId: String(row.discovered_url_id),
-    fetchResultId: row.fetch_result_id === null ? null : String(row.fetch_result_id),
-    url: String(row.url),
-    state: row.state as IndexabilityRecord["state"],
-    isIndexable: Number(row.is_indexable) === 1,
-    reasons: JSON.parse(String(row.reasons)) as string[],
-    canonicalUrl: row.canonical_url === null ? null : String(row.canonical_url),
-    assessedAt: String(row.assessed_at)
-  };
-}
-
-function mapIntegration(row: Record<string, unknown>): IntegrationAccount {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    provider: row.provider as IntegrationProvider,
-    status: row.status as IntegrationAccount["status"],
-    sourceConfidence: row.source_confidence as IntegrationAccount["sourceConfidence"],
-    quotaRemaining: row.quota_remaining === null ? null : Number(row.quota_remaining),
-    freshness: row.freshness === null ? null : String(row.freshness)
-  };
-}
-
-function mapJob(row: Record<string, unknown>): FoundationJob {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    type: row.job_type as FoundationJob["type"],
-    status: row.status as FoundationJob["status"],
-    idempotencyKey: String(row.idempotency_key),
-    attempts: Number(row.attempts),
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at)
-  };
-}
-
-function mapSourceMapEntry(row: Record<string, unknown>): SourceMapEntry {
-  return {
-    id: String(row.id),
-    projectId: String(row.project_id),
-    urlPattern: String(row.url_pattern),
-    template: String(row.template),
-    component: String(row.component),
-    repoPath: String(row.repo_path),
-    confidence: row.confidence as SourceMapEntry["confidence"]
-  };
 }

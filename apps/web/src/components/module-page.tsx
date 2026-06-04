@@ -1,9 +1,22 @@
 import { appRoutes, demoIntegrations, demoJobs, demoOpportunities, demoProject, demoSourceMap, seoMemory } from "@seo-tool/shared-config";
+import { InfoCard } from "./info-card";
+import { StatusList } from "./status-list";
 
 export function ModulePage({ href }: { href: string }) {
   const route = appRoutes.find((item) => item.href === href) ?? appRoutes[0];
   const isFoundation = route.wave === 1;
   const primaryOpportunity = demoOpportunities[0];
+  const moduleStats = [
+    { label: "Sites", value: String(demoProject.sites.length) },
+    { label: "Connectors", value: String(demoIntegrations.length) },
+    { label: "Jobs", value: String(demoJobs.length) }
+  ];
+  const sourceMapItems = demoSourceMap.map((entry) => ({
+    id: entry.id,
+    label: entry.routePattern,
+    status: entry.confidence,
+    statusClassName: `status ${entry.confidence === "exact" ? "succeeded" : "queued"}`
+  }));
 
   return (
     <>

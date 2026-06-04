@@ -4,3 +4,8 @@ apps/web/.next/
 *.tsbuildinfo
 .env*
 artifacts/
+dist/
+apps/*/dist/
+services/*/dist/
+packages/*/dist/
+data/
