@@ -22,6 +22,13 @@ SQLite is the default local/Codex backend because it is embedded and fully inspe
 | enums | `CHECK` constraints | enum types or check constraints |
 | queue claiming | single-process local claim | transactional claim with row locking |
 
+## Current runner
+
+- SQLite migrations are versioned SQL files in `infra/db/sqlite` and are applied in filename/version order.
+- Applied versions are tracked in `schema_migrations` with `version`, `name` and `applied_at`.
+- The API store runs pending SQLite migrations before seeding demo Foundation data, so local files and `sqlite::memory:` tests share the same schema path.
+- Local smoke command: `npm run migrate:sqlite -- sqlite:./data/seo-tool.db`.
+
 ## Next migration task
 
-Introduce a migration runner once the first Welle-2 schema change is needed. Until then, Welle-1 schemas remain hand-maintained and validated by tests.
+Add Postgres-compatible migration files for the same entities and introduce a cross-database migration smoke once the Postgres target is available in CI.

@@ -71,7 +71,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | URL Discovery v0 | Domain/API/DB/Tests vorhanden | contract_done | Worker muss echte Sitemap/Seed-Pipeline schreiben |
 | HTTP Fetch Worker v0 | Normalisierungslogik + Persistenz vorhanden | contract_done | Queue-Worker mit Retry/Timeout fehlt |
 | Indexability Checks v0 | Klassifikation + Persistenz vorhanden | contract_done | Integration in Worker und UI-Explorer fehlt |
-| Issue Rules Minimum Set | Rules + Persistenz vorhanden | contract_done | Issue-Lifecycle und UI-Filter fehlen |
+| Issue Rules Minimum Set | Rules + Persistenz, Resolve-Endpoint und UI-Filter vorhanden | in_progress | Pagination und Reopen/Dismiss fehlen |
 | Health Score v0 | Score + Snapshots vorhanden | contract_done | Score-UI und automatische Recompute-Policy fehlen |
 | Crawl Runs | Lifecycle + Summary vorhanden; Worker schließt Fixture-Runs mit Artefakten ab | in_progress | Daemon/echte Site-Robustheit fehlt |
 | Interner Linkgraph | nicht implementiert | todo | Link-Extraktion, Edges, Depth, Orphans |
@@ -121,7 +121,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 **Scope:**
 
 1. Technical-Audit-Seite zeigt Crawl Runs, letzten Health Score und Issue Counts.
-2. URL Explorer listet Discovered URLs mit latest Fetch/Indexability State.
+2. URL Explorer listet Discovered URLs mit latest Fetch/Indexability State. (Detaildaten sind angebunden; Pagination/Drawer fehlen.)
 3. Issue-Tabelle mit Severity, Rule, URL, Status und Filter.
 4. Buttons: Crawl starten, Health neu berechnen, Issue als resolved markieren.
 5. Empty/Error/Loading States.
@@ -137,7 +137,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 **Scope:**
 
 1. API-Routen modularisieren (`routes/*`, `validators/*`, `store/*`).
-2. Versionierte Migrationen für SQLite und Postgres-Zielpfad einführen.
+2. Versionierte Migrationen für SQLite einführen; Postgres-Zielpfad nachziehen.
 3. AuthZ pro Projekt/Site und Rollen-Gates für Mutations.
 4. Pagination/Filter/Limit für Listen-Endpunkte.
 5. Next/PostCSS-Audit-Befund gezielt beheben oder dokumentiert risk-accepten.
@@ -149,12 +149,12 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 | ID | Bereich | Befund | Empfehlung | Priorität | Ziel-Sprint |
 |---|---|---|---|---|---|
-| GAP-UI-001 | Frontend | UI liest Demo-Fixtures statt Backend | API-Client und echte Dashboard-/Technical-Audit-Daten | P0 | A/C |
+| GAP-UI-001 | Frontend | UI nutzt echte Foundation-/Technical-Audit-Daten; URL Detail Drawer fehlt | API-Client und echte Dashboard-/Technical-Audit-Daten | P0 | A/C |
 | GAP-WORKER-001 | Crawler | Crawler-Service nicht an Job Queue gekoppelt | Worker für Crawl Run Pipeline bauen | P0 | B |
-| GAP-MIG-001 | DB | Kein versioniertes Migrationssystem | Migration Runner + SQL-Dateien | P0 | D |
+| GAP-MIG-001 | DB | SQLite-Migration Runner vorhanden; Postgres-Migrationen fehlen | Postgres SQL-Dateien + Cross-DB-Smoke ergänzen | P0 | D |
 | GAP-AUTHZ-001 | Security | Business-Endpunkte ohne Projekt-/Rollen-Gates | AuthZ Middleware/Service einführen | P0 | D |
 | GAP-API-001 | API | Große Router-/Store-Dateien | Routen, Validatoren, Store-Module splitten | P1 | D |
-| GAP-API-002 | API | Keine Pagination/Filter/Limits | Query-DTOs für URL/Issue/Crawl-Listen | P1 | C/D |
+| GAP-API-002 | API | Keine Pagination/Limits; Issue-Filter aktuell UI-seitig | Query-DTOs für URL/Issue/Crawl-Listen | P1 | C/D |
 | GAP-SEC-001 | Dependencies | Next/PostCSS moderate Audit Findings | gezieltes Upgrade/Risk Assessment, kein blindes `--force` | P1 | D |
 | GAP-CRAWL-001 | Crawl | Regex-HTML-Heuristiken und nur minimale Robots-Policy | Parser/Robots/Sitemap-Index robust machen | P1 | B/D |
 | GAP-LINK-001 | Crawl | Interner Linkgraph fehlt | Link Extraction + Edge Table + Depth/Orphan-Auswertung | P1 | Welle 2+ |

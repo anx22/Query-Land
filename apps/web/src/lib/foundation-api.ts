@@ -1,5 +1,5 @@
 import { apiDefaults } from "@seo-tool/shared-config";
-import type { AuditIssueRecord, CrawlHealthScore, CrawlRun, DiscoveredUrl } from "@seo-tool/domain-model";
+import type { AuditIssueRecord, CrawlHealthScore, CrawlRun, DiscoveredUrl, IndexabilityRecord, UrlFetchRecord } from "@seo-tool/domain-model";
 
 export interface FoundationProject {
   id: string;
@@ -92,12 +92,19 @@ export interface CreateFoundationJobInput {
   payload?: Record<string, unknown>;
 }
 
+export interface TechnicalAuditUrlRow {
+  discoveredUrl: DiscoveredUrl;
+  latestFetch: UrlFetchRecord | null;
+  latestIndexability: IndexabilityRecord | null;
+}
+
 export interface TechnicalAuditData extends FoundationDashboardData {
   selectedSite: FoundationSite | null;
   crawlRuns: CrawlRun[];
   healthScores: CrawlHealthScore[];
   auditIssues: AuditIssueRecord[];
   discoveredUrls: DiscoveredUrl[];
+  urlExplorerRows: TechnicalAuditUrlRow[];
 }
 
 interface ApiEnvelope<T> {
@@ -168,7 +175,7 @@ export async function loadTechnicalAuditData(): Promise<TechnicalAuditData> {
   const dashboard = await loadFoundationDashboardData();
   const selectedSite = dashboard.sites[0] ?? null;
   if (!dashboard.connected || !dashboard.selectedProject || !selectedSite) {
-    return { ...dashboard, selectedSite, crawlRuns: [], healthScores: [], auditIssues: [], discoveredUrls: [] };
+    return { ...dashboard, selectedSite, crawlRuns: [], healthScores: [], auditIssues: [], discoveredUrls: [], urlExplorerRows: [] };
   }
 
   try {
@@ -180,7 +187,9 @@ export async function loadTechnicalAuditData(): Promise<TechnicalAuditData> {
       apiGet<DiscoveredUrl[]>(`${base}/discovered-urls`)
     ]);
 
-    return { ...dashboard, selectedSite, crawlRuns, healthScores, auditIssues, discoveredUrls };
+    const urlExplorerRows = await loadUrlExplorerRows(base, discoveredUrls);
+
+    return { ...dashboard, selectedSite, crawlRuns, healthScores, auditIssues, discoveredUrls, urlExplorerRows };
   } catch (error) {
     return {
       ...dashboard,
@@ -190,9 +199,25 @@ export async function loadTechnicalAuditData(): Promise<TechnicalAuditData> {
       crawlRuns: [],
       healthScores: [],
       auditIssues: [],
-      discoveredUrls: []
+      discoveredUrls: [],
+      urlExplorerRows: []
     };
   }
+}
+
+async function loadUrlExplorerRows(base: string, discoveredUrls: DiscoveredUrl[]): Promise<TechnicalAuditUrlRow[]> {
+  return Promise.all(discoveredUrls.map(async (discoveredUrl) => {
+    const detailBase = `${base}/discovered-urls/${discoveredUrl.id}`;
+    const [fetches, indexability] = await Promise.all([
+      apiGet<UrlFetchRecord[]>(`${detailBase}/fetch-results`),
+      apiGet<IndexabilityRecord[]>(`${detailBase}/indexability`)
+    ]);
+    return {
+      discoveredUrl,
+      latestFetch: fetches[0] ?? null,
+      latestIndexability: indexability[0] ?? null
+    };
+  }));
 }
 
 export async function createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): Promise<CrawlRun> {
@@ -201,6 +226,10 @@ export async function createCrawlRun(projectId: string, siteId: string, trigger:
 
 export async function computeCrawlHealthScore(projectId: string, siteId: string): Promise<CrawlHealthScore> {
   return apiPost<CrawlHealthScore>(`/projects/${projectId}/sites/${siteId}/health-scores/compute`, {});
+}
+
+export async function resolveAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
+  return apiPost<AuditIssueRecord>(`/projects/${projectId}/sites/${siteId}/audit-issues/${issueId}/resolve`, {});
 }
 
 export async function createFoundationProject(input: CreateFoundationProjectInput): Promise<FoundationProject> {

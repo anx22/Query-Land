@@ -112,7 +112,7 @@ Nachzuziehen:
 
 - Query-Parameter für Pagination/Filter/Sort.
 - Start-Crawl-Endpunkt oder Job-typed Command, der Worker-Orchestrierung auslöst.
-- Resolve/Reopen Issue Endpunkt.
+- Resolve-Issue-Endpunkt ist vorhanden; Reopen/Dismiss fehlen noch.
 - Linkgraph-/URL-Explorer-Endpunkte.
 
 ## UI Screens
@@ -121,8 +121,8 @@ MVP-Screens für Sprint C:
 
 - Crawl Runs: Liste, Status, Trigger, Summary, Start/Finish.
 - Health Score: letzter Score, Trend, Severity Counts.
-- URL Explorer: Discovered URLs mit latest Fetch und Indexability.
-- Issue Table: Severity, Rule, URL, Status, Filter.
+- URL Explorer: Discovered URLs mit latest Fetch und Indexability ist in der Technical-Audit-Seite angebunden; Detail Drawer fehlt noch.
+- Issue Table: Severity, Rule, URL, Status, Filter und Resolve-Aktion.
 - Detail Drawer: Fetch Headers, Redirect Chain, Reasons, Canonical.
 
 ## States
@@ -141,7 +141,7 @@ Job Queue:
 Issue Lifecycle:
 
 - Aktuell: offen, wenn `resolvedAt = null`; resolved, wenn `resolvedAt != null`.
-- Nachzuziehen: explizite Aktionen `resolve`, `reopen`, `dismiss`.
+- Aktuell: `resolve` per API/UI; nachzuziehen: `reopen`, `dismiss`.
 
 ## Error Handling
 
@@ -171,7 +171,7 @@ Welle-2 Gate:
 - Robots.txt-Disallow wird als `blocked_by_robots` Indexability Assessment ohne Page-Fetch persistiert.
 - Out-of-scope Sitemap-URLs werden nicht persistiert/gefetches.
 - Duplicate URLs werden idempotent verarbeitet.
-- Technical-Audit-UI zeigt Run, URLs, Issues und Health Score aus echter API.
+- Technical-Audit-UI zeigt Run, URLs inklusive latest Fetch/Indexability, Issues und Health Score aus echter API.
 - Wiederholter Crawl auf eigener Site ist stabil genug für das Master-Gate: 95 % stabile Vollcrawls auf eigenen Sites.
 
 ## Future Extensions

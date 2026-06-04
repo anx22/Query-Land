@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { calculateHealthScore, makeIdempotencyKey, normalizeEmail, sourceConfidenceForProvider, validateBusinessValue, validatePassword, type AuditIssueRecord, type AuthUser, type CrawlHealthScore, type CrawlRun, type DiscoveredUrl, type FoundationJob, type HealthSnapshot, type IndexabilityRecord, type IntegrationAccount, type IntegrationProvider, type Project, type Site, type SourceMapEntry, type UrlFetchRecord, type UserRole } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
 import { hashPassword, hashToken, verifyPassword } from "./password.js";
-import { sqliteFoundationSchema } from "./sqlite-schema.js";
+import { runSQLiteMigrations } from "./sqlite-migrations.js";
 import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapIntegration, mapJob, mapProject, mapSite, mapSourceMapEntry, mapUrlFetchRecord, mapUser } from "./sqlite-mappers.js";
 
 const require = createRequire(import.meta.url);
@@ -56,6 +56,7 @@ export interface BackendStore {
   computeHealthScore(projectId: string, siteId: string): CrawlHealthScore;
   listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[];
   recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[]): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number };
+  resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord;
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
   listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[];
@@ -78,7 +79,7 @@ export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Backen
     mkdirSync(dirname(location), { recursive: true });
   }
   const db = new DatabaseSync(location);
-  db.exec(sqliteFoundationSchema);
+  runSQLiteMigrations(db);
   seedFoundation(db);
   return new SQLiteStore(db, location);
 }
@@ -295,20 +296,22 @@ class SQLiteStore implements BackendStore {
         this.assertDiscoveredUrlScope(projectId, siteId, issue.discoveredUrlId);
       }
     }
+
     let inserted = 0;
     let updated = 0;
+    let resolved = 0;
     const now = new Date().toISOString();
     const submittedIssueIds = new Set(issues.map((issue) => issue.id));
     const openIssueIds = this.db.prepare(`SELECT id FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL`).all(projectId, siteId).map((row) => String(row.id));
-    const resolvedIssueIds = openIssueIds.filter((id) => !submittedIssueIds.has(id));
-    let resolved = 0;
-    if (resolvedIssueIds.length > 0) {
-      const resolveIssue = this.db.prepare(`UPDATE audit_issues SET resolved_at = ?, updated_at = ? WHERE id = ? AND project_id = ? AND site_id = ? AND resolved_at IS NULL`);
-      for (const issueId of resolvedIssueIds) {
-        const result = resolveIssue.run(now, now, issueId, projectId, siteId);
+    const staleIssueIds = openIssueIds.filter((id) => !submittedIssueIds.has(id));
+    if (staleIssueIds.length > 0) {
+      const resolveStaleIssue = this.db.prepare(`UPDATE audit_issues SET resolved_at = ?, updated_at = ? WHERE id = ? AND project_id = ? AND site_id = ? AND resolved_at IS NULL`);
+      for (const issueId of staleIssueIds) {
+        const result = resolveStaleIssue.run(now, now, issueId, projectId, siteId);
         resolved += Number(result.changes ?? 0);
       }
     }
+
     for (const issue of issues) {
       const existing = this.db.prepare(`SELECT id FROM audit_issues WHERE id = ?`).get(issue.id);
       this.db.prepare(`
@@ -329,6 +332,22 @@ class SQLiteStore implements BackendStore {
     const stored = this.listAuditIssues(projectId, siteId);
     this.audit("system", "crawl.issues.record", "site", siteId, { projectId, inserted, updated, resolved, total: stored.length });
     return { issues: stored, inserted, updated, resolved };
+  }
+
+  resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord {
+    this.assertSiteScope(projectId, siteId);
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE audit_issues
+      SET resolved_at = COALESCE(resolved_at, ?), updated_at = ?
+      WHERE id = ? AND project_id = ? AND site_id = ?
+    `).run(now, now, issueId, projectId, siteId);
+    const row = this.db.prepare(`SELECT * FROM audit_issues WHERE id = ? AND project_id = ? AND site_id = ?`).get(issueId, projectId, siteId);
+    if (!row) {
+      throw new RequestError(404, "audit_issue_not_found", "Audit issue not found", { projectId, siteId, issueId });
+    }
+    this.audit("system", "crawl.issue.resolve", "audit_issue", issueId, { projectId, siteId });
+    return mapAuditIssueRecord(row);
   }
 
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[] {
@@ -612,7 +631,7 @@ function sqliteConstraintError(error: unknown, fallbackCode: string, fallbackMes
   return new RequestError(400, fallbackCode, fallbackMessage);
 }
 
-function sqliteLocation(databaseUrl: string): string {
+export function sqliteLocation(databaseUrl: string): string {
   if (databaseUrl === "sqlite::memory:" || databaseUrl === ":memory:") {
     return ":memory:";
   }

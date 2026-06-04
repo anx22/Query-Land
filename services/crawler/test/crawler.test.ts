@@ -204,6 +204,7 @@ test("crawl worker accepts a valid sitemap that only contains the seed URL", asy
   store.close();
 });
 
+
 test("crawl worker marks invalid successful sitemap jobs as failed", async () => {
   const store = createSQLiteStore("sqlite::memory:");
   const app = createApp(store);

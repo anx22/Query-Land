@@ -2,7 +2,7 @@ import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
 import { StatusList } from "../../components/status-list";
 import { loadTechnicalAuditData } from "../../lib/foundation-api";
-import { computeHealthAction, startCrawlAction } from "./actions";
+import { computeHealthAction, resolveIssueAction, startCrawlAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const latestHealth = data.healthScores[0] ?? null;
   const latestRun = data.crawlRuns[0] ?? null;
   const openIssues = data.auditIssues.filter((issue) => issue.resolvedAt === null);
-  const feedback = feedbackMessage(params?.started, params?.health, params?.error);
+  const issueStatus = singleParam(params?.issueStatus) ?? "open";
+  const issueSeverity = singleParam(params?.severity) ?? "all";
+  const filteredIssues = data.auditIssues.filter((issue) => {
+    const matchesStatus = issueStatus === "all" || (issueStatus === "resolved" ? issue.resolvedAt !== null : issue.resolvedAt === null);
+    const matchesSeverity = issueSeverity === "all" || issue.severity === issueSeverity;
+    return matchesStatus && matchesSeverity;
+  });
+  const feedback = feedbackMessage(params?.started, params?.health, params?.resolved, params?.error);
   const crawlRunItems = data.crawlRuns.length > 0
     ? data.crawlRuns.map((run) => ({
       id: run.id,
@@ -84,15 +91,45 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       <section className="content-grid">
         <div className="card">
           <p className="kicker">Issue Tabelle</p>
+          <form className="filter-row" action="/technical-audit">
+            <label>
+              Status
+              <select name="issueStatus" defaultValue={issueStatus}>
+                <option value="open">Open</option>
+                <option value="resolved">Resolved</option>
+                <option value="all">Alle</option>
+              </select>
+            </label>
+            <label>
+              Severity
+              <select name="severity" defaultValue={issueSeverity}>
+                <option value="all">Alle</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            <button className="button secondary" type="submit">Filtern</button>
+          </form>
           {data.auditIssues.length > 0 ? (
             <div className="table-list">
-              {data.auditIssues.map((issue) => (
+              {filteredIssues.map((issue) => (
                 <article key={issue.id}>
                   <strong>{issue.severity.toUpperCase()} · {issue.rule}</strong>
                   <span>{issue.url}</span>
-                  <span>{issue.message} · {issue.resolvedAt ? "resolved" : "open"}</span>
+                  <span>{issue.message} · {issue.resolvedAt ? `resolved ${new Date(issue.resolvedAt).toLocaleString("de-DE")}` : "open"}</span>
+                  {!issue.resolvedAt ? (
+                    <form className="inline-actions" action={resolveIssueAction}>
+                      <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+                      <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+                      <input type="hidden" name="issueId" value={issue.id} />
+                      <button className="button secondary compact" type="submit" disabled={!data.connected}>Als resolved markieren</button>
+                    </form>
+                  ) : null}
                 </article>
               ))}
+              {filteredIssues.length === 0 ? <p>Keine Issues für die aktiven Filter.</p> : null}
             </div>
           ) : (
             <p>Keine Audit Issues gespeichert. Der Worker-Slice wird diese Tabelle befüllen.</p>
@@ -100,12 +137,19 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </div>
         <div className="card">
           <p className="kicker">URL Explorer</p>
-          {data.discoveredUrls.length > 0 ? (
+          {data.urlExplorerRows.length > 0 ? (
             <div className="table-list">
-              {data.discoveredUrls.map((url) => (
-                <article key={url.id}>
-                  <strong>{url.normalizedUrl}</strong>
-                  <span>{url.source} · depth {url.depth} · discovered {new Date(url.discoveredAt).toLocaleString("de-DE")}</span>
+              {data.urlExplorerRows.map((row) => (
+                <article key={row.discoveredUrl.id}>
+                  <strong>{row.discoveredUrl.normalizedUrl}</strong>
+                  <span>{row.discoveredUrl.source} · depth {row.discoveredUrl.depth} · discovered {new Date(row.discoveredUrl.discoveredAt).toLocaleString("de-DE")}</span>
+                  <span>
+                    Fetch: {row.latestFetch ? `${row.latestFetch.statusClass} · ${row.latestFetch.statusCode ?? "network"} · ${new Date(row.latestFetch.fetchedAt).toLocaleString("de-DE")}` : "noch kein Fetch"}
+                  </span>
+                  <span>
+                    Indexability: {row.latestIndexability ? `${row.latestIndexability.state} · ${row.latestIndexability.isIndexable ? "indexable" : "not indexable"}` : "noch keine Bewertung"}
+                  </span>
+                  {row.latestIndexability?.reasons.length ? <span>Reasons: {row.latestIndexability.reasons.join(", ")}</span> : null}
                 </article>
               ))}
             </div>
@@ -118,10 +162,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   );
 }
 
-function feedbackMessage(started: string | string[] | undefined, health: string | string[] | undefined, error: string | string[] | undefined): { kind: "success" | "danger"; message: string } | null {
+function feedbackMessage(started: string | string[] | undefined, health: string | string[] | undefined, resolved: string | string[] | undefined, error: string | string[] | undefined): { kind: "success" | "danger"; message: string } | null {
   const errorValue = Array.isArray(error) ? error[0] : error;
   if (errorValue) return { kind: "danger", message: errorValue };
   if (started) return { kind: "success", message: "Crawl Run und crawl_seed Job wurden angelegt." };
   if (health) return { kind: "success", message: "Health Score wurde neu berechnet." };
+  if (resolved) return { kind: "success", message: "Issue wurde als resolved markiert und Health neu berechnet." };
   return null;
+}
+
+function singleParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
 }

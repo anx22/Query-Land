@@ -31,7 +31,8 @@
 - **Status:** contract_done
 - **Scope:** HTTP error, redirect chain, missing title, duplicate title, canonical mismatch, broken link.
 - **Vorhanden:** `AuditIssueRecord`, `crawl_audit_issues`, API list/record, Rule-Evaluation, Tests.
-- **Offene Lücke:** Issue-Lifecycle UI, Filter/Pagination und Resolve-Aktion fehlen.
+- **Umgesetzt:** Resolve-Aktion und UI-Filter für Status/Severity sind an die API angebunden; Health wird nach Resolve neu berechnet.
+- **Offene Lücke:** Pagination und Reopen/Dismiss-Aktionen fehlen.
 - **Acceptance:** Rule tests map fixture inputs to issue severity.
 
 ## W2-AUDIT-005 — Health Score v0
@@ -61,8 +62,10 @@
 
 ## W2-AUDIT-008 — Technical Audit UI v0
 
-- **Status:** ready
+- **Status:** in_progress
 - **Scope:** Crawl Runs list, Health Score card, URL Explorer and Issue table using real API data.
+- **Umgesetzt:** Technical-Audit-Seite zeigt Runs, Health, Issues, Issue-Filter/Resolve und einen URL Explorer mit latest Fetch sowie latest Indexability aus den Detail-Endpunkten.
+- **Offene Lücke:** URL-/Issue-Pagination, Detail Drawer und serverseitige Listenfilter fehlen.
 - **Acceptance:** User can start a crawl and inspect URLs/issues/health without direct API calls.
 - **Test gate:** UI smoke + API fixture state.
 

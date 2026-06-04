@@ -299,6 +299,72 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/IndexabilityRecord'
+  /projects/{projectId}/sites/{siteId}/audit-issues:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      summary: List audit issues for a site scope
+      operationId: listAuditIssues
+      responses:
+        '200':
+          description: Audit issue list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditIssueRecord'
+    post:
+      summary: Record audit issues for a site scope
+      operationId: recordAuditIssues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordAuditIssuesRequest'
+      responses:
+        '201':
+          description: Audit issues stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditIssueRecord'
+                  meta:
+                    type: object
+                    properties:
+                      inserted: { type: integer }
+                      updated: { type: integer }
+  /projects/{projectId}/sites/{siteId}/audit-issues/{issueId}/resolve:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - name: issueId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Resolve an open audit issue
+      operationId: resolveAuditIssue
+      responses:
+        '200':
+          description: Audit issue resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AuditIssueRecord'
   /integrations:
     get:
       summary: List integration accounts
@@ -631,6 +697,28 @@ components:
             projectId: { type: string }
             siteId: { type: string }
             discoveredUrlId: { type: string }
+    AuditIssueRecord:
+      type: object
+      required: [id, projectId, siteId, discoveredUrlId, url, rule, severity, message, detectedAt, resolvedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        discoveredUrlId: { type: string, nullable: true }
+        url: { type: string, format: uri }
+        rule: { type: string, enum: [http_error, redirect_chain, missing_title, duplicate_title, canonical_mismatch, broken_link] }
+        severity: { type: string, enum: [critical, high, medium, low] }
+        message: { type: string }
+        detectedAt: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+    RecordAuditIssuesRequest:
+      type: object
+      required: [issues]
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditIssueRecord'
     IntegrationAccount:
       type: object
       required: [id, projectId, provider, status, sourceConfidence]

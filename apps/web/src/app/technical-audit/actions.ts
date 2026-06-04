@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { computeCrawlHealthScore, createCrawlRun, createFoundationJob } from "../../lib/foundation-api";
+import { computeCrawlHealthScore, createCrawlRun, createFoundationJob, resolveAuditIssue } from "../../lib/foundation-api";
 
 export async function startCrawlAction(formData: FormData) {
   try {
@@ -13,7 +13,7 @@ export async function startCrawlAction(formData: FormData) {
     await createFoundationJob({
       projectId,
       type: "crawl_seed",
-      subject: `${baseUrl}#${crawlRun.id}`,
+      subject: `${baseUrl}:run:${crawlRun.id}`,
       payload: { siteId, baseUrl, crawlRunId: crawlRun.id }
     });
   } catch (error) {
@@ -33,6 +33,20 @@ export async function computeHealthAction(formData: FormData) {
 
   revalidateTechnicalAuditViews();
   redirect("/technical-audit?health=1");
+}
+
+export async function resolveIssueAction(formData: FormData) {
+  try {
+    const projectId = requiredString(formData, "projectId");
+    const siteId = requiredString(formData, "siteId");
+    await resolveAuditIssue(projectId, siteId, requiredString(formData, "issueId"));
+    await computeCrawlHealthScore(projectId, siteId);
+  } catch (error) {
+    redirect(`/technical-audit?error=${encodeURIComponent(messageFor(error))}`);
+  }
+
+  revalidateTechnicalAuditViews();
+  redirect("/technical-audit?resolved=1&issueStatus=open");
 }
 
 function revalidateTechnicalAuditViews(): void {
