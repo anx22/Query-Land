@@ -1,5 +1,5 @@
 import type { AuditIssueRecord, AuditIssueSeverity, CrawlRun, CrawlRunStatus, DiscoveredUrl, FetchStatusClass, FoundationJob, IndexabilityRecord, IndexabilityState, IntegrationProvider, ProjectStatus, SiteScopeType, UrlDiscoverySource, UrlFetchRecord } from "@seo-tool/domain-model";
-import { RequestError } from "./sqlite-store.js";
+import { RequestError } from "./stores/store-errors.js";
 
 type MarketInput = { country: string; language: string; device: "desktop" | "mobile"; searchEngine: "google" | "bing" };
 type CreateProjectRequest = { name: string; slug: string; status?: ProjectStatus; defaultLocale?: string; markets?: MarketInput[] };
