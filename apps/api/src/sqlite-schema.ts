@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS url_indexability_assessments (
   discovered_url_id TEXT NOT NULL REFERENCES discovered_urls(id) ON DELETE CASCADE,
   fetch_result_id TEXT REFERENCES url_fetch_results(id) ON DELETE SET NULL,
   url TEXT NOT NULL,
-  state TEXT NOT NULL CHECK (state IN ('indexable', 'blocked_by_status', 'blocked_by_meta', 'blocked_by_x_robots', 'canonicalized')),
+  state TEXT NOT NULL CHECK (state IN ('indexable', 'blocked_by_status', 'blocked_by_meta', 'blocked_by_x_robots', 'blocked_by_robots', 'canonicalized')),
   is_indexable INTEGER NOT NULL CHECK (is_indexable IN (0, 1)),
   reasons TEXT NOT NULL DEFAULT '[]',
   canonical_url TEXT,

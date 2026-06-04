@@ -91,7 +91,7 @@ Aktuell implementiert:
 Nachzuziehen:
 
 - Linkgraph-basierte Regeln: Deep URL, Orphan URL, broken internal links nach Linkquelle.
-- Robots.txt-Allow/Disallow-Klassifikation.
+- Robustere Robots.txt-Details: Crawl-delay, mehrere User-Agent-Gruppen, Sitemap-Direktiven und persistierte Robots-Evidence.
 - Canonical-Cluster und Duplicate-Content-Heuristiken.
 - Web-Vitals als separater Signaltyp.
 
@@ -168,6 +168,7 @@ Welle-2 Gate:
 
 - Fixture-Crawl erzeugt Crawl Run, URLs, Fetch Results, Indexability, Issues und Health Score.
 - Network Error und ungültige Sitemap sind deterministisch getestet.
+- Robots.txt-Disallow wird als `blocked_by_robots` Indexability Assessment ohne Page-Fetch persistiert.
 - Out-of-scope Sitemap-URLs werden nicht persistiert/gefetches.
 - Duplicate URLs werden idempotent verarbeitet.
 - Technical-Audit-UI zeigt Run, URLs, Issues und Health Score aus echter API.

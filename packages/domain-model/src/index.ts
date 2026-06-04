@@ -145,7 +145,7 @@ export interface SeoMemorySnapshot {
 
 export type UrlDiscoverySource = "seed" | "sitemap" | "link";
 export type FetchStatusClass = "success" | "redirect" | "client_error" | "server_error" | "network_error";
-export type IndexabilityState = "indexable" | "blocked_by_status" | "blocked_by_meta" | "blocked_by_x_robots" | "canonicalized";
+export type IndexabilityState = "indexable" | "blocked_by_status" | "blocked_by_meta" | "blocked_by_x_robots" | "blocked_by_robots" | "canonicalized";
 export type AuditIssueSeverity = "critical" | "high" | "medium" | "low";
 export type CrawlRunStatus = "running" | "succeeded" | "failed";
 

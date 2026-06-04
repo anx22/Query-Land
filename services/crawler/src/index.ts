@@ -43,6 +43,17 @@ export interface AuditPageInput {
   outgoingLinks?: Array<{ url: string; statusCode: number | null }>;
 }
 
+export interface RobotsRule {
+  userAgent: string;
+  directive: "allow" | "disallow";
+  path: string;
+}
+
+export interface RobotsPolicy {
+  rules: RobotsRule[];
+  fetchedUrl: string;
+}
+
 export function createCrawlSeedJob(input: CrawlSeedInput): FoundationJob {
   const now = new Date().toISOString();
   return {
@@ -336,6 +347,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     }
 
     const now = options.now ?? (() => new Date().toISOString());
+    const robotsPolicy = await loadRobotsPolicy({ baseUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
     const sitemapFetch = await fetchUrl({ url: sitemapUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
     const sitemapXml = sitemapFetch.responseBody ?? "";
     const discovered = sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300
@@ -353,6 +365,19 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     let fetchedUrls = 0;
 
     for (const discoveredUrl of storedUrls) {
+      if (!isRobotsAllowed(discoveredUrl.normalizedUrl, robotsPolicy)) {
+        await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, discoveredUrl.id, {
+          url: discoveredUrl.normalizedUrl,
+          state: "blocked_by_robots",
+          isIndexable: false,
+          reasons: [`robots.txt disallows ${new URL(discoveredUrl.normalizedUrl).pathname}`],
+          canonicalUrl: null,
+          fetchResultId: null,
+          assessedAt: now()
+        });
+        continue;
+      }
+
       const fetchResult = await fetchUrl({ url: discoveredUrl.normalizedUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
       const storedFetch = await options.apiClient.recordFetchResult(job.projectId, siteId, discoveredUrl.id, fetchResult);
       const page: AuditPageInput = {
@@ -402,6 +427,64 @@ function stringPayload(payload: Record<string, unknown>, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+
+
+export async function loadRobotsPolicy(input: Omit<FetchWorkerInput, "url"> & { baseUrl: string }): Promise<RobotsPolicy> {
+  const robotsUrl = normalizeCrawlUrl("/robots.txt", input.baseUrl);
+  const result = await fetchUrl({
+    url: robotsUrl,
+    fetchImpl: input.fetchImpl,
+    fetchedAt: input.fetchedAt,
+    timeoutMs: input.timeoutMs,
+    retry: input.retry
+  });
+
+  return {
+    fetchedUrl: robotsUrl,
+    rules: result.statusCode && result.statusCode >= 200 && result.statusCode < 300
+      ? parseRobotsTxt(result.responseBody ?? "")
+      : []
+  };
+}
+
+export function parseRobotsTxt(robotsTxt: string): RobotsRule[] {
+  const rules: RobotsRule[] = [];
+  let activeUserAgents: string[] = [];
+  for (const rawLine of robotsTxt.split(/\r?\n/)) {
+    const line = rawLine.replace(/#.*/, "").trim();
+    if (!line) continue;
+    const [rawDirective, ...rawValue] = line.split(":");
+    const directive = rawDirective?.trim().toLowerCase();
+    const value = rawValue.join(":").trim();
+    if (!directive) continue;
+
+    if (directive === "user-agent") {
+      activeUserAgents = [value.toLowerCase() || "*"];
+      continue;
+    }
+
+    if ((directive === "allow" || directive === "disallow") && activeUserAgents.length > 0) {
+      for (const userAgent of activeUserAgents) {
+        rules.push({ userAgent, directive, path: value });
+      }
+    }
+  }
+  return rules;
+}
+
+export function isRobotsAllowed(candidateUrl: string, policy: RobotsPolicy, userAgent = "*"): boolean {
+  const path = pathForRobots(candidateUrl);
+  const matchingRules = policy.rules
+    .filter((rule) => (rule.userAgent === "*" || rule.userAgent === userAgent.toLowerCase()) && rule.path !== "" && path.startsWith(rule.path))
+    .sort((left, right) => right.path.length - left.path.length);
+  const strongestRule = matchingRules[0];
+  return strongestRule ? strongestRule.directive === "allow" : true;
+}
+
+function pathForRobots(candidateUrl: string): string {
+  const url = new URL(candidateUrl);
+  return `${url.pathname}${url.search}` || "/";
+}
 
 export function isInCrawlScope(candidateUrl: string, baseUrl: string): boolean {
   try {

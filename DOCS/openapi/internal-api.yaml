@@ -613,7 +613,7 @@ components:
       required: [url, state, isIndexable, reasons, canonicalUrl, fetchResultId, assessedAt]
       properties:
         url: { type: string, format: uri }
-        state: { type: string, enum: [indexable, blocked_by_status, blocked_by_meta, blocked_by_x_robots, canonicalized] }
+        state: { type: string, enum: [indexable, blocked_by_status, blocked_by_meta, blocked_by_x_robots, blocked_by_robots, canonicalized] }
         isIndexable: { type: boolean }
         reasons:
           type: array
