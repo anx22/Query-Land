@@ -31,8 +31,8 @@ export class HttpCrawlWorkerApiClient implements CrawlWorkerApiClient {
     return this.post(`/projects/${projectId}/sites/${siteId}/discovered-urls/${discoveredUrlId}/indexability`, assessment);
   }
 
-  recordAuditIssues(projectId: string, siteId: string, issues: Array<AuditIssue & { projectId: string; siteId: string; discoveredUrlId: string | null; detectedAt: string; resolvedAt: string | null }>): Promise<unknown> {
-    return this.post(`/projects/${projectId}/sites/${siteId}/audit-issues`, { issues });
+  recordAuditIssues(projectId: string, siteId: string, issues: Array<AuditIssue & { projectId: string; siteId: string; discoveredUrlId: string | null; detectedAt: string; resolvedAt: string | null }>, checkedDiscoveredUrlIds: string[]): Promise<unknown> {
+    return this.post(`/projects/${projectId}/sites/${siteId}/audit-issues`, { issues, checkedDiscoveredUrlIds });
   }
 
   computeHealthScore(projectId: string, siteId: string): Promise<unknown> {
