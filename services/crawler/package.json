@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/src/index.js",
+  "main": "dist/src/worker.js",
   "types": "dist/src/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "start": "node dist/src/index.js"
+    "start": "node dist/src/worker.js",
+    "start:once": "CRAWLER_ONCE=1 node dist/src/worker.js"
   },
   "dependencies": {
-    "@seo-tool/domain-model": "0.1.0"
+    "@seo-tool/domain-model": "0.1.0",
+    "@seo-tool/api": "0.1.0",
+    "@seo-tool/shared-config": "0.1.0"
   }
 }

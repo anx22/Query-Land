@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS url_indexability_assessments (
   discovered_url_id TEXT NOT NULL REFERENCES discovered_urls(id) ON DELETE CASCADE,
   fetch_result_id TEXT REFERENCES url_fetch_results(id) ON DELETE SET NULL,
   url TEXT NOT NULL,
-  state TEXT NOT NULL CHECK (state IN ('indexable', 'blocked_by_status', 'blocked_by_meta', 'blocked_by_x_robots', 'canonicalized')),
+  state TEXT NOT NULL CHECK (state IN ('indexable', 'blocked_by_status', 'blocked_by_meta', 'blocked_by_x_robots', 'blocked_by_robots', 'canonicalized')),
   is_indexable INTEGER NOT NULL CHECK (is_indexable IN (0, 1)),
   reasons TEXT NOT NULL DEFAULT '[]',
   canonical_url TEXT,
@@ -95,6 +95,49 @@ CREATE TABLE IF NOT EXISTS url_indexability_assessments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_url_indexability_discovered_url ON url_indexability_assessments(discovered_url_id, assessed_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS crawl_runs (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')) DEFAULT 'running',
+  trigger TEXT NOT NULL CHECK (trigger IN ('manual', 'scheduled', 'deploy')),
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  summary TEXT NOT NULL DEFAULT '{}',
+  error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_crawl_runs_project_site ON crawl_runs(project_id, site_id, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS audit_issues (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  discovered_url_id TEXT REFERENCES discovered_urls(id) ON DELETE SET NULL,
+  url TEXT NOT NULL,
+  rule TEXT NOT NULL CHECK (rule IN ('http_error', 'redirect_chain', 'missing_title', 'duplicate_title', 'canonical_mismatch', 'broken_link')),
+  severity TEXT NOT NULL CHECK (severity IN ('critical', 'high', 'medium', 'low')),
+  message TEXT NOT NULL,
+  detected_at TEXT NOT NULL,
+  resolved_at TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_issues_project_site ON audit_issues(project_id, site_id, resolved_at, severity);
+
+CREATE TABLE IF NOT EXISTS crawl_health_scores (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+  score INTEGER NOT NULL CHECK (score BETWEEN 0 AND 100),
+  total_issues INTEGER NOT NULL,
+  issue_counts TEXT NOT NULL DEFAULT '{}',
+  generated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_crawl_health_scores_project_site ON crawl_health_scores(project_id, site_id, generated_at DESC);
 
 CREATE TABLE IF NOT EXISTS integration_accounts (
   id TEXT PRIMARY KEY,

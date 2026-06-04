@@ -57,7 +57,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 |---|---|---|---|---|
 | Project/Site persistieren | vorhanden | Demo/teilweise | backend_done_ui_gap | UI muss SQLite/API lesen/schreiben |
 | GSC/GA4 Stub + Sync Job | vorhanden | Demo/teilweise | backend_done_ui_gap | Connector-UI und Job-Planung sichtbar machen |
-| Crawl Seed Job starten/status verfolgen | Queue + Crawl Runs vorhanden | Demo/teilweise | backend_done_ui_gap | Start-Crawl-Button gegen API/Worker |
+| Crawl Seed Job starten/status verfolgen | Queue + Crawl Runs vorhanden; Worker kann `crawl_seed` claimen und abschließen | Teilweise | worker_slice_in_progress | Start-Crawl-Button erzeugt Worker-Payload; Robots-Details/echte-Site-Smoke fehlt |
 | Source Map Refresh + Mapping anzeigen | Listing vorhanden | Demo/teilweise | backend_done_ui_gap | Refresh-Job und echte Mapping-Ansicht |
 
 **Welle-1-Entscheidung:** Backend ist weitgehend vorhanden. Das Gate ist erst geschlossen, wenn UI-Smokes die echten API-Flows nachweisen.
@@ -73,9 +73,9 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | Indexability Checks v0 | Klassifikation + Persistenz vorhanden | contract_done | Integration in Worker und UI-Explorer fehlt |
 | Issue Rules Minimum Set | Rules + Persistenz vorhanden | contract_done | Issue-Lifecycle und UI-Filter fehlen |
 | Health Score v0 | Score + Snapshots vorhanden | contract_done | Score-UI und automatische Recompute-Policy fehlen |
-| Crawl Runs | Lifecycle + Summary vorhanden | contract_done | echte Run-Artefakt-Kopplung/Worker fehlt |
+| Crawl Runs | Lifecycle + Summary vorhanden; Worker schließt Fixture-Runs mit Artefakten ab | in_progress | Daemon/echte Site-Robustheit fehlt |
 | Interner Linkgraph | nicht implementiert | todo | Link-Extraktion, Edges, Depth, Orphans |
-| Robots/Sitemap robust | minimal | todo | robots.txt, Sitemap-Index, Scope-Policy |
+| Robots/Sitemap robust | erster robots.txt-Disallow-Filter + Scope-Policy vorhanden | in_progress | Crawl-delay/User-Agent-Gruppen, Sitemap-Index |
 | Web Vitals | nicht implementiert | todo | PSI/Lighthouse Connector oder Stub |
 
 **Welle-2-Entscheidung:** Der API-/Persistenzkern ist gut genug, um den nächsten Sprint auf Worker+UI statt weitere Tabellen zu fokussieren.
@@ -112,7 +112,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 **Nicht-Scope:** JS Rendering, Vollcrawl >5k, externes Scheduling, Web Vitals.
 
-**Done-Gate:** Ein Fixture-Crawl läuft end-to-end durch Worker und erzeugt persistierte Artefakte plus Crawl-Run-Summary.
+**Done-Gate:** Ein Fixture-Crawl läuft end-to-end durch Worker und erzeugt persistierte Artefakte plus Crawl-Run-Summary. Der erste programmatische Worker-Cycle plus HTTP-Worker-Startscript ist umgesetzt; offen bleibt ein robuster Betrieb gegen echte Sites inklusive Robots-Details und Sitemap-Index.
 
 ### Sprint C — Technical Audit UI v0
 
@@ -156,7 +156,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | GAP-API-001 | API | Große Router-/Store-Dateien | Routen, Validatoren, Store-Module splitten | P1 | D |
 | GAP-API-002 | API | Keine Pagination/Filter/Limits | Query-DTOs für URL/Issue/Crawl-Listen | P1 | C/D |
 | GAP-SEC-001 | Dependencies | Next/PostCSS moderate Audit Findings | gezieltes Upgrade/Risk Assessment, kein blindes `--force` | P1 | D |
-| GAP-CRAWL-001 | Crawl | Regex-HTML-Heuristiken | Parser/Robots/Sitemap-Index robust machen | P1 | B/D |
+| GAP-CRAWL-001 | Crawl | Regex-HTML-Heuristiken und nur minimale Robots-Policy | Parser/Robots/Sitemap-Index robust machen | P1 | B/D |
 | GAP-LINK-001 | Crawl | Interner Linkgraph fehlt | Link Extraction + Edge Table + Depth/Orphan-Auswertung | P1 | Welle 2+ |
 | GAP-OBS-001 | Observability | Job-/Run-Korrelation minimal | structured logs + runId/jobId/requestId | P1 | D |
 | GAP-WV-001 | Audit | Web Vitals fehlt | Lighthouse/PSI Stub und spätere Provider-Abstraktion | P2 | Welle 2+ |

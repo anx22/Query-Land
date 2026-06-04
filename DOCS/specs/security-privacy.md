@@ -49,6 +49,15 @@ Fehlende Berechtigungen liefern 403; Secret-/Auth-Fehler werden ohne Secret-Wert
 ## Observability
 Security-relevante Ereignisse werden strukturiert geloggt und mit Request-/Job-ID korreliert → `specs/observability-sre.md`.
 
+## Open Source & Sovereignty Guardrails
+
+- Foundation Core remains self-hostable: SQLite is the local runtime store and every persisted entity must keep a Postgres migration path.
+- No mandatory proprietary SaaS dependency may be introduced for crawl runs, audit issues, source-map data, projects, users, sessions or jobs.
+- Provider integrations stay behind replaceable adapters; `integration_account.auth_config` must remain a secret-safe placeholder until encrypted credential storage is implemented.
+- Raw events and normalized SEO entities stay separated so exports, replays and provider replacement remain possible without data loss.
+- Before production hardening, every new runtime dependency needs a license and supply-chain review; unknown or incompatible licenses block release.
+- UI settings must expose the current sovereignty/readiness state so operators can see which guardrails are already met and which still require review.
+
 ## Acceptance Tests
 Rollenbasierter Zugriff, Audit-Log aktiv. Welle 1 prüft Registrierung, Login, Session-Auflösung, Schema-Vorhandensein und dass Fixtures keine Secrets enthalten.
 

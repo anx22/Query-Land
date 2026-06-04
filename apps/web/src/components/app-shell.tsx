@@ -1,4 +1,4 @@
-import { Navigation } from "./navigation.js";
+import { Navigation } from "./navigation";
 
 export function AppShell({ activePath, children }: { activePath: string; children: React.ReactNode }) {
   return (
@@ -10,6 +10,7 @@ export function AppShell({ activePath, children }: { activePath: string; childre
           <div className="badge-row">
             <span className="badge primary">Welle 1 · Foundation</span>
             <span className="badge">UTC 2026-06-02</span>
+            <a className="badge" href="/login">Dev Login</a>
           </div>
         </header>
         {children}
