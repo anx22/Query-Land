@@ -1,10 +1,12 @@
 import type { FoundationJob } from "@seo-tool/domain-model";
 import type { ApiResponse } from "./http.js";
 import { apiError, json } from "./http.js";
-import type { BackendStore } from "./sqlite-store.js";
+import type { CrawlStore, JobStore, ProjectStore, SourceMapStore } from "./sqlite-store.js";
 import { completeCrawlRunRequest, completeJobRequest, createCrawlRunRequest, createIntegrationRequest, createJobRequest, createSiteRequest, recordAuditIssuesRequest, recordDiscoveredUrlsRequest, recordFetchResultRequest, recordIndexabilityRequest } from "./request-validators.js";
 
-export async function routeProjectChildren(store: BackendStore, method: string, pathname: string, body: unknown, requestId: string): Promise<ApiResponse> {
+export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore;
+
+export async function routeProjectChildren(store: ProjectChildStore, method: string, pathname: string, body: unknown, requestId: string): Promise<ApiResponse> {
   const siteMatch = pathname.match(/^\/projects\/([^/]+)\/sites$/);
   if (method === "GET" && siteMatch) {
     return json(200, { data: store.listSites(siteMatch[1]) });
@@ -42,7 +44,7 @@ export async function routeProjectChildren(store: BackendStore, method: string, 
   }
   if (method === "POST" && auditIssuesMatch) {
     const input = recordAuditIssuesRequest(body);
-    const result = store.recordAuditIssues(auditIssuesMatch[1], auditIssuesMatch[2], input.issues);
+    const result = store.recordAuditIssues(auditIssuesMatch[1], auditIssuesMatch[2], input.issues, { checkedDiscoveredUrlIds: input.checkedDiscoveredUrlIds });
     return json(201, { data: result.issues, meta: { inserted: result.inserted, updated: result.updated, resolved: result.resolved } });
   }
 

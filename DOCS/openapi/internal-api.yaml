@@ -715,6 +715,11 @@ components:
       type: object
       required: [issues]
       properties:
+        checkedDiscoveredUrlIds:
+          type: array
+          description: Discovered URL IDs actually checked in this crawl scope; only stale issues in this list may be resolved.
+          items:
+            type: string
         issues:
           type: array
           items:

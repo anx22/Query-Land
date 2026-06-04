@@ -114,11 +114,11 @@ test("maps minimum issue rules and health-score penalties", () => {
   assert.equal(calculateHealthScore([]), 100);
 });
 
-import { createApp, createSQLiteStore, type BackendStore } from "@seo-tool/api";
+import { createApp, createSQLiteStore, type SQLiteStore } from "@seo-tool/api";
 import type { CrawlWorkerApiClient } from "../src/index.js";
 import { runCrawlWorkerCycle } from "../src/index.js";
 
-function apiClientForStore(store: BackendStore): CrawlWorkerApiClient {
+function apiClientForStore(store: SQLiteStore): CrawlWorkerApiClient {
   const app = createApp(store);
   const post = async <T>(path: string, body?: unknown): Promise<T> => {
     const response = await app("POST", path, body);
@@ -131,7 +131,7 @@ function apiClientForStore(store: BackendStore): CrawlWorkerApiClient {
     recordDiscoveredUrls: async (projectId, siteId, urls) => post(`/projects/${projectId}/sites/${siteId}/discovered-urls`, { urls }),
     recordFetchResult: (projectId, siteId, discoveredUrlId, result) => post(`/projects/${projectId}/sites/${siteId}/discovered-urls/${discoveredUrlId}/fetch-results`, result),
     recordIndexabilityAssessment: (projectId, siteId, discoveredUrlId, assessment) => post(`/projects/${projectId}/sites/${siteId}/discovered-urls/${discoveredUrlId}/indexability`, assessment),
-    recordAuditIssues: (projectId, siteId, issues) => post(`/projects/${projectId}/sites/${siteId}/audit-issues`, { issues }),
+    recordAuditIssues: (projectId, siteId, issues, checkedDiscoveredUrlIds) => post(`/projects/${projectId}/sites/${siteId}/audit-issues`, { issues, checkedDiscoveredUrlIds }),
     computeHealthScore: (projectId, siteId) => post(`/projects/${projectId}/sites/${siteId}/health-scores/compute`, {}),
     completeCrawlRun: (projectId, siteId, crawlRunId, status, errorMessage) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/complete`, { status, errorMessage }),
     completeJob: (jobId, status, lastError) => post(`/jobs/${jobId}/complete`, { status, lastError })

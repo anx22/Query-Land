@@ -273,9 +273,16 @@ export function makeIdempotencyKey(projectId: string, jobType: FoundationJob["ty
   return `${projectId}:${jobType}:${subject}`.toLowerCase().replace(/[^a-z0-9:_-]+/g, "-");
 }
 
+export class DomainValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DomainValidationError";
+  }
+}
+
 export function validateBusinessValue(value: number): number {
   if (!Number.isInteger(value) || value < 1 || value > 100) {
-    throw new Error("businessValue must be an integer between 1 and 100");
+    throw new DomainValidationError("businessValue must be an integer between 1 and 100");
   }
   return value;
 }
@@ -283,21 +290,21 @@ export function validateBusinessValue(value: number): number {
 export function normalizeEmail(email: string): string {
   const normalized = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-    throw new Error("email must be valid");
+    throw new DomainValidationError("email must be valid");
   }
   return normalized;
 }
 
 export function validatePassword(password: string): string {
   if (password.length < 12) {
-    throw new Error("password must contain at least 12 characters");
+    throw new DomainValidationError("password must contain at least 12 characters");
   }
   return password;
 }
 
 export function scoreOpportunity(input: Pick<Opportunity, "expectedImpact" | "confidence" | "businessValue" | "urgency" | "effort">): number {
   if (input.effort <= 0) {
-    throw new Error("Opportunity effort must be greater than zero.");
+    throw new DomainValidationError("Opportunity effort must be greater than zero.");
   }
 
   return Math.round((input.expectedImpact * input.confidence * input.businessValue * input.urgency * 100) / input.effort);

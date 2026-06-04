@@ -40,3 +40,9 @@
 2. `npm run check:boundaries`
 3. `npm run validate:openapi`
 4. `npm test`
+
+## Web module boundaries
+
+- Feature routes are registered centrally in `apps/web/src/app/module-routes.ts` with path, label, status and planned wave.
+- New module-specific UI, data loading, hooks and workflow state belong under `apps/web/src/features/<module>`.
+- `apps/web/src/components/module-page.tsx` and shared route factories must stay generic shells; do not grow future module logic inside `ModulePage` or other generic page wrappers.

@@ -1,10 +1,3 @@
-import { AppShell } from "../../components/app-shell";
-import { ModulePage } from "../../components/module-page";
+import { createPlannedModulePage } from "../planned-module-page";
 
-export default function Page() {
-  return (
-    <AppShell activePath="/backlinks">
-      <ModulePage href="/backlinks" />
-    </AppShell>
-  );
-}
+export default createPlannedModulePage("/backlinks");

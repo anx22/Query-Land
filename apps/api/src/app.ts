@@ -2,9 +2,12 @@ import { randomUUID } from "node:crypto";
 import { apiError, bearerToken, json, logRequest, type ApiResponse, type RequestContext } from "./http.js";
 import { authRequest, createProjectRequest } from "./request-validators.js";
 import { routeProjectChildren } from "./routes.js";
-import { createSQLiteStore, RequestError, type BackendStore } from "./sqlite-store.js";
+import { createSQLiteStore, RequestError, type AuthStore, type HealthStore, type ProjectStore } from "./sqlite-store.js";
+import type { ProjectChildStore } from "./routes.js";
 
-export function createApp(store: BackendStore = createSQLiteStore()) {
+export type AppStore = HealthStore & AuthStore & ProjectStore & ProjectChildStore;
+
+export function createApp(store: AppStore = createSQLiteStore()) {
   return async function appHandleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
     return routeRequest(store, method, pathname, body, context);
   };
@@ -16,7 +19,7 @@ export async function handleRequest(method: string, pathname: string, body?: unk
   return defaultHandleRequest(method, pathname, body, context);
 }
 
-async function routeRequest(store: BackendStore, method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
+async function routeRequest(store: AppStore, method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
   const requestId = context.headers?.["x-request-id"] ?? context.headers?.["X-Request-Id"] ?? `req-${randomUUID()}`;
 
   try {
@@ -26,15 +29,13 @@ async function routeRequest(store: BackendStore, method: string, pathname: strin
   } catch (error) {
     const response = error instanceof RequestError
       ? apiError(error.status, error.code, error.message, requestId, error.details)
-      : error instanceof Error
-        ? apiError(400, "validation_error", error.message, requestId)
-        : apiError(500, "internal_error", "Internal error", requestId);
+      : apiError(500, "internal_error", "Internal error", requestId);
     logRequest(method, pathname, response.status, requestId);
     return response;
   }
 }
 
-async function routeTopLevel(store: BackendStore, method: string, pathname: string, body: unknown, context: RequestContext, requestId: string): Promise<ApiResponse> {
+async function routeTopLevel(store: AppStore, method: string, pathname: string, body: unknown, context: RequestContext, requestId: string): Promise<ApiResponse> {
   if (method === "GET" && pathname === "/health") {
     return json(200, store.health());
   }
