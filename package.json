@@ -19,7 +19,8 @@
     "migrate:sqlite": "npm --workspace @seo-tool/api run build && node apps/api/dist/src/migrate-sqlite.js",
     "build:web": "npm --workspace @seo-tool/web run build",
     "vercel-build": "npm run build:vercel",
-    "build:vercel": "npm run build && npm --workspace @seo-tool/web run build:next"
+    "build:vercel": "npm run build && npm --workspace @seo-tool/web run build:next",
+    "vercel:sync-settings": "node scripts/sync-vercel-project-settings.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.11",

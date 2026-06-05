@@ -16,6 +16,42 @@ Use these project settings in Vercel:
 
 `apps/web/vercel.json` mirrors the build command and output directory for the web workspace. The repository-root `vercel.json` remains as a compatibility path for projects that intentionally keep Root Directory empty/repository-root, but the preferred monorepo setting is `apps/web`.
 
+
+## CLI/API repair path
+
+If the Vercel Dashboard project is already mis-pointed at `apps/api`, fix the project settings through the Vercel REST API instead of guessing in the build scripts. The repository contains a checked-in helper that applies the deployment target used by this app:
+
+```bash
+VERCEL_TOKEN=<token> \
+VERCEL_PROJECT_ID=<project-id-or-name> \
+npm run vercel:sync-settings
+```
+
+For team-owned projects, add either a team id or slug:
+
+```bash
+VERCEL_TOKEN=<token> \
+VERCEL_PROJECT_ID=<project-id-or-name> \
+VERCEL_TEAM_ID=<team-id> \
+npm run vercel:sync-settings
+```
+
+The helper updates the Vercel project to:
+
+- `rootDirectory: apps/web`
+- `framework: nextjs`
+- `buildCommand: npm run vercel-build`
+- `outputDirectory: .next`
+- `sourceFilesOutsideRootDirectory: true`
+
+`sourceFilesOutsideRootDirectory` is intentionally enabled because the web workspace builds TypeScript packages from `packages/*` and the embedded API from `apps/api`. Without that setting, Vercel's Root Directory isolation can block files outside `apps/web`.
+
+Use a dry run to verify the exact API request before sending it:
+
+```bash
+npm run vercel:sync-settings -- --project <project-id-or-name> --team <team-id-or-slug> --dry-run
+```
+
 ## Why the scripts are split
 
 Vercel runs the build command against the selected monorepo project/workspace. Therefore every deployment-relevant workspace has a `vercel-build` script:
