@@ -4,20 +4,11 @@ This monorepo can run the Next.js web app and the embedded foundation API in one
 
 ## Import settings
 
-Preferred root import settings:
-
-- **Framework Preset:** Next.js
-- **Root Directory:** repository root / leave empty
-- **Install Command:** default (`npm install`) or the checked-in `vercel.json` value
-- **Build Command:** `npm --workspace @seo-tool/web run build` (checked in via `vercel.json`)
-- **Output Directory:** `apps/web/.next` (checked in via `vercel.json`)
-
-The root `package.json` intentionally declares `next`, `react`, and `react-dom` so Vercel can detect Next.js even when the project is imported at the repository root. The checked-in `vercel.json` then builds the actual web workspace.
-
-Alternative workspace-root settings:
+Use these settings in Vercel:
 
 - **Framework Preset:** Next.js
 - **Root Directory:** `apps/web`
+- **Install Command:** default (`npm install`)
 - **Build Command:** default (`npm run build`)
 - **Output Directory:** default
 
