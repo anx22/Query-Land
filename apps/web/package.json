@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "build": "npm run vercel-build",
+    "start": "next start",
+    "build:next": "DATABASE_URL=sqlite::memory: next build",
+    "build:deps": "npm --workspace @seo-tool/domain-model run build && npm --workspace @seo-tool/shared-config run build && npm --workspace @seo-tool/api run build",
+    "vercel-build": "npm run build:deps && npm run build:next"
   },
   "dependencies": {
     "@seo-tool/api": "0.1.0",

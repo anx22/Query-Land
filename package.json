@@ -18,7 +18,8 @@
     "check": "npm run typecheck && npm run check:boundaries && npm run validate:openapi && npm test",
     "migrate:sqlite": "npm --workspace @seo-tool/api run build && node apps/api/dist/src/migrate-sqlite.js",
     "build:web": "npm --workspace @seo-tool/web run build",
-    "vercel-build": "npm run build && npm --workspace @seo-tool/web run build"
+    "vercel-build": "npm run build:vercel",
+    "build:vercel": "npm run build && npm --workspace @seo-tool/web run build:next"
   },
   "devDependencies": {
     "@types/node": "^20.19.11",
