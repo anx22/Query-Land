@@ -2,7 +2,7 @@
 
 > Zweck: offizielles Tracking-Dokument für den aktuellen Implementierungsstand nach der Foundation- und Crawl-Pipeline-Arbeit. Dieses Dokument ergänzt `docs/PRODUCT_MASTER_SPEC.md` §10 und die Wave-Backlogs in `tasks/`.
 >
-> Stand: 2026-06-03 · Quelle: Code-/Test-Bestandsaufnahme nach `Add crawl pipeline: domain types, DB schema, API routes and crawler service; migrate packages to @seo-tool scope`.
+> Stand: 2026-06-05 · Quelle: Code-/Test-Bestandsaufnahme inklusive Worker-v0- und Technical-Audit-UI-Slice.
 
 ## 1. Dokumentationsstruktur und Wahrheitsebenen
 
@@ -24,10 +24,10 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | Domain Model Foundation + Crawl Core | 65–75 % | gute Basis für Welle 1/2 | DTOs/Migrationskontrakte trennen, spätere Module ergänzen |
 | API Foundation + Crawl API | 60–70 % | viele Endpunkte, getestet | AuthZ, Pagination, Filter, Route-Aufteilung |
 | SQLite Local Backend | 60–70 % | gut für lokale Ausführung | echte Migrationen, Transaktionen, Retention |
-| Crawler Core Library | 35–45 % | nützliche Heuristik-Library | Worker-Orchestrierung, Robots, Linkgraph |
-| Frontend Produkt-UI | 15–25 % | Demo Shell | echte API-Anbindung, Technical-Audit UI |
+| Crawler/Worker Core | 55–65 % | Worker v0 claimt Jobs und erzeugt Crawl-Artefakte | Robustheit, echte Site-Smokes, Betrieb/Daemon, Robots/Sitemap-Details |
+| Frontend Produkt-UI | 40–50 % | Foundation-/Technical-Audit-Flows nutzen echte API-Daten; UI bleibt v0 | Pagination, Detail Drawer, serverseitige Filter, Foundation-Smokes |
 | Observability/Ops/Security | 15–25 % | erste Health-/Log-Basis | Request-/Job-Tracing, Audit-Fix, Secrets/AuthZ |
-| Gesamt-App | 30–40 % | MVP-Kern vorhanden, Produkt noch unfertig | vertikaler UI+Worker-Schnitt |
+| Gesamt-App | 40–50 % | vertikaler Welle-1/2-Schnitt erkennbar, Gate noch nicht bewiesen | echte Site-Smokes, Härtung, AuthZ, Migrationen |
 
 ## 3. Befund der Fehlerprüfung
 
@@ -40,8 +40,8 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 ### 3.2 Rote / gelbe Befunde
 
 - `npm audit --audit-level=moderate` meldet 2 moderate Findings über Next/PostCSS. `npm audit fix --force` würde laut npm einen Breaking-Downgrade installieren und ist deshalb nicht automatisch anzuwenden.
-- `apps/web` nutzt weiterhin Demo-Fixtures aus `@seo-tool/shared-config`; die echte SQLite/API-Pipeline wird im UI noch nicht produktiv konsumiert.
-- `services/crawler` ist noch keine laufende Worker-Pipeline, sondern eine Library mit Discovery-/Fetch-/Audit-Helfern.
+- Die Web-App nutzt für Foundation-/Technical-Audit-Flows echte API-/SQLite-Daten, aber Gate-Smokes, Pagination und Details sind noch nicht vollständig.
+- `services/crawler` hat Worker-v0-Funktionalität, ist aber noch nicht robust als Betriebskomponente für echte Sites nachgewiesen.
 - SQLite-Schema ist ein großer idempotenter SQL-String; ein versioniertes Migrationssystem fehlt.
 - API-Routing, Request-Validierung und Store-Persistenz wachsen in wenigen großen Dateien und müssen vor weiterem Ausbau modularisiert werden.
 - Business-Endpunkte sind noch nicht projekt-/rollenbasiert geschützt; Auth existiert, AuthZ-Gates fehlen.
@@ -55,12 +55,12 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 | Slice | Backend | UI | Status | Offene Lücke |
 |---|---|---|---|---|
-| Project/Site persistieren | vorhanden | Demo/teilweise | backend_done_ui_gap | UI muss SQLite/API lesen/schreiben |
-| GSC/GA4 Stub + Sync Job | vorhanden | Demo/teilweise | backend_done_ui_gap | Connector-UI und Job-Planung sichtbar machen |
-| Crawl Seed Job starten/status verfolgen | Queue + Crawl Runs vorhanden; Worker kann `crawl_seed` claimen und abschließen | Teilweise | worker_slice_in_progress | Start-Crawl-Button erzeugt Worker-Payload; Robots-Details/echte-Site-Smoke fehlt |
-| Source Map Refresh + Mapping anzeigen | Listing vorhanden | Demo/teilweise | backend_done_ui_gap | Refresh-Job und echte Mapping-Ansicht |
+| Project/Site persistieren | vorhanden | echte API-Formulare/Listen vorhanden | in_progress | UI-Smoke, Validierungsdetails und Rollen-/Scope-Gates fehlen |
+| GSC/GA4 Stub + Sync Job | vorhanden | Connector-UI nutzt echte API-Zustände | in_progress | Job-Planung/Sync-Smoke und OAuth-Produktionspfad fehlen |
+| Crawl Seed Job starten/status verfolgen | Queue + Crawl Runs vorhanden; Worker v0 kann `crawl_seed` claimen, Artefakte schreiben und Runs abschließen | Teilweise | worker_v0_stabilisieren | Gate-Smoke gegen Fixture und echte Site, Robots-Details und Betrieb fehlen |
+| Source Map Refresh + Mapping anzeigen | Listing vorhanden | echte API-Daten sichtbar | in_progress | Refresh-Job-Smoke und Mapping-Detailansicht fehlen |
 
-**Welle-1-Entscheidung:** Backend ist weitgehend vorhanden. Das Gate ist erst geschlossen, wenn UI-Smokes die echten API-Flows nachweisen.
+**Welle-1-Entscheidung:** Backend und erste echte UI-/Worker-Anbindung sind weitgehend vorhanden. Das Gate ist erst geschlossen, wenn UI-Smokes die echten API-Flows reproduzierbar nachweisen.
 
 ### 4.2 Welle 2 — Audit Core nutzbar machen
 
@@ -68,17 +68,17 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 | Slice | Aktueller Stand | Status | Offene Lücke |
 |---|---|---|---|
-| URL Discovery v0 | Domain/API/DB/Tests vorhanden | contract_done | Worker muss echte Sitemap/Seed-Pipeline schreiben |
-| HTTP Fetch Worker v0 | Normalisierungslogik + Persistenz vorhanden | contract_done | Queue-Worker mit Retry/Timeout fehlt |
-| Indexability Checks v0 | Klassifikation + Persistenz vorhanden | contract_done | Integration in Worker und UI-Explorer fehlt |
-| Issue Rules Minimum Set | Rules + Persistenz, Resolve-Endpoint und UI-Filter vorhanden | in_progress | Pagination und Reopen/Dismiss fehlen |
-| Health Score v0 | Score + Snapshots vorhanden | contract_done | Score-UI und automatische Recompute-Policy fehlen |
-| Crawl Runs | Lifecycle + Summary vorhanden; Worker schließt Fixture-Runs mit Artefakten ab | in_progress | Daemon/echte Site-Robustheit fehlt |
+| URL Discovery v0 | Domain/API/DB/Tests und Worker-v0-Persistenz vorhanden | in_progress | echte Sitemap-/Seed-Smokes, Sitemap-Index und Scope-Robustheit fehlen |
+| HTTP Fetch Worker v0 | Normalisierungslogik, Persistenz und Worker-v0-Ausführung vorhanden | in_progress | Retry/Timeout robuster machen und echte Site-Smokes nachweisen |
+| Indexability Checks v0 | Klassifikation, Persistenz, Worker-Integration und URL-Explorer-Anzeige vorhanden | in_progress | Detail Drawer und Edge-Cases fehlen |
+| Issue Rules Minimum Set | Rules + Persistenz, Resolve-Endpoint, UI-Filter und Issue-Tabelle vorhanden | in_progress | Pagination, serverseitige Filter und Reopen/Dismiss fehlen |
+| Health Score v0 | Score + Snapshots, Worker-Berechnung und Score-UI vorhanden | in_progress | automatische Recompute-Policy fehlt |
+| Crawl Runs | Lifecycle + Summary vorhanden; Worker v0 schließt Fixture-Runs mit Artefakten ab; UI listet Runs | in_progress | Daemon/Betrieb und echte Site-Robustheit fehlen |
 | Interner Linkgraph | nicht implementiert | todo | Link-Extraktion, Edges, Depth, Orphans |
 | Robots/Sitemap robust | erster robots.txt-Disallow-Filter + Scope-Policy vorhanden | in_progress | Crawl-delay/User-Agent-Gruppen, Sitemap-Index |
 | Web Vitals | nicht implementiert | todo | PSI/Lighthouse Connector oder Stub |
 
-**Welle-2-Entscheidung:** Der API-/Persistenzkern ist gut genug, um den nächsten Sprint auf Worker+UI statt weitere Tabellen zu fokussieren.
+**Welle-2-Entscheidung:** Der API-/Persistenzkern plus Worker-v0 und Technical-Audit-UI reichen für einen vertikalen Slice. Der nächste Schwerpunkt ist Stabilisierung, echte Site-Smokes und Bedienhärtung statt weiterer Tabellen.
 
 ## 5. Offizielle nächste Sprint-Sequenz
 
@@ -98,37 +98,39 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 **Done-Gate:** UI-Smoke zeigt: Projekt anlegen → Site anlegen → Connector Stub anlegen → Job sichtbar → Reload hält Daten.
 
-### Sprint B — Crawl Run Worker v0
+### Sprint B — Worker stabilisieren und Gate nachweisen
 
-**Ziel:** Welle-2 vom Contract-Kern zu einer echten laufenden Crawl-Pipeline bringen.
+**Ziel:** Worker v0 von einem funktionierenden Slice zu einem reproduzierbaren Welle-2-Gate mit Fixture- und echter-Site-Smokes härten.
 
 **Scope:**
 
-1. Worker claimt `crawl_seed`/Crawl-Run-Jobs aus `job_queue`.
-2. Worker erstellt Crawl Run und führt Seed-/Sitemap-Discovery aus.
-3. Worker speichert Discovered URLs, Fetch Results, Indexability Assessments, Audit Issues.
-4. Worker berechnet Health Score und schließt Crawl Run ab.
-5. Retry-/Timeout-/Failure-Mode für mindestens Network Error und ungültige Sitemap.
+1. Bestehenden `crawl_seed`-Worker-v0 als wiederholbaren Fixture-Smoke dokumentieren und automatisieren.
+2. Echte eigene Test-Site als Smoke-Ziel definieren und Run-Kriterien festhalten.
+3. Retry-/Timeout-/Failure-Modes für Network Error, ungültige Sitemap und Robots-Blocker härten.
+4. Robots-/Sitemap-Details inklusive Sitemap-Index und User-Agent-Gruppen ausbauen.
+5. Betriebsmodus klären: Startscript/Daemon, Logs, Run-/Job-Korrelation und Exit-/Retry-Verhalten.
 
 **Nicht-Scope:** JS Rendering, Vollcrawl >5k, externes Scheduling, Web Vitals.
 
-**Done-Gate:** Ein Fixture-Crawl läuft end-to-end durch Worker und erzeugt persistierte Artefakte plus Crawl-Run-Summary. Der erste programmatische Worker-Cycle plus HTTP-Worker-Startscript ist umgesetzt; offen bleibt ein robuster Betrieb gegen echte Sites inklusive Robots-Details und Sitemap-Index.
+**Done-Gate:** Fixture-Crawl und mindestens ein Crawl auf einer echten eigenen Site laufen end-to-end durch Worker v0, erzeugen persistierte Artefakte plus Crawl-Run-Summary und sind über Logs/Run-Status nachvollziehbar. Offen dokumentierte Restrisiken dürfen nicht das Welle-2-Gate blockieren.
 
 ### Sprint C — Technical Audit UI v0
 
-**Ziel:** Welle-2 fachlich sichtbar/nutzbar machen.
+**Ziel:** Bestehende Technical-Audit-UI von v0-Transparenz zu operativer Nutzbarkeit härten.
+
+**Aktueller Stand:** Technical-Audit-UI zeigt bereits Crawl Runs, Health, Issues und einen URL Explorer aus echten API-/SQLite-Daten.
 
 **Scope:**
 
-1. Technical-Audit-Seite zeigt Crawl Runs, letzten Health Score und Issue Counts.
-2. URL Explorer listet Discovered URLs mit latest Fetch/Indexability State. (Detaildaten sind angebunden; Pagination/Drawer fehlen.)
-3. Issue-Tabelle mit Severity, Rule, URL, Status und Filter.
-4. Buttons: Crawl starten, Health neu berechnen, Issue als resolved markieren.
-5. Empty/Error/Loading States.
+1. Pagination oder harte Limits für Crawl Runs, URL Explorer und Issue-Liste.
+2. URL-/Issue-Detail Drawer mit Fetch-, Indexability-, Rule- und Run-Kontext.
+3. Serverseitige Filter für Issue-Status, Severity, Rule, URL und Run/Site-Kontext.
+4. Issue-Aktionen vervollständigen: Reopen und Dismiss zusätzlich zu Resolve.
+5. Empty/Error/Loading States für die neuen Listen-/Detailzustände nachziehen.
 
 **Nicht-Scope:** Deep Segmentation, Export, Alerts, Web Vitals.
 
-**Done-Gate:** User kann Crawl starten und danach Issues/Health/URL-Details ohne manuelle API-Aufrufe sehen.
+**Done-Gate:** User kann Crawl starten, Runs/Health/URLs/Issues paginiert durchsuchen, Detailkontext öffnen und Issues per Resolve/Reopen/Dismiss ohne manuelle API-Aufrufe bearbeiten.
 
 ### Sprint D — Härtung vor Welle 3
 
@@ -150,11 +152,11 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | ID | Bereich | Befund | Empfehlung | Priorität | Ziel-Sprint |
 |---|---|---|---|---|---|
 | GAP-UI-001 | Frontend | UI nutzt echte Foundation-/Technical-Audit-Daten; URL Detail Drawer fehlt | API-Client und echte Dashboard-/Technical-Audit-Daten | P0 | A/C |
-| GAP-WORKER-001 | Crawler | Crawler-Service nicht an Job Queue gekoppelt | Worker für Crawl Run Pipeline bauen | P0 | B |
+| GAP-WORKER-001 | Crawler | Worker v0 vorhanden; Robustheit, echte Site-Smokes und Betrieb fehlen | Worker stabilisieren, Fixture-/echte-Site-Gate nachweisen und Betriebsmodus klären | P0 | B |
 | GAP-MIG-001 | DB | SQLite-Migration Runner vorhanden; Postgres-Migrationen fehlen | Postgres SQL-Dateien + Cross-DB-Smoke ergänzen | P0 | D |
 | GAP-AUTHZ-001 | Security | Business-Endpunkte ohne Projekt-/Rollen-Gates | AuthZ Middleware/Service einführen | P0 | D |
 | GAP-API-001 | API | Große Router-/Store-Dateien | Routen, Validatoren, Store-Module splitten | P1 | D |
-| GAP-API-002 | API | Keine Pagination/Limits; Issue-Filter aktuell UI-seitig | Query-DTOs für URL/Issue/Crawl-Listen | P1 | C/D |
+| GAP-API-002 | API | Pagination/Limits fehlen; Issue-/URL-Filter sind noch nicht serverseitig vollständig | Query-DTOs für URL/Issue/Crawl-Listen | P1 | C/D |
 | GAP-SEC-001 | Dependencies | Next/PostCSS moderate Audit Findings | gezieltes Upgrade/Risk Assessment, kein blindes `--force` | P1 | D |
 | GAP-CRAWL-001 | Crawl | Regex-HTML-Heuristiken und nur minimale Robots-Policy | Parser/Robots/Sitemap-Index robust machen | P1 | B/D |
 | GAP-LINK-001 | Crawl | Interner Linkgraph fehlt | Link Extraction + Edge Table + Depth/Orphan-Auswertung | P1 | Welle 2+ |
@@ -177,10 +179,11 @@ Die App ist erst MVP-ready, wenn alle folgenden Punkte erfüllt sind:
 
 ## 8. Aktuelle Prozent-Einschätzung
 
-- Welle 1 Backend: 75–85 %
-- Welle 1 End-to-End inkl. UI: 45–55 %
-- Welle 2 Contracts/Persistenz/API: 65–75 %
-- Welle 2 echter Crawl-Betrieb/UI: 25–35 %
-- Gesamt-App Richtung intern nutzbarer MVP: 30–40 %
+- Welle 1 Backend: 80–90 %
+- Welle 1 End-to-End inkl. UI: 60–70 %
+- Welle 2 Contracts/Persistenz/API: 75–85 %
+- Welle 2 Worker-v0/Technical-Audit-UI: 60–70 %
+- Welle 2 echtes Betriebsgate: 40–50 %
+- Gesamt-App Richtung intern nutzbarer MVP: 40–50 %
 
 Diese Prozentwerte sind bewusst grob. Sie messen nicht Lines of Code, sondern Gate-Fähigkeit: Kann ein Nutzer den geplanten Workflow ohne Entwickler-/API-Handarbeit ausführen?
