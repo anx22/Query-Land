@@ -29,7 +29,7 @@ Die Codebasis ist nach dem Worker-v0- und Technical-Audit-UI-Slice grundsätzlic
 - `sqlite-store.ts` ist trotz ausgelagerter Mapper noch SQL- und Use-Case-lastig. Die nächste sinnvolle Zerlegung ist pro Aggregate/Repository: Auth, Project/Site, Crawl Artifacts, Jobs/Integrations.
 - API-Routing nutzt noch manuelles Regex-Matching. Das ist für den aktuellen Umfang akzeptabel, sollte aber bei weiteren Endpoint-Gruppen in deklarative Route-Tabellen oder einen kleinen Router überführt werden.
 - Request-Validierung ist bewusst leichtgewichtig, aber nicht schema-getrieben. Bei wachsendem OpenAPI-Umfang sollten Validatoren aus gemeinsamen Schemas/Contracts abgeleitet oder zentral getestet werden.
-- Technical-Audit-UI ist v0: Runs, Health, Issues und URL Explorer sind sichtbar, aber Pagination, Detail Drawer, serverseitige Filter sowie Reopen/Dismiss fehlen.
+- Technical-Audit-UI ist v0: Runs, Health, Issues und URL Explorer sind sichtbar; Resolve/Dismiss/Reopen sind bedienbar, aber Detail Drawer, zusätzliche serverseitige Filter und getrennte Dismiss-Reason-Historie fehlen.
 - Worker v0 ist vorhanden, aber noch nicht als robuster Betrieb gegen echte Sites nachgewiesen; echte Site-Smokes, Robots-/Sitemap-Details, Daemon-Verhalten und Run-/Job-Korrelation fehlen.
 - Security-, Session-, Connector- und AuthZ-Aspekte sind noch Foundation-Level und nicht production-grade.
 
@@ -67,7 +67,7 @@ Aktueller Stand: Technical-Audit-UI zeigt bereits Crawl Runs, Health, Issues und
 1. Pagination oder harte Limits für Crawl Runs, URL Explorer und Issue-Liste ergänzen.
 2. URL-/Issue-Detail Drawer mit Fetch-, Indexability-, Rule- und Run-Kontext bauen.
 3. Serverseitige Filter für Issue-Status, Severity, Rule, URL und Run/Site-Kontext ergänzen.
-4. Issue-Aktionen vervollständigen: Reopen und Dismiss zusätzlich zu Resolve.
+4. Issue-Aktionen nachziehen: Resolve/Dismiss/Reopen sind vorhanden; offen bleiben Dismiss-Gründe, Actor-Kontext und Historie.
 5. Empty/Error/Loading States für die neuen Listen-/Detailzustände nachziehen.
 
 ## 4. Do-not-break-Hinweise

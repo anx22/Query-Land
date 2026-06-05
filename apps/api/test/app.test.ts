@@ -678,6 +678,18 @@ test("audit issue API resolves issues and health recompute ignores resolved issu
   assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.totalIssues, 1);
   assert.equal((health.body as { data: { totalIssues: number; score: number } }).data.score, 98);
 
+  const reopened = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-resolve-critical/reopen", {});
+  assert.equal(reopened.status, 200);
+  assert.equal((reopened.body as { data: { resolvedAt: string | null } }).data.resolvedAt, null);
+
+  const dismissed = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-resolve-low/dismiss", {});
+  assert.equal(dismissed.status, 200);
+  assert.equal((dismissed.body as { data: { resolvedAt: string | null } }).data.resolvedAt !== null, true);
+
+  const healthAfterIssueActions = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute", {});
+  assert.equal((healthAfterIssueActions.body as { data: { totalIssues: number; score: number } }).data.totalIssues, 1);
+  assert.equal((healthAfterIssueActions.body as { data: { totalIssues: number; score: number } }).data.score, 82);
+
   const missing = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/missing/resolve", {});
   assert.equal(missing.status, 404);
   assert.equal((missing.body as { error: { code: string } }).error.code, "audit_issue_not_found");

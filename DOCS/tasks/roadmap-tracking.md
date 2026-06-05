@@ -25,7 +25,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | API Foundation + Crawl API | 60–70 % | viele Endpunkte, getestet | AuthZ, Pagination, Filter, Route-Aufteilung |
 | SQLite Local Backend | 60–70 % | gut für lokale Ausführung | echte Migrationen, Transaktionen, Retention |
 | Crawler/Worker Core | 55–65 % | Worker v0 claimt Jobs und erzeugt Crawl-Artefakte | Robustheit, echte Site-Smokes, Betrieb/Daemon, Robots/Sitemap-Details |
-| Frontend Produkt-UI | 40–50 % | Foundation-/Technical-Audit-Flows nutzen echte API-Daten; UI bleibt v0 | Pagination, Detail Drawer, serverseitige Filter, Foundation-Smokes |
+| Frontend Produkt-UI | 45–55 % | Foundation-/Technical-Audit-Flows nutzen echte API-Daten; Technical-Audit-Issue-Aktionen sind bedienbar; UI bleibt v0 | Detail Drawer, weitere serverseitige Filter, Foundation-Smokes |
 | Observability/Ops/Security | 15–25 % | erste Health-/Log-Basis | Request-/Job-Tracing, Audit-Fix, Secrets/AuthZ |
 | Gesamt-App | 40–50 % | vertikaler Welle-1/2-Schnitt erkennbar, Gate noch nicht bewiesen | echte Site-Smokes, Härtung, AuthZ, Migrationen |
 
@@ -125,7 +125,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 1. Pagination oder harte Limits für Crawl Runs, URL Explorer und Issue-Liste.
 2. URL-/Issue-Detail Drawer mit Fetch-, Indexability-, Rule- und Run-Kontext.
 3. Serverseitige Filter für Issue-Status, Severity, Rule, URL und Run/Site-Kontext.
-4. Issue-Aktionen vervollständigen: Reopen und Dismiss zusätzlich zu Resolve.
+4. Issue-Aktionen vervollständigen: Reopen und Dismiss zusätzlich zu Resolve. **Status 2026-06-05:** API- und UI-Aktionen für Resolve, Dismiss und Reopen vorhanden; getrennte Dismiss-Reason-Historie bleibt offen.
 5. Empty/Error/Loading States für die neuen Listen-/Detailzustände nachziehen.
 
 **Nicht-Scope:** Deep Segmentation, Export, Alerts, Web Vitals.

@@ -2,21 +2,35 @@
 
 This monorepo can run the Next.js web app and the embedded foundation API in one Vercel project.
 
-## Import settings
+## Verified Vercel settings
 
-Use these settings in Vercel. The repository-root `vercel.json` is authoritative for the project configuration, so keep the Vercel project rooted at the repository root and mirror the values from that file when importing or reviewing the project settings:
+The Vercel project must point at the **Next.js app workspace**, not the API workspace. The deployment log that says `workspace @seo-tool/api` means the Vercel Root Directory is still set to `apps/api` or the project is linked to the API workspace; that project cannot be the web deployment target.
 
-- **Root Directory:** repository root / leave empty
+Use these project settings in Vercel:
+
+- **Root Directory:** `apps/web`
 - **Framework Preset:** Next.js
-- **Install Command:** default (`npm install`)
-- **Build Command:** `npm --workspace @seo-tool/web run build`
-- **Output Directory:** `apps/web/.next`
+- **Install Command:** default / empty override
+- **Build Command:** `npm run vercel-build`
+- **Output Directory:** `.next`
+
+`apps/web/vercel.json` mirrors the build command and output directory for the web workspace. The repository-root `vercel.json` remains as a compatibility path for projects that intentionally keep Root Directory empty/repository-root, but the preferred monorepo setting is `apps/web`.
+
+## Why the scripts are split
+
+Vercel runs the build command against the selected monorepo project/workspace. Therefore every deployment-relevant workspace has a `vercel-build` script:
+
+- `apps/web` is the canonical web deployment script. It first builds internal TypeScript workspace dependencies, then runs `next build`.
+- repository root keeps `vercel-build` for root-directory deployments.
+- `apps/api` has a forwarding `vercel-build` only to prevent the observed `Missing script: "vercel-build"` failure while the Vercel project is still mis-pointed at the API workspace. The correct permanent setting is still Root Directory `apps/web`.
+
+The web `build:next` script sets `DATABASE_URL=sqlite::memory:` during `next build` so static generation does not create competing file-backed SQLite handles. Runtime behavior is unchanged: when `DATABASE_URL` is omitted on Vercel, shared config still falls back to `sqlite:/tmp/seo-os.sqlite`.
 
 ## Environment variables
 
 For the single-deployment mode, do **not** set `SEO_API_BASE_URL`. When it is absent, the web app calls the embedded API handler directly and also exposes the same backend under `/api/backend/*`.
 
-Optional values:
+Optional runtime value:
 
 ```env
 DATABASE_URL=sqlite:/tmp/seo-os.sqlite
