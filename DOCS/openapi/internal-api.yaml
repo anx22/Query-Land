@@ -365,6 +365,48 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/AuditIssueRecord'
+  /projects/{projectId}/sites/{siteId}/audit-issues/{issueId}/dismiss:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - name: issueId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Dismiss an audit issue without waiting for crawler auto-resolution
+      operationId: dismissAuditIssue
+      responses:
+        '200':
+          description: Audit issue dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AuditIssueRecord'
+  /projects/{projectId}/sites/{siteId}/audit-issues/{issueId}/reopen:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - name: issueId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      summary: Reopen a resolved or dismissed audit issue
+      operationId: reopenAuditIssue
+      responses:
+        '200':
+          description: Audit issue reopened
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AuditIssueRecord'
   /integrations:
     get:
       summary: List integration accounts

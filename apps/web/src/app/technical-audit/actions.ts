@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { computeCrawlHealthScore, createCrawlRun, createFoundationJob, resolveAuditIssue } from "../../lib/foundation-api";
+import { computeCrawlHealthScore, createCrawlRun, createFoundationJob, dismissAuditIssue, reopenAuditIssue, resolveAuditIssue } from "../../lib/foundation-api";
 
 export async function startCrawlAction(formData: FormData) {
   try {
@@ -36,17 +36,36 @@ export async function computeHealthAction(formData: FormData) {
 }
 
 export async function resolveIssueAction(formData: FormData) {
+  await updateIssueAction(formData, "resolve");
+}
+
+export async function dismissIssueAction(formData: FormData) {
+  await updateIssueAction(formData, "dismiss");
+}
+
+export async function reopenIssueAction(formData: FormData) {
+  await updateIssueAction(formData, "reopen");
+}
+
+async function updateIssueAction(formData: FormData, action: "resolve" | "dismiss" | "reopen") {
   try {
     const projectId = requiredString(formData, "projectId");
     const siteId = requiredString(formData, "siteId");
-    await resolveAuditIssue(projectId, siteId, requiredString(formData, "issueId"));
+    const issueId = requiredString(formData, "issueId");
+    if (action === "resolve") {
+      await resolveAuditIssue(projectId, siteId, issueId);
+    } else if (action === "dismiss") {
+      await dismissAuditIssue(projectId, siteId, issueId);
+    } else {
+      await reopenAuditIssue(projectId, siteId, issueId);
+    }
     await computeCrawlHealthScore(projectId, siteId);
   } catch (error) {
     redirect(`/technical-audit?error=${encodeURIComponent(messageFor(error))}`);
   }
 
   revalidateTechnicalAuditViews();
-  redirect("/technical-audit?resolved=1&issueStatus=open");
+  redirect(`/technical-audit?issue=${action}&issueStatus=${action === "reopen" ? "resolved" : "open"}`);
 }
 
 function revalidateTechnicalAuditViews(): void {

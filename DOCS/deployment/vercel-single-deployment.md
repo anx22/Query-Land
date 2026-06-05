@@ -4,12 +4,12 @@ This monorepo can run the Next.js web app and the embedded foundation API in one
 
 ## Import settings
 
-Use these settings in Vercel. The repository-root `vercel.json` is authoritative for the project configuration, so keep the Vercel project rooted at the repository root and mirror the values from that file when importing or reviewing the project settings:
+Use these settings in Vercel. The repository-root `vercel.json` is authoritative for the project configuration, so keep the Vercel project rooted at the repository root and mirror the values from that file when importing or reviewing the project settings. The build command intentionally compiles TypeScript workspace packages before `next build`, because the web app imports the embedded API and shared config packages by their workspace package names:
 
 - **Root Directory:** repository root / leave empty
 - **Framework Preset:** Next.js
-- **Install Command:** default (`npm install`)
-- **Build Command:** `npm --workspace @seo-tool/web run build`
+- **Install Command:** `npm install --workspaces --include-workspace-root`
+- **Build Command:** `npm run vercel-build`
 - **Output Directory:** `apps/web/.next`
 
 ## Environment variables

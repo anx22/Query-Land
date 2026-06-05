@@ -258,7 +258,19 @@ export async function computeCrawlHealthScore(projectId: string, siteId: string)
 }
 
 export async function resolveAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
-  return apiPost<AuditIssueRecord>(`/projects/${projectId}/sites/${siteId}/audit-issues/${issueId}/resolve`, {});
+  return updateAuditIssue(projectId, siteId, issueId, "resolve");
+}
+
+export async function dismissAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
+  return updateAuditIssue(projectId, siteId, issueId, "dismiss");
+}
+
+export async function reopenAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
+  return updateAuditIssue(projectId, siteId, issueId, "reopen");
+}
+
+function updateAuditIssue(projectId: string, siteId: string, issueId: string, action: "resolve" | "dismiss" | "reopen"): Promise<AuditIssueRecord> {
+  return apiPost<AuditIssueRecord>(`/projects/${projectId}/sites/${siteId}/audit-issues/${issueId}/${action}`, {});
 }
 
 export async function createFoundationProject(input: CreateFoundationProjectInput): Promise<FoundationProject> {
