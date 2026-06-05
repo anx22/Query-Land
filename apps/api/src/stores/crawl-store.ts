@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { calculateHealthScore, type AuditIssueRecord, type CrawlHealthScore, type CrawlRun, type DiscoveredUrl, type IndexabilityRecord, type UrlFetchRecord } from "@seo-tool/domain-model";
+import { calculateHealthScore, type AuditIssueRecord, type AuditIssueSeverity, type CrawlHealthScore, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type IndexabilityRecord, type UrlFetchRecord } from "@seo-tool/domain-model";
 import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapUrlFetchRecord } from "../sqlite-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
@@ -9,16 +9,54 @@ export interface RecordAuditIssuesScope {
   checkedDiscoveredUrlIds: string[];
 }
 
+export interface ListPageOptions {
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListPage<T> {
+  data: T[];
+  limit: number;
+  offset: number;
+  total: number;
+  nextCursor: string | null;
+}
+
+export interface CrawlRunListFilters {
+  status?: CrawlRunStatus;
+}
+
+export interface AuditIssueListFilters {
+  status?: "open" | "resolved" | "all";
+  severity?: AuditIssueSeverity;
+  rule?: AuditIssueRecord["rule"];
+}
+
+export interface DiscoveredUrlListFilters {
+  status?: FetchStatusClass;
+  source?: DiscoveredUrl["source"];
+}
+
+export interface UrlExplorerRow {
+  discoveredUrl: DiscoveredUrl;
+  latestFetch: UrlFetchRecord | null;
+  latestIndexability: IndexabilityRecord | null;
+}
+
 export interface CrawlStore {
   listCrawlRuns(projectId: string, siteId: string): CrawlRun[];
+  listCrawlRunsPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: CrawlRunListFilters): ListPage<CrawlRun>;
   createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): CrawlRun;
   completeCrawlRun(projectId: string, siteId: string, runId: string, status: Extract<CrawlRun["status"], "succeeded" | "failed">, errorMessage?: string): CrawlRun;
   listHealthScores(projectId: string, siteId: string): CrawlHealthScore[];
   computeHealthScore(projectId: string, siteId: string): CrawlHealthScore;
   listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[];
+  listAuditIssuesPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: AuditIssueListFilters): ListPage<AuditIssueRecord>;
   recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number };
   resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord;
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
+  listDiscoveredUrlsPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): ListPage<DiscoveredUrl>;
+  listUrlExplorerRows(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): ListPage<UrlExplorerRow>;
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number };
   listFetchResults(projectId: string, siteId: string, discoveredUrlId: string): UrlFetchRecord[];
   recordFetchResult(projectId: string, siteId: string, discoveredUrlId: string, result: Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">): UrlFetchRecord;
@@ -30,11 +68,113 @@ export function createCrawlStore(db: SQLiteDatabase, audit: AuditLog): CrawlStor
   return new SQLiteCrawlStore(db, audit);
 }
 
+function normalizePageOptions(options: ListPageOptions): Required<ListPageOptions> {
+  const limit = Math.max(1, Math.min(Math.trunc(options.limit ?? 50), 200));
+  const offset = Math.max(0, Math.trunc(options.offset ?? 0));
+  return { limit, offset };
+}
+
+function createListPage<T>(data: T[], limit: number, offset: number, total: number): ListPage<T> {
+  const nextOffset = offset + data.length;
+  return {
+    data,
+    limit,
+    offset,
+    total,
+    nextCursor: nextOffset < total ? encodeCursor(nextOffset) : null
+  };
+}
+
+function encodeCursor(offset: number): string {
+  return Buffer.from(`offset:${offset}`, "utf8").toString("base64url");
+}
+
+function pageTotal(db: SQLiteDatabase, tableName: string, whereSql: string, params: unknown[]): number {
+  const row = db.prepare(`SELECT COUNT(*) AS count FROM ${tableName} WHERE ${whereSql}`).get(...params);
+  return Number(row?.count ?? 0);
+}
+
+function discoveredUrlWhere(projectId: string, siteId: string, filters: DiscoveredUrlListFilters): { whereSql: string; params: unknown[] } {
+  const where = [`project_id = ?`, `site_id = ?`];
+  const params: unknown[] = [projectId, siteId];
+  if (filters.source) {
+    where.push(`source = ?`);
+    params.push(filters.source);
+  }
+  if (filters.status) {
+    where.push(`(SELECT fetch.status_class FROM url_fetch_results fetch WHERE fetch.discovered_url_id = discovered_urls.id ORDER BY fetch.fetched_at DESC, fetch.created_at DESC, fetch.id ASC LIMIT 1) = ?`);
+    params.push(filters.status);
+  }
+  return { whereSql: where.join(" AND "), params };
+}
+
+function mapUrlExplorerRow(row: Record<string, unknown>): UrlExplorerRow {
+  return {
+    discoveredUrl: mapDiscoveredUrl({
+      id: row.url_id,
+      project_id: row.url_project_id,
+      site_id: row.url_site_id,
+      url: row.url_url,
+      normalized_url: row.url_normalized_url,
+      source: row.url_source,
+      discovered_from: row.url_discovered_from,
+      depth: row.url_depth,
+      discovered_at: row.url_discovered_at
+    }),
+    latestFetch: row.fetch_id === null ? null : mapUrlFetchRecord({
+      id: row.fetch_id,
+      project_id: row.fetch_project_id,
+      site_id: row.fetch_site_id,
+      discovered_url_id: row.fetch_discovered_url_id,
+      url: row.fetch_url,
+      final_url: row.fetch_final_url,
+      status_code: row.fetch_status_code,
+      status_class: row.fetch_status_class,
+      headers: row.fetch_headers,
+      redirect_chain: row.fetch_redirect_chain,
+      fetched_at: row.fetch_fetched_at,
+      error_message: row.fetch_error_message
+    }),
+    latestIndexability: row.index_id === null ? null : mapIndexabilityRecord({
+      id: row.index_id,
+      project_id: row.index_project_id,
+      site_id: row.index_site_id,
+      discovered_url_id: row.index_discovered_url_id,
+      fetch_result_id: row.index_fetch_result_id,
+      url: row.index_url,
+      state: row.index_state,
+      is_indexable: row.index_is_indexable,
+      reasons: row.index_reasons,
+      canonical_url: row.index_canonical_url,
+      assessed_at: row.index_assessed_at
+    })
+  };
+}
+
 class SQLiteCrawlStore implements CrawlStore {
   constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
 
   listCrawlRuns(projectId: string, siteId: string): CrawlRun[] {
     return this.db.prepare(`SELECT * FROM crawl_runs WHERE project_id = ? AND site_id = ? ORDER BY started_at DESC`).all(projectId, siteId).map(mapCrawlRun);
+  }
+
+  listCrawlRunsPage(projectId: string, siteId: string, options: ListPageOptions = {}, filters: CrawlRunListFilters = {}): ListPage<CrawlRun> {
+    const { limit, offset } = normalizePageOptions(options);
+    const where = [`project_id = ?`, `site_id = ?`];
+    const params: unknown[] = [projectId, siteId];
+    if (filters.status) {
+      where.push(`status = ?`);
+      params.push(filters.status);
+    }
+    const whereSql = where.join(" AND ");
+    const total = pageTotal(this.db, `crawl_runs`, whereSql, params);
+    const data = this.db.prepare(`
+      SELECT * FROM crawl_runs
+      WHERE ${whereSql}
+      ORDER BY started_at DESC, id ASC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset).map(mapCrawlRun);
+    return createListPage(data, limit, offset, total);
   }
 
   createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): CrawlRun {
@@ -101,6 +241,34 @@ class SQLiteCrawlStore implements CrawlStore {
 
   listAuditIssues(projectId: string, siteId: string): AuditIssueRecord[] {
     return this.db.prepare(`SELECT * FROM audit_issues WHERE project_id = ? AND site_id = ? ORDER BY detected_at DESC, severity ASC`).all(projectId, siteId).map(mapAuditIssueRecord);
+  }
+
+  listAuditIssuesPage(projectId: string, siteId: string, options: ListPageOptions = {}, filters: AuditIssueListFilters = {}): ListPage<AuditIssueRecord> {
+    const { limit, offset } = normalizePageOptions(options);
+    const where = [`project_id = ?`, `site_id = ?`];
+    const params: unknown[] = [projectId, siteId];
+    if (filters.status === "open") {
+      where.push(`resolved_at IS NULL`);
+    } else if (filters.status === "resolved") {
+      where.push(`resolved_at IS NOT NULL`);
+    }
+    if (filters.severity) {
+      where.push(`severity = ?`);
+      params.push(filters.severity);
+    }
+    if (filters.rule) {
+      where.push(`rule = ?`);
+      params.push(filters.rule);
+    }
+    const whereSql = where.join(" AND ");
+    const total = pageTotal(this.db, `audit_issues`, whereSql, params);
+    const data = this.db.prepare(`
+      SELECT * FROM audit_issues
+      WHERE ${whereSql}
+      ORDER BY detected_at DESC, severity ASC, id ASC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset).map(mapAuditIssueRecord);
+    return createListPage(data, limit, offset, total);
   }
 
   recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number } {
@@ -198,6 +366,58 @@ class SQLiteCrawlStore implements CrawlStore {
       ? this.db.prepare(sql).all(projectId, siteId)
       : this.db.prepare(sql).all(projectId);
     return rows.map(mapDiscoveredUrl);
+  }
+
+  listDiscoveredUrlsPage(projectId: string, siteId: string, options: ListPageOptions = {}, filters: DiscoveredUrlListFilters = {}): ListPage<DiscoveredUrl> {
+    const { limit, offset } = normalizePageOptions(options);
+    const { whereSql, params } = discoveredUrlWhere(projectId, siteId, filters);
+    const total = pageTotal(this.db, `discovered_urls`, whereSql, params);
+    const data = this.db.prepare(`
+      SELECT * FROM discovered_urls
+      WHERE ${whereSql}
+      ORDER BY discovered_at ASC, normalized_url ASC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset).map(mapDiscoveredUrl);
+    return createListPage(data, limit, offset, total);
+  }
+
+  listUrlExplorerRows(projectId: string, siteId: string, options: ListPageOptions = {}, filters: DiscoveredUrlListFilters = {}): ListPage<UrlExplorerRow> {
+    const { limit, offset } = normalizePageOptions(options);
+    const { whereSql, params } = discoveredUrlWhere(projectId, siteId, filters);
+    const total = pageTotal(this.db, `discovered_urls`, whereSql, params);
+    const rows = this.db.prepare(`
+      WITH paged_urls AS (
+        SELECT * FROM discovered_urls
+        WHERE ${whereSql}
+        ORDER BY discovered_at ASC, normalized_url ASC
+        LIMIT ? OFFSET ?
+      ),
+      latest_fetches AS (
+        SELECT * FROM (
+          SELECT fetch.*, ROW_NUMBER() OVER (PARTITION BY fetch.discovered_url_id ORDER BY fetch.fetched_at DESC, fetch.created_at DESC, fetch.id ASC) AS row_number
+          FROM url_fetch_results fetch
+          INNER JOIN paged_urls url ON url.id = fetch.discovered_url_id
+        )
+        WHERE row_number = 1
+      ),
+      latest_indexability AS (
+        SELECT * FROM (
+          SELECT assessment.*, ROW_NUMBER() OVER (PARTITION BY assessment.discovered_url_id ORDER BY assessment.assessed_at DESC, assessment.created_at DESC, assessment.id ASC) AS row_number
+          FROM url_indexability_assessments assessment
+          INNER JOIN paged_urls url ON url.id = assessment.discovered_url_id
+        )
+        WHERE row_number = 1
+      )
+      SELECT
+        url.id AS url_id, url.project_id AS url_project_id, url.site_id AS url_site_id, url.url AS url_url, url.normalized_url AS url_normalized_url, url.source AS url_source, url.discovered_from AS url_discovered_from, url.depth AS url_depth, url.discovered_at AS url_discovered_at,
+        fetch.id AS fetch_id, fetch.project_id AS fetch_project_id, fetch.site_id AS fetch_site_id, fetch.discovered_url_id AS fetch_discovered_url_id, fetch.url AS fetch_url, fetch.final_url AS fetch_final_url, fetch.status_code AS fetch_status_code, fetch.status_class AS fetch_status_class, fetch.headers AS fetch_headers, fetch.redirect_chain AS fetch_redirect_chain, fetch.fetched_at AS fetch_fetched_at, fetch.error_message AS fetch_error_message,
+        assessment.id AS index_id, assessment.project_id AS index_project_id, assessment.site_id AS index_site_id, assessment.discovered_url_id AS index_discovered_url_id, assessment.fetch_result_id AS index_fetch_result_id, assessment.url AS index_url, assessment.state AS index_state, assessment.is_indexable AS index_is_indexable, assessment.reasons AS index_reasons, assessment.canonical_url AS index_canonical_url, assessment.assessed_at AS index_assessed_at
+      FROM paged_urls url
+      LEFT JOIN latest_fetches fetch ON fetch.discovered_url_id = url.id
+      LEFT JOIN latest_indexability assessment ON assessment.discovered_url_id = url.id
+      ORDER BY url.discovered_at ASC, url.normalized_url ASC
+    `).all(...params, limit, offset).map(mapUrlExplorerRow);
+    return createListPage(rows, limit, offset, total);
   }
 
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): { urls: DiscoveredUrl[]; inserted: number; updated: number } {

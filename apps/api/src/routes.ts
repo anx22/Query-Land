@@ -6,7 +6,7 @@ import { completeCrawlRunRequest, completeJobRequest, createCrawlRunRequest, cre
 
 export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore;
 
-export async function routeProjectChildren(store: ProjectChildStore, method: string, pathname: string, body: unknown, requestId: string): Promise<ApiResponse> {
+export async function routeProjectChildren(store: ProjectChildStore, method: string, pathname: string, searchParams: URLSearchParams, body: unknown, requestId: string): Promise<ApiResponse> {
   const siteMatch = pathname.match(/^\/projects\/([^/]+)\/sites$/);
   if (method === "GET" && siteMatch) {
     return json(200, { data: store.listSites(siteMatch[1]) });
@@ -17,7 +17,8 @@ export async function routeProjectChildren(store: ProjectChildStore, method: str
 
   const crawlRunsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs$/);
   if (method === "GET" && crawlRunsMatch) {
-    return json(200, { data: store.listCrawlRuns(crawlRunsMatch[1], crawlRunsMatch[2]) });
+    const page = store.listCrawlRunsPage(crawlRunsMatch[1], crawlRunsMatch[2], paginationOptions(searchParams), { status: enumQuery(searchParams, "status", ["running", "succeeded", "failed"]) });
+    return json(200, { data: page.data, meta: pageMeta(page) });
   }
   if (method === "POST" && crawlRunsMatch) {
     const input = createCrawlRunRequest(body);
@@ -40,7 +41,12 @@ export async function routeProjectChildren(store: ProjectChildStore, method: str
 
   const auditIssuesMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/audit-issues$/);
   if (method === "GET" && auditIssuesMatch) {
-    return json(200, { data: store.listAuditIssues(auditIssuesMatch[1], auditIssuesMatch[2]) });
+    const page = store.listAuditIssuesPage(auditIssuesMatch[1], auditIssuesMatch[2], paginationOptions(searchParams), {
+      status: enumQuery(searchParams, "status", ["open", "resolved", "all"]),
+      severity: enumQuery(searchParams, "severity", ["critical", "high", "medium", "low"]),
+      rule: enumQuery(searchParams, "rule", ["http_error", "redirect_chain", "missing_title", "duplicate_title", "canonical_mismatch", "broken_link"])
+    });
+    return json(200, { data: page.data, meta: pageMeta(page) });
   }
   if (method === "POST" && auditIssuesMatch) {
     const input = recordAuditIssuesRequest(body);
@@ -55,12 +61,25 @@ export async function routeProjectChildren(store: ProjectChildStore, method: str
 
   const discoveredUrlsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls$/);
   if (method === "GET" && discoveredUrlsMatch) {
-    return json(200, { data: store.listDiscoveredUrls(discoveredUrlsMatch[1], discoveredUrlsMatch[2]) });
+    const page = store.listDiscoveredUrlsPage(discoveredUrlsMatch[1], discoveredUrlsMatch[2], paginationOptions(searchParams), {
+      status: enumQuery(searchParams, "status", ["success", "redirect", "client_error", "server_error", "network_error"]),
+      source: enumQuery(searchParams, "source", ["seed", "sitemap", "link"])
+    });
+    return json(200, { data: page.data, meta: pageMeta(page) });
   }
   if (method === "POST" && discoveredUrlsMatch) {
     const input = recordDiscoveredUrlsRequest(body);
     const result = store.recordDiscoveredUrls(discoveredUrlsMatch[1], discoveredUrlsMatch[2], input.urls);
     return json(201, { data: result.urls, meta: { inserted: result.inserted, updated: result.updated } });
+  }
+
+  const urlExplorerMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/url-explorer$/);
+  if (method === "GET" && urlExplorerMatch) {
+    const page = store.listUrlExplorerRows(urlExplorerMatch[1], urlExplorerMatch[2], paginationOptions(searchParams), {
+      status: enumQuery(searchParams, "status", ["success", "redirect", "client_error", "server_error", "network_error"]),
+      source: enumQuery(searchParams, "source", ["seed", "sitemap", "link"])
+    });
+    return json(200, { data: page.data, meta: pageMeta(page) });
   }
 
   const fetchResultsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls\/([^/]+)\/fetch-results$/);
@@ -109,4 +128,52 @@ export async function routeProjectChildren(store: ProjectChildStore, method: str
     return json(200, { data: store.listSourceMapEntries() });
   }
   return apiError(404, "not_found", "Route not found", requestId);
+}
+
+interface RoutePage<T> {
+  data: T[];
+  limit: number;
+  offset: number;
+  total: number;
+  nextCursor: string | null;
+}
+
+function paginationOptions(searchParams: URLSearchParams): { limit?: number; offset?: number } {
+  const limit = positiveInt(searchParams.get("limit"));
+  const offset = cursorOffset(searchParams.get("cursor")) ?? nonNegativeInt(searchParams.get("offset"));
+  return { limit, offset };
+}
+
+function pageMeta<T>(page: RoutePage<T>): Omit<RoutePage<T>, "data"> {
+  return { limit: page.limit, offset: page.offset, total: page.total, nextCursor: page.nextCursor };
+}
+
+function positiveInt(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function nonNegativeInt(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function cursorOffset(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const direct = nonNegativeInt(value);
+  if (direct !== undefined) return direct;
+  try {
+    const decoded = Buffer.from(value, "base64url").toString("utf8");
+    const match = /^offset:(\d+)$/.exec(decoded);
+    return match ? Number(match[1]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function enumQuery<const T extends string>(searchParams: URLSearchParams, key: string, allowed: readonly T[]): T | undefined {
+  const value = searchParams.get(key);
+  return value && (allowed as readonly string[]).includes(value) ? value as T : undefined;
 }

@@ -10,7 +10,7 @@ export function createApiServer() {
     request.on("end", async () => {
       const rawBody = Buffer.concat(chunks).toString("utf8");
       const parsedBody = rawBody ? JSON.parse(rawBody) as unknown : undefined;
-      const apiResponse = await handleRequest(request.method ?? "GET", url.pathname, parsedBody, {
+      const apiResponse = await handleRequest(request.method ?? "GET", `${url.pathname}${url.search}`, parsedBody, {
         headers: {
           authorization: request.headers.authorization
         }
