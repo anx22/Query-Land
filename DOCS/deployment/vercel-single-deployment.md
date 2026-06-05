@@ -1,0 +1,31 @@
+# Vercel single-deployment setup
+
+This monorepo can run the Next.js web app and the embedded foundation API in one Vercel project.
+
+## Import settings
+
+Use these settings in Vercel:
+
+- **Framework Preset:** Next.js
+- **Root Directory:** `apps/web`
+- **Install Command:** default (`npm install`)
+- **Build Command:** default (`npm run build`)
+- **Output Directory:** default
+
+## Environment variables
+
+For the single-deployment mode, do **not** set `SEO_API_BASE_URL`. When it is absent, the web app calls the embedded API handler directly and also exposes the same backend under `/api/backend/*`.
+
+Optional values:
+
+```env
+DATABASE_URL=sqlite:/tmp/seo-os.sqlite
+```
+
+When `DATABASE_URL` is omitted on Vercel, the shared config falls back to `sqlite:/tmp/seo-os.sqlite` so the SQLite database is written to Vercel's writable temporary directory instead of the read-only deployment bundle.
+
+## Limitations
+
+- The embedded API runs as Vercel/Next.js server functions, not as a permanent background process.
+- SQLite in `/tmp` is suitable for preview/demo operation but is not durable across cold starts or new function instances. Move `DATABASE_URL` to a durable database adapter when production persistence is required.
+- The crawler worker loop is still a worker process and is not started by Vercel. API endpoints remain available under `/api/backend/*`; schedule/worker execution needs a separate trigger or future cron/function integration.

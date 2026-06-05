@@ -54,8 +54,10 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     const fetchesByUrl = new Map<string, FetchResult>();
     const detectedAt = now();
     let fetchedUrls = 0;
+    const checkedDiscoveredUrlIds: string[] = [];
 
     for (const discoveredUrl of storedUrls) {
+      checkedDiscoveredUrlIds.push(discoveredUrl.id);
       if (!isRobotsAllowed(discoveredUrl.normalizedUrl, robotsPolicy)) {
         await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, discoveredUrl.id, {
           url: discoveredUrl.normalizedUrl,
@@ -101,7 +103,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
       detectedAt,
       resolvedAt: null
     }));
-    await options.apiClient.recordAuditIssues(job.projectId, siteId, issues);
+    await options.apiClient.recordAuditIssues(job.projectId, siteId, issues, checkedDiscoveredUrlIds);
     await options.apiClient.computeHealthScore(job.projectId, siteId);
     await options.apiClient.completeCrawlRun(job.projectId, siteId, crawlRunId, "succeeded");
     const completed = await options.apiClient.completeJob(job.id, "succeeded");

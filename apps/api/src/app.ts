@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { apiError, bearerToken, json, logRequest, type ApiResponse, type RequestContext } from "./http.js";
 import { authRequest, createProjectRequest } from "./request-validators.js";
 import { routeProjectChildren } from "./routes.js";
-import { createSQLiteStore, RequestError, type AuthStore, type HealthStore, type ProjectStore } from "./sqlite-store.js";
+import { createSQLiteStore, type AuthStore, type HealthStore, type ProjectStore } from "./sqlite-store.js";
+import { RequestError } from "./stores/store-errors.js";
 import type { ProjectChildStore } from "./routes.js";
 
 export type AppStore = HealthStore & AuthStore & ProjectStore & ProjectChildStore;
