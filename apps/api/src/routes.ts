@@ -54,9 +54,15 @@ export async function routeProjectChildren(store: ProjectChildStore, method: str
     return json(201, { data: result.issues, meta: { inserted: result.inserted, updated: result.updated, resolved: result.resolved } });
   }
 
-  const resolveAuditIssueMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/audit-issues\/([^/]+)\/resolve$/);
-  if (method === "POST" && resolveAuditIssueMatch) {
-    return json(200, { data: store.resolveAuditIssue(resolveAuditIssueMatch[1], resolveAuditIssueMatch[2], resolveAuditIssueMatch[3]) });
+  const issueActionMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/audit-issues\/([^/]+)\/(resolve|dismiss|reopen)$/);
+  if (method === "POST" && issueActionMatch) {
+    const [projectId, siteId, issueId, action] = issueActionMatch.slice(1) as [string, string, string, "resolve" | "dismiss" | "reopen"];
+    const issue = action === "resolve"
+      ? store.resolveAuditIssue(projectId, siteId, issueId)
+      : action === "dismiss"
+        ? store.dismissAuditIssue(projectId, siteId, issueId)
+        : store.reopenAuditIssue(projectId, siteId, issueId);
+    return json(200, { data: issue });
   }
 
   const discoveredUrlsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/discovered-urls$/);

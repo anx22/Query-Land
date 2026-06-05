@@ -2,7 +2,7 @@ import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
 import { StatusList } from "../../components/status-list";
 import { loadTechnicalAuditData } from "../../lib/foundation-api";
-import { computeHealthAction, resolveIssueAction, startCrawlAction } from "./actions";
+import { computeHealthAction, dismissIssueAction, reopenIssueAction, resolveIssueAction, startCrawlAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const filteredIssues = data.auditIssues;
   const nextUrlOffset = data.urlExplorerMeta.offset + data.urlExplorerRows.length;
   const previousUrlOffset = Math.max(0, data.urlExplorerMeta.offset - data.urlExplorerMeta.limit);
-  const feedback = feedbackMessage(params?.started, params?.health, params?.resolved, params?.error);
+  const feedback = feedbackMessage(params?.started, params?.health, params?.issue, params?.error);
   const crawlRunItems = data.crawlRuns.length > 0
     ? data.crawlRuns.map((run) => ({
       id: run.id,
@@ -120,14 +120,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <strong>{issue.severity.toUpperCase()} · {issue.rule}</strong>
                   <span>{issue.url}</span>
                   <span>{issue.message} · {issue.resolvedAt ? `resolved ${new Date(issue.resolvedAt).toLocaleString("de-DE")}` : "open"}</span>
-                  {!issue.resolvedAt ? (
-                    <form className="inline-actions" action={resolveIssueAction}>
-                      <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-                      <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-                      <input type="hidden" name="issueId" value={issue.id} />
-                      <button className="button secondary compact" type="submit" disabled={!data.connected}>Als resolved markieren</button>
-                    </form>
-                  ) : null}
+                  <div className="inline-actions">
+                    <IssueActionForm action={issue.resolvedAt ? reopenIssueAction : resolveIssueAction} projectId={data.selectedProject?.id ?? ""} siteId={data.selectedSite?.id ?? ""} issueId={issue.id} disabled={!data.connected} label={issue.resolvedAt ? "Reopen" : "Als resolved markieren"} />
+                    {!issue.resolvedAt ? (
+                      <IssueActionForm action={dismissIssueAction} projectId={data.selectedProject?.id ?? ""} siteId={data.selectedSite?.id ?? ""} issueId={issue.id} disabled={!data.connected} label="Dismiss" />
+                    ) : null}
+                  </div>
                 </article>
               ))}
               {filteredIssues.length === 0 ? <p>Keine Issues für die aktiven Filter.</p> : null}
@@ -174,12 +172,26 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   );
 }
 
-function feedbackMessage(started: string | string[] | undefined, health: string | string[] | undefined, resolved: string | string[] | undefined, error: string | string[] | undefined): { kind: "success" | "danger"; message: string } | null {
+function IssueActionForm({ action, projectId, siteId, issueId, disabled, label }: { action: (formData: FormData) => Promise<void>; projectId: string; siteId: string; issueId: string; disabled: boolean; label: string }) {
+  return (
+    <form action={action}>
+      <input type="hidden" name="projectId" value={projectId} />
+      <input type="hidden" name="siteId" value={siteId} />
+      <input type="hidden" name="issueId" value={issueId} />
+      <button className="button secondary compact" type="submit" disabled={disabled}>{label}</button>
+    </form>
+  );
+}
+
+function feedbackMessage(started: string | string[] | undefined, health: string | string[] | undefined, issue: string | string[] | undefined, error: string | string[] | undefined): { kind: "success" | "danger"; message: string } | null {
   const errorValue = Array.isArray(error) ? error[0] : error;
+  const issueValue = Array.isArray(issue) ? issue[0] : issue;
   if (errorValue) return { kind: "danger", message: errorValue };
   if (started) return { kind: "success", message: "Crawl Run und crawl_seed Job wurden angelegt." };
   if (health) return { kind: "success", message: "Health Score wurde neu berechnet." };
-  if (resolved) return { kind: "success", message: "Issue wurde als resolved markiert und Health neu berechnet." };
+  if (issueValue === "dismiss") return { kind: "success", message: "Issue wurde dismissed und Health neu berechnet." };
+  if (issueValue === "reopen") return { kind: "success", message: "Issue wurde wieder geöffnet und Health neu berechnet." };
+  if (issueValue === "resolve") return { kind: "success", message: "Issue wurde als resolved markiert und Health neu berechnet." };
   return null;
 }
 

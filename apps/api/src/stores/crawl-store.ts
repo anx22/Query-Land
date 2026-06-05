@@ -54,6 +54,8 @@ export interface CrawlStore {
   listAuditIssuesPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: AuditIssueListFilters): ListPage<AuditIssueRecord>;
   recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): { issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number };
   resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord;
+  dismissAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord;
+  reopenAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord;
   listDiscoveredUrls(projectId: string, siteId?: string): DiscoveredUrl[];
   listDiscoveredUrlsPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): ListPage<DiscoveredUrl>;
   listUrlExplorerRows(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): ListPage<UrlExplorerRow>;
@@ -343,18 +345,30 @@ class SQLiteCrawlStore implements CrawlStore {
   }
 
   resolveAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord {
+    return this.setAuditIssueResolution(projectId, siteId, issueId, new Date().toISOString(), "crawl.issue.resolve");
+  }
+
+  dismissAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord {
+    return this.setAuditIssueResolution(projectId, siteId, issueId, new Date().toISOString(), "crawl.issue.dismiss");
+  }
+
+  reopenAuditIssue(projectId: string, siteId: string, issueId: string): AuditIssueRecord {
+    return this.setAuditIssueResolution(projectId, siteId, issueId, null, "crawl.issue.reopen");
+  }
+
+  private setAuditIssueResolution(projectId: string, siteId: string, issueId: string, resolvedAt: string | null, action: string): AuditIssueRecord {
     this.assertSiteScope(projectId, siteId);
     const now = new Date().toISOString();
     this.db.prepare(`
       UPDATE audit_issues
-      SET resolved_at = COALESCE(resolved_at, ?), updated_at = ?
+      SET resolved_at = ?, updated_at = ?
       WHERE id = ? AND project_id = ? AND site_id = ?
-    `).run(now, now, issueId, projectId, siteId);
+    `).run(resolvedAt, now, issueId, projectId, siteId);
     const row = this.db.prepare(`SELECT * FROM audit_issues WHERE id = ? AND project_id = ? AND site_id = ?`).get(issueId, projectId, siteId);
     if (!row) {
       throw new RequestError(404, "audit_issue_not_found", "Audit issue not found", { projectId, siteId, issueId });
     }
-    this.audit("system", "crawl.issue.resolve", "audit_issue", issueId, { projectId, siteId });
+    this.audit("system", action, "audit_issue", issueId, { projectId, siteId });
     return mapAuditIssueRecord(row);
   }
 
