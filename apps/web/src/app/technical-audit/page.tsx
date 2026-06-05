@@ -8,17 +8,16 @@ export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const data = await loadTechnicalAuditData();
+  const issueStatus = singleParam(params?.issueStatus) ?? "open";
+  const issueSeverity = singleParam(params?.severity) ?? "all";
+  const urlOffset = Math.max(0, Number.parseInt(singleParam(params?.urlOffset) ?? "0", 10) || 0);
+  const data = await loadTechnicalAuditData({ issueStatus, issueSeverity, urlOffset });
   const latestHealth = data.healthScores[0] ?? null;
   const latestRun = data.crawlRuns[0] ?? null;
   const openIssues = data.auditIssues.filter((issue) => issue.resolvedAt === null);
-  const issueStatus = singleParam(params?.issueStatus) ?? "open";
-  const issueSeverity = singleParam(params?.severity) ?? "all";
-  const filteredIssues = data.auditIssues.filter((issue) => {
-    const matchesStatus = issueStatus === "all" || (issueStatus === "resolved" ? issue.resolvedAt !== null : issue.resolvedAt === null);
-    const matchesSeverity = issueSeverity === "all" || issue.severity === issueSeverity;
-    return matchesStatus && matchesSeverity;
-  });
+  const filteredIssues = data.auditIssues;
+  const nextUrlOffset = data.urlExplorerMeta.offset + data.urlExplorerRows.length;
+  const previousUrlOffset = Math.max(0, data.urlExplorerMeta.offset - data.urlExplorerMeta.limit);
   const feedback = feedbackMessage(params?.started, params?.health, params?.resolved, params?.error);
   const crawlRunItems = data.crawlRuns.length > 0
     ? data.crawlRuns.map((run) => ({
@@ -61,9 +60,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       <section className="metric-grid">
         <MetricCard label="Health Score" value={latestHealth ? String(latestHealth.score) : "—"} note={latestHealth ? `${latestHealth.totalIssues} offene Issues gewertet` : "noch kein Score"} />
-        <MetricCard label="Crawl Runs" value={String(data.crawlRuns.length)} note={latestRun ? `letzter Status ${latestRun.status}` : "noch kein Run"} />
-        <MetricCard label="Open Issues" value={String(openIssues.length)} note={`${data.auditIssues.length} Issues insgesamt`} />
-        <MetricCard label="Discovered URLs" value={String(data.discoveredUrls.length)} note="aus /discovered-urls" />
+        <MetricCard label="Crawl Runs" value={String(data.crawlRunsMeta.total)} note={latestRun ? `letzter Status ${latestRun.status}` : "noch kein Run"} />
+        <MetricCard label="Open Issues" value={String(openIssues.length)} note={`${data.auditIssuesMeta.total} Issues im Filter`} />
+        <MetricCard label="Discovered URLs" value={String(data.discoveredUrlsMeta.total)} note={`${data.urlExplorerRows.length} im Explorer geladen`} />
       </section>
 
       <section className="content-grid">
@@ -91,6 +90,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       <section className="content-grid">
         <div className="card">
           <p className="kicker">Issue Tabelle</p>
+          <p className="muted">Serverseitig limitiert: {data.auditIssues.length} von {data.auditIssuesMeta.total} Issues geladen.</p>
           <form className="filter-row" action="/technical-audit">
             <label>
               Status
@@ -110,6 +110,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 <option value="low">Low</option>
               </select>
             </label>
+            <input type="hidden" name="urlOffset" value={String(urlOffset)} />
             <button className="button secondary" type="submit">Filtern</button>
           </form>
           {data.auditIssues.length > 0 ? (
@@ -137,22 +138,33 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </div>
         <div className="card">
           <p className="kicker">URL Explorer</p>
+          <p className="muted">Seite {Math.floor(data.urlExplorerMeta.offset / Math.max(data.urlExplorerMeta.limit, 1)) + 1}: {data.urlExplorerRows.length} von {data.urlExplorerMeta.total} URLs geladen; latest Fetch und Indexability kommen aggregiert aus einem API-Endpoint.</p>
           {data.urlExplorerRows.length > 0 ? (
-            <div className="table-list">
-              {data.urlExplorerRows.map((row) => (
-                <article key={row.discoveredUrl.id}>
-                  <strong>{row.discoveredUrl.normalizedUrl}</strong>
-                  <span>{row.discoveredUrl.source} · depth {row.discoveredUrl.depth} · discovered {new Date(row.discoveredUrl.discoveredAt).toLocaleString("de-DE")}</span>
-                  <span>
-                    Fetch: {row.latestFetch ? `${row.latestFetch.statusClass} · ${row.latestFetch.statusCode ?? "network"} · ${new Date(row.latestFetch.fetchedAt).toLocaleString("de-DE")}` : "noch kein Fetch"}
-                  </span>
-                  <span>
-                    Indexability: {row.latestIndexability ? `${row.latestIndexability.state} · ${row.latestIndexability.isIndexable ? "indexable" : "not indexable"}` : "noch keine Bewertung"}
-                  </span>
-                  {row.latestIndexability?.reasons.length ? <span>Reasons: {row.latestIndexability.reasons.join(", ")}</span> : null}
-                </article>
-              ))}
-            </div>
+            <>
+              <div className="table-list">
+                {data.urlExplorerRows.map((row) => (
+                  <article key={row.discoveredUrl.id}>
+                    <strong>{row.discoveredUrl.normalizedUrl}</strong>
+                    <span>{row.discoveredUrl.source} · depth {row.discoveredUrl.depth} · discovered {new Date(row.discoveredUrl.discoveredAt).toLocaleString("de-DE")}</span>
+                    <span>
+                      Fetch: {row.latestFetch ? `${row.latestFetch.statusClass} · ${row.latestFetch.statusCode ?? "network"} · ${new Date(row.latestFetch.fetchedAt).toLocaleString("de-DE")}` : "noch kein Fetch"}
+                    </span>
+                    <span>
+                      Indexability: {row.latestIndexability ? `${row.latestIndexability.state} · ${row.latestIndexability.isIndexable ? "indexable" : "not indexable"}` : "noch keine Bewertung"}
+                    </span>
+                    {row.latestIndexability?.reasons.length ? <span>Reasons: {row.latestIndexability.reasons.join(", ")}</span> : null}
+                  </article>
+                ))}
+              </div>
+              <div className="action-row">
+                {data.urlExplorerMeta.offset > 0 ? (
+                  <a className="button secondary" href={technicalAuditHref(issueStatus, issueSeverity, previousUrlOffset)}>Zurück</a>
+                ) : null}
+                {data.urlExplorerMeta.nextCursor ? (
+                  <a className="button secondary" href={technicalAuditHref(issueStatus, issueSeverity, nextUrlOffset)}>Mehr laden</a>
+                ) : null}
+              </div>
+            </>
           ) : (
             <p>Noch keine Discovered URLs für die ausgewählte Site.</p>
           )}
@@ -173,4 +185,9 @@ function feedbackMessage(started: string | string[] | undefined, health: string 
 
 function singleParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function technicalAuditHref(issueStatus: string, issueSeverity: string, urlOffset: number): string {
+  const params = new URLSearchParams({ issueStatus, severity: issueSeverity, urlOffset: String(urlOffset) });
+  return `/technical-audit?${params.toString()}`;
 }

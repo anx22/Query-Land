@@ -98,17 +98,35 @@ export interface TechnicalAuditUrlRow {
   latestIndexability: IndexabilityRecord | null;
 }
 
+export interface ListMeta {
+  limit: number;
+  offset: number;
+  total: number;
+  nextCursor: string | null;
+}
+
 export interface TechnicalAuditData extends FoundationDashboardData {
   selectedSite: FoundationSite | null;
   crawlRuns: CrawlRun[];
+  crawlRunsMeta: ListMeta;
   healthScores: CrawlHealthScore[];
   auditIssues: AuditIssueRecord[];
+  auditIssuesMeta: ListMeta;
   discoveredUrls: DiscoveredUrl[];
+  discoveredUrlsMeta: ListMeta;
   urlExplorerRows: TechnicalAuditUrlRow[];
+  urlExplorerMeta: ListMeta;
+}
+
+interface TechnicalAuditLoadOptions {
+  issueStatus?: string;
+  issueSeverity?: string;
+  urlOffset?: number;
 }
 
 interface ApiEnvelope<T> {
   data: T;
+  meta?: ListMeta;
 }
 
 const configuredApiBaseUrl = process.env.SEO_API_BASE_URL;
@@ -172,25 +190,42 @@ export async function loadProjectControlData(): Promise<ProjectControlData> {
   }
 }
 
-export async function loadTechnicalAuditData(): Promise<TechnicalAuditData> {
+export async function loadTechnicalAuditData(options: TechnicalAuditLoadOptions = {}): Promise<TechnicalAuditData> {
   const dashboard = await loadFoundationDashboardData();
   const selectedSite = dashboard.sites[0] ?? null;
   if (!dashboard.connected || !dashboard.selectedProject || !selectedSite) {
-    return { ...dashboard, selectedSite, crawlRuns: [], healthScores: [], auditIssues: [], discoveredUrls: [], urlExplorerRows: [] };
+    return { ...dashboard, selectedSite, crawlRuns: [], crawlRunsMeta: emptyListMeta(), healthScores: [], auditIssues: [], auditIssuesMeta: emptyListMeta(), discoveredUrls: [], discoveredUrlsMeta: emptyListMeta(), urlExplorerRows: [], urlExplorerMeta: emptyListMeta() };
   }
 
   try {
     const base = `/projects/${dashboard.selectedProject.id}/sites/${selectedSite.id}`;
-    const [crawlRuns, healthScores, auditIssues, discoveredUrls] = await Promise.all([
-      apiGet<CrawlRun[]>(`${base}/crawl-runs`),
+    const issueParams = new URLSearchParams({ limit: "25" });
+    const normalizedIssueStatus = options.issueStatus && ["open", "resolved", "all"].includes(options.issueStatus) ? options.issueStatus : "open";
+    issueParams.set("status", normalizedIssueStatus);
+    if (options.issueSeverity && options.issueSeverity !== "all") issueParams.set("severity", options.issueSeverity);
+    const urlParams = new URLSearchParams({ limit: "25", offset: String(Math.max(0, Math.trunc(options.urlOffset ?? 0))) });
+
+    const [crawlRunsResponse, healthScores, auditIssuesResponse, discoveredUrlsResponse, urlExplorerResponse] = await Promise.all([
+      apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=10`),
       apiGet<CrawlHealthScore[]>(`${base}/health-scores`),
-      apiGet<AuditIssueRecord[]>(`${base}/audit-issues`),
-      apiGet<DiscoveredUrl[]>(`${base}/discovered-urls`)
+      apiGetEnvelope<AuditIssueRecord[]>(`${base}/audit-issues?${issueParams.toString()}`),
+      apiGetEnvelope<DiscoveredUrl[]>(`${base}/discovered-urls?limit=25`),
+      apiGetEnvelope<TechnicalAuditUrlRow[]>(`${base}/url-explorer?${urlParams.toString()}`)
     ]);
 
-    const urlExplorerRows = await loadUrlExplorerRows(base, discoveredUrls);
-
-    return { ...dashboard, selectedSite, crawlRuns, healthScores, auditIssues, discoveredUrls, urlExplorerRows };
+    return {
+      ...dashboard,
+      selectedSite,
+      crawlRuns: crawlRunsResponse.data,
+      crawlRunsMeta: crawlRunsResponse.meta ?? emptyListMeta(crawlRunsResponse.data.length),
+      healthScores,
+      auditIssues: auditIssuesResponse.data,
+      auditIssuesMeta: auditIssuesResponse.meta ?? emptyListMeta(auditIssuesResponse.data.length),
+      discoveredUrls: discoveredUrlsResponse.data,
+      discoveredUrlsMeta: discoveredUrlsResponse.meta ?? emptyListMeta(discoveredUrlsResponse.data.length),
+      urlExplorerRows: urlExplorerResponse.data,
+      urlExplorerMeta: urlExplorerResponse.meta ?? emptyListMeta(urlExplorerResponse.data.length)
+    };
   } catch (error) {
     return {
       ...dashboard,
@@ -198,27 +233,20 @@ export async function loadTechnicalAuditData(): Promise<TechnicalAuditData> {
       errorMessage: error instanceof Error ? error.message : "Technical-Audit-Daten konnten nicht geladen werden.",
       selectedSite,
       crawlRuns: [],
+      crawlRunsMeta: emptyListMeta(),
       healthScores: [],
       auditIssues: [],
+      auditIssuesMeta: emptyListMeta(),
       discoveredUrls: [],
-      urlExplorerRows: []
+      discoveredUrlsMeta: emptyListMeta(),
+      urlExplorerRows: [],
+      urlExplorerMeta: emptyListMeta()
     };
   }
 }
 
-async function loadUrlExplorerRows(base: string, discoveredUrls: DiscoveredUrl[]): Promise<TechnicalAuditUrlRow[]> {
-  return Promise.all(discoveredUrls.map(async (discoveredUrl) => {
-    const detailBase = `${base}/discovered-urls/${discoveredUrl.id}`;
-    const [fetches, indexability] = await Promise.all([
-      apiGet<UrlFetchRecord[]>(`${detailBase}/fetch-results`),
-      apiGet<IndexabilityRecord[]>(`${detailBase}/indexability`)
-    ]);
-    return {
-      discoveredUrl,
-      latestFetch: fetches[0] ?? null,
-      latestIndexability: indexability[0] ?? null
-    };
-  }));
+function emptyListMeta(total = 0): ListMeta {
+  return { limit: total, offset: 0, total, nextCursor: null };
 }
 
 export async function createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): Promise<CrawlRun> {
@@ -250,19 +278,23 @@ export async function createFoundationJob(input: CreateFoundationJobInput): Prom
 }
 
 async function apiGet<T>(path: string): Promise<T> {
+  return (await apiGetEnvelope<T>(path)).data;
+}
+
+async function apiGetEnvelope<T>(path: string): Promise<ApiEnvelope<T>> {
   if (!configuredApiBaseUrl) {
     const response = await callInternalApi("GET", path);
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`GET ${path} failed with ${response.status}`);
     }
-    return unwrapEnvelope<T>(response.body);
+    return normalizeEnvelope<T>(response.body);
   }
 
   const response = await fetch(new URL(path, configuredApiBaseUrl), { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`GET ${path} failed with ${response.status}`);
   }
-  return unwrapEnvelope<T>(await response.json() as ApiEnvelope<T> | T);
+  return normalizeEnvelope<T>(await response.json() as ApiEnvelope<T> | T);
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
@@ -292,10 +324,14 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 function unwrapEnvelope<T>(payload: ApiEnvelope<T> | T | unknown): T {
+  return normalizeEnvelope<T>(payload).data;
+}
+
+function normalizeEnvelope<T>(payload: ApiEnvelope<T> | T | unknown): ApiEnvelope<T> {
   if (isEnvelope<T>(payload)) {
-    return payload.data;
+    return payload;
   }
-  return payload as T;
+  return { data: payload as T };
 }
 
 function isEnvelope<T>(payload: unknown): payload is ApiEnvelope<T> {

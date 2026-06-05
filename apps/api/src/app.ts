@@ -20,11 +20,13 @@ export async function handleRequest(method: string, pathname: string, body?: unk
   return defaultHandleRequest(method, pathname, body, context);
 }
 
-async function routeRequest(store: AppStore, method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
+async function routeRequest(store: AppStore, method: string, requestPath: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
+  const parsedUrl = new URL(requestPath, "http://localhost");
+  const pathname = parsedUrl.pathname;
   const requestId = context.headers?.["x-request-id"] ?? context.headers?.["X-Request-Id"] ?? `req-${randomUUID()}`;
 
   try {
-    const response = await routeTopLevel(store, method, pathname, body, context, requestId);
+    const response = await routeTopLevel(store, method, pathname, parsedUrl.searchParams, body, context, requestId);
     logRequest(method, pathname, response.status, requestId);
     return response;
   } catch (error) {
@@ -36,7 +38,7 @@ async function routeRequest(store: AppStore, method: string, pathname: string, b
   }
 }
 
-async function routeTopLevel(store: AppStore, method: string, pathname: string, body: unknown, context: RequestContext, requestId: string): Promise<ApiResponse> {
+async function routeTopLevel(store: AppStore, method: string, pathname: string, searchParams: URLSearchParams, body: unknown, context: RequestContext, requestId: string): Promise<ApiResponse> {
   if (method === "GET" && pathname === "/health") {
     return json(200, store.health());
   }
@@ -72,5 +74,5 @@ async function routeTopLevel(store: AppStore, method: string, pathname: string, 
     return json(201, { data: store.createProject(createProjectRequest(body)) });
   }
 
-  return routeProjectChildren(store, method, pathname, body, requestId);
+  return routeProjectChildren(store, method, pathname, searchParams, body, requestId);
 }

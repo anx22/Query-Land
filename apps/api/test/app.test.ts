@@ -252,6 +252,81 @@ test("crawl discovery API persists sitemap URLs with source metadata", async () 
   store.close();
 });
 
+
+test("limited crawl list endpoints expose pagination, filters, and URL explorer latest details", async () => {
+  const { app, store } = testApp();
+  const discoveredAt = "2026-06-02T08:00:00.000Z";
+  await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" });
+  const secondRun = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "deploy" });
+  const secondRunId = (secondRun.body as { data: { id: string } }).data.id;
+  await app("POST", `/projects/proj-demo/sites/site-demo/crawl-runs/${secondRunId}/complete`, { status: "succeeded" });
+
+  await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", {
+    urls: [
+      { id: "url-page-one", projectId: "proj-demo", siteId: "site-demo", url: "https://example.com/a", normalizedUrl: "https://example.com/a", source: "sitemap", discoveredFrom: null, depth: 1, discoveredAt },
+      { id: "url-page-two", projectId: "proj-demo", siteId: "site-demo", url: "https://example.com/b", normalizedUrl: "https://example.com/b", source: "link", discoveredFrom: "https://example.com/a", depth: 2, discoveredAt: "2026-06-02T08:01:00.000Z" }
+    ]
+  });
+  await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls/url-page-one/fetch-results", {
+    url: "https://example.com/a",
+    finalUrl: "https://example.com/a",
+    statusCode: 500,
+    statusClass: "server_error",
+    headers: {},
+    redirectChain: [],
+    fetchedAt: "2026-06-02T08:02:00.000Z"
+  });
+  const latestFetch = await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls/url-page-one/fetch-results", {
+    url: "https://example.com/a",
+    finalUrl: "https://example.com/a",
+    statusCode: 200,
+    statusClass: "success",
+    headers: {},
+    redirectChain: [],
+    fetchedAt: "2026-06-02T08:03:00.000Z"
+  });
+  const latestFetchId = (latestFetch.body as { data: { id: string } }).data.id;
+  await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls/url-page-one/indexability", {
+    url: "https://example.com/a",
+    state: "indexable",
+    isIndexable: true,
+    reasons: [],
+    canonicalUrl: null,
+    fetchResultId: latestFetchId,
+    assessedAt: "2026-06-02T08:04:00.000Z"
+  });
+  await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    checkedDiscoveredUrlIds: ["url-page-one"],
+    issues: [
+      { id: "issue-page-one", projectId: "proj-demo", siteId: "site-demo", discoveredUrlId: "url-page-one", url: "https://example.com/a", rule: "http_error", severity: "critical", message: "Server error", detectedAt: "2026-06-02T08:05:00.000Z", resolvedAt: null }
+    ]
+  });
+
+  const runs = await app("GET", "/projects/proj-demo/sites/site-demo/crawl-runs?limit=1&status=succeeded");
+  assert.equal(runs.status, 200);
+  assert.equal((runs.body as { data: Array<{ status: string }>; meta: { total: number; limit: number } }).data[0]?.status, "succeeded");
+  assert.deepEqual((runs.body as { meta: { total: number; limit: number } }).meta, { limit: 1, offset: 0, total: 1, nextCursor: null });
+
+  const urls = await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls?limit=1&offset=0&source=link");
+  assert.equal(urls.status, 200);
+  assert.equal((urls.body as { data: Array<{ id: string }> }).data[0]?.id, "url-page-two");
+  assert.equal((urls.body as { meta: { total: number } }).meta.total, 1);
+
+  const issues = await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues?limit=5&status=open&severity=critical&rule=http_error");
+  assert.equal(issues.status, 200);
+  assert.equal((issues.body as { data: Array<{ id: string }> }).data[0]?.id, "issue-page-one");
+
+  const explorer = await app("GET", "/projects/proj-demo/sites/site-demo/url-explorer?limit=1");
+  assert.equal(explorer.status, 200);
+  const explorerData = (explorer.body as { data: Array<{ discoveredUrl: { id: string }; latestFetch: { statusCode: number }; latestIndexability: { state: string } }>; meta: { total: number; nextCursor: string | null } });
+  assert.equal(explorerData.data[0]?.discoveredUrl.id, "url-page-one");
+  assert.equal(explorerData.data[0]?.latestFetch.statusCode, 200);
+  assert.equal(explorerData.data[0]?.latestIndexability.state, "indexable");
+  assert.equal(explorerData.meta.total, 2);
+  assert.ok(explorerData.meta.nextCursor);
+  store.close();
+});
+
 test("crawl fetch API stores normalized fetch results for a discovered URL", async () => {
   const { app, store } = testApp();
   const discoveredAt = "2026-06-02T08:00:00.000Z";
