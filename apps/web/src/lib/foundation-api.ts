@@ -1,5 +1,5 @@
-import { apiDefaults } from "@seo-tool/shared-config";
 import type { AuditIssueRecord, CrawlHealthScore, CrawlRun, DiscoveredUrl, IndexabilityRecord, UrlFetchRecord } from "@seo-tool/domain-model";
+import { callInternalApi } from "./server-api";
 
 export interface FoundationProject {
   id: string;
@@ -111,7 +111,8 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
-const apiBaseUrl = process.env.SEO_API_BASE_URL ?? `http://localhost:${apiDefaults.port}`;
+const configuredApiBaseUrl = process.env.SEO_API_BASE_URL;
+const apiBaseUrl = configuredApiBaseUrl ?? "/api/backend";
 
 export async function loadFoundationDashboardData(): Promise<FoundationDashboardData> {
   try {
@@ -249,19 +250,32 @@ export async function createFoundationJob(input: CreateFoundationJobInput): Prom
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(new URL(path, apiBaseUrl), { cache: "no-store" });
+  if (!configuredApiBaseUrl) {
+    const response = await callInternalApi("GET", path);
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`GET ${path} failed with ${response.status}`);
+    }
+    return unwrapEnvelope<T>(response.body);
+  }
+
+  const response = await fetch(new URL(path, configuredApiBaseUrl), { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`GET ${path} failed with ${response.status}`);
   }
-  const payload = await response.json() as ApiEnvelope<T> | T;
-  if (isEnvelope<T>(payload)) {
-    return payload.data;
-  }
-  return payload;
+  return unwrapEnvelope<T>(await response.json() as ApiEnvelope<T> | T);
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(new URL(path, apiBaseUrl), {
+  if (!configuredApiBaseUrl) {
+    const response = await callInternalApi("POST", path, body);
+    if (response.status < 200 || response.status >= 300) {
+      const payload = response.body as { error?: { message?: string } } | null;
+      throw new Error(payload?.error?.message ?? `POST ${path} failed with ${response.status}`);
+    }
+    return unwrapEnvelope<T>(response.body);
+  }
+
+  const response = await fetch(new URL(path, configuredApiBaseUrl), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -271,12 +285,19 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
   if (!response.ok) {
     throw new Error(payload?.error?.message ?? `POST ${path} failed with ${response.status}`);
   }
-  if (payload && isEnvelope<T>(payload)) {
-    return payload.data;
+  if (payload) {
+    return unwrapEnvelope<T>(payload);
   }
   throw new Error(`POST ${path} returned an invalid response`);
 }
 
-function isEnvelope<T>(payload: ApiEnvelope<T> | T): payload is ApiEnvelope<T> {
+function unwrapEnvelope<T>(payload: ApiEnvelope<T> | T | unknown): T {
+  if (isEnvelope<T>(payload)) {
+    return payload.data;
+  }
+  return payload as T;
+}
+
+function isEnvelope<T>(payload: unknown): payload is ApiEnvelope<T> {
   return Boolean(payload && typeof payload === "object" && "data" in payload);
 }

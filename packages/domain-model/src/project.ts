@@ -1,3 +1,5 @@
+import { DomainValidationError } from "./errors.js";
+
 export type ProjectStatus = "draft" | "active" | "archived";
 export type SiteScopeType = "domain" | "subdomain" | "folder";
 export type MappingConfidence = "exact" | "manifest" | "heuristic" | "unknown";
@@ -41,7 +43,7 @@ export interface SourceMapEntry {
 
 export function validateBusinessValue(value: number): number {
   if (!Number.isInteger(value) || value < 1 || value > 100) {
-    throw new Error("businessValue must be an integer between 1 and 100");
+    throw new DomainValidationError("businessValue must be an integer between 1 and 100");
   }
   return value;
 }

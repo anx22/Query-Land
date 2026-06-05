@@ -1,5 +1,5 @@
-import { apiDefaults } from "@seo-tool/shared-config";
 import type { AuthUser } from "@seo-tool/domain-model";
+import { callInternalApi } from "./server-api";
 
 export const webSessionCookieName = "seo_os_session";
 
@@ -17,7 +17,7 @@ interface ApiErrorEnvelope {
   error?: { message?: string };
 }
 
-const apiBaseUrl = process.env.SEO_API_BASE_URL ?? `http://localhost:${apiDefaults.port}`;
+const configuredApiBaseUrl = process.env.SEO_API_BASE_URL;
 
 export async function registerLocalUser(input: { email: string; password: string; name?: string }): Promise<AuthUser> {
   return apiPost<AuthUser>("/auth/register", input);
@@ -29,7 +29,16 @@ export async function loginLocalUser(input: { email: string; password: string })
 
 export async function resolveLocalSession(token: string | undefined): Promise<AuthUser | null> {
   if (!token) return null;
-  const response = await fetch(new URL("/auth/session", apiBaseUrl), {
+  if (!configuredApiBaseUrl) {
+    const response = await callInternalApi("GET", "/auth/session", undefined, { headers: { authorization: `Bearer ${token}` } });
+    if (response.status === 401) return null;
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`GET /auth/session failed with ${response.status}`);
+    }
+    return unwrapEnvelope<{ user: AuthUser }>(response.body).user;
+  }
+
+  const response = await fetch(new URL("/auth/session", configuredApiBaseUrl), {
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store"
   });
@@ -37,13 +46,20 @@ export async function resolveLocalSession(token: string | undefined): Promise<Au
   if (!response.ok) {
     throw new Error(`GET /auth/session failed with ${response.status}`);
   }
-  const payload = await response.json() as ApiEnvelope<{ user: AuthUser }>;
-  return payload.data.user;
+  return unwrapEnvelope<{ user: AuthUser }>(await response.json() as ApiEnvelope<{ user: AuthUser }>).user;
 }
 
 export async function logoutLocalSession(token: string | undefined): Promise<void> {
   if (!token) return;
-  const response = await fetch(new URL("/auth/logout", apiBaseUrl), {
+  if (!configuredApiBaseUrl) {
+    const response = await callInternalApi("POST", "/auth/logout", undefined, { headers: { authorization: `Bearer ${token}` } });
+    if ((response.status < 200 || response.status >= 300) && response.status !== 401) {
+      throw new Error(`POST /auth/logout failed with ${response.status}`);
+    }
+    return;
+  }
+
+  const response = await fetch(new URL("/auth/logout", configuredApiBaseUrl), {
     method: "POST",
     headers: { authorization: `Bearer ${token}` },
     cache: "no-store"
@@ -54,7 +70,16 @@ export async function logoutLocalSession(token: string | undefined): Promise<voi
 }
 
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(new URL(path, apiBaseUrl), {
+  if (!configuredApiBaseUrl) {
+    const response = await callInternalApi("POST", path, body);
+    if (response.status < 200 || response.status >= 300) {
+      const payload = response.body as ApiErrorEnvelope | null;
+      throw new Error(payload?.error?.message ?? `POST ${path} failed with ${response.status}`);
+    }
+    return unwrapEnvelope<T>(response.body);
+  }
+
+  const response = await fetch(new URL(path, configuredApiBaseUrl), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -64,8 +89,15 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
   if (!response.ok) {
     throw new Error(payload?.error?.message ?? `POST ${path} failed with ${response.status}`);
   }
-  if (payload && "data" in payload) {
-    return payload.data;
+  if (payload) {
+    return unwrapEnvelope<T>(payload);
   }
   throw new Error(`POST ${path} returned an invalid response`);
+}
+
+function unwrapEnvelope<T>(payload: ApiEnvelope<T> | unknown): T {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return (payload as ApiEnvelope<T>).data;
+  }
+  return payload as T;
 }

@@ -1,3 +1,5 @@
+import { DomainValidationError } from "./errors.js";
+
 export type UserRole = "owner" | "editor" | "viewer";
 export type UserStatus = "active" | "disabled";
 
@@ -22,14 +24,14 @@ export interface AuthSession {
 export function normalizeEmail(email: string): string {
   const normalized = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-    throw new Error("email must be valid");
+    throw new DomainValidationError("email must be valid");
   }
   return normalized;
 }
 
 export function validatePassword(password: string): string {
   if (password.length < 12) {
-    throw new Error("password must contain at least 12 characters");
+    throw new DomainValidationError("password must contain at least 12 characters");
   }
   return password;
 }

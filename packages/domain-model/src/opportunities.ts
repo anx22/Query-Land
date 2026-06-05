@@ -1,3 +1,4 @@
+import { DomainValidationError } from "./errors.js";
 import type { SourceConfidence } from "./integrations.js";
 
 export type OpportunityStatus = "open" | "planned" | "in_progress" | "implemented" | "validated" | "reopened" | "dismissed" | "expired";
@@ -45,7 +46,7 @@ export interface Opportunity {
 
 export function scoreOpportunity(input: Pick<Opportunity, "expectedImpact" | "confidence" | "businessValue" | "urgency" | "effort">): number {
   if (input.effort <= 0) {
-    throw new Error("Opportunity effort must be greater than zero.");
+    throw new DomainValidationError("Opportunity effort must be greater than zero.");
   }
 
   return Math.round((input.expectedImpact * input.confidence * input.businessValue * input.urgency * 100) / input.effort);
