@@ -154,8 +154,10 @@ export const stackDecision = {
   auth: "Backend-owned email/password sessions stored in the embedded database"
 } as const;
 
+const defaultDatabaseUrl = process.env.VERCEL ? "sqlite:/tmp/seo-os.sqlite" : "sqlite:data/seo-os.sqlite";
+
 export const apiDefaults = {
   port: Number.parseInt(process.env.API_PORT ?? "4000", 10),
   version: "0.2.0-sqlite-auth",
-  databaseUrl: process.env.DATABASE_URL ?? "sqlite:data/seo-os.sqlite"
+  databaseUrl: process.env.DATABASE_URL ?? defaultDatabaseUrl
 } as const;
