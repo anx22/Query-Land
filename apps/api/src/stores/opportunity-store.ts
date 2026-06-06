@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { hasRequiredEvidence, scoreOpportunity, type Evidence, type Opportunity, type OpportunityStatus, type SourceAnchor } from "@seo-tool/domain-model";
+import { analyzeCannibalization, analyzeCtrGap, analyzeStrikingDistance, hasRequiredEvidence, scoreOpportunity, type Evidence, type Opportunity, type OpportunityStatus, type SearchPerformanceMetricRow, type SourceAnchor } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { SQLiteDatabase } from "./sqlite-types.js";
@@ -51,6 +51,12 @@ export interface OpportunityStore {
   // §6.6 erster Generator + §6.5 Validierungsloop (binär: Indexierbarkeit).
   generateIndexabilityOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
   revalidateOpportunity(opportunityId: string): Opportunity;
+  // WP-3.2: weitere Opportunity-Klassen (§6.1). Aus Search-Performance: low_hanging_keyword,
+  // money_page, cannibalization. Aus dem Linkgraph: internal_link_gap.
+  generateSearchOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
+  generateInternalLinkOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
+  // Umbrella: alle fünf harten Klassen in einem Lauf, idempotent.
+  generateAllOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
 }
 
 // Statusmodell §6.5: open -> planned -> in_progress -> implemented -> validated | reopened | dismissed | expired.
@@ -81,6 +87,11 @@ function normalizeLimit(limit?: number): number {
 function normalizeOffset(offset?: number): number {
   if (!offset || !Number.isFinite(offset)) return 0;
   return Math.max(0, Math.trunc(offset));
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
 }
 
 function parseReasons(raw: unknown): string {
@@ -331,6 +342,160 @@ class SQLiteOpportunityStore implements OpportunityStore {
     const indexable = !!row && Number(row.is_indexable) === 1;
     this.db.prepare(`UPDATE opportunity_evidence SET current_value = ? WHERE opportunity_id = ? AND metric = 'indexable'`).run(JSON.stringify(indexable ? "true" : "false"), opportunityId);
     return this.transitionOpportunity(opportunityId, indexable ? "validated" : "reopened");
+  }
+
+  generateSearchOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
+    const businessValue = this.siteBusinessValue(projectId, siteId);
+    const { capturedAt, rows } = this.latestSearchRows(siteId);
+    const created: Opportunity[] = [];
+    if (!capturedAt || rows.length === 0) {
+      return { created: 0, opportunities: [] };
+    }
+
+    // Low-Hanging Keywords (Striking Distance, Position 11–20). Dedupe je Query.
+    const lowHangingCovered = this.coveredEntities(projectId, "low_hanging_keyword", "affected_keywords");
+    for (const item of analyzeStrikingDistance(rows, { limit: 10 })) {
+      if (lowHangingCovered.has(item.query)) continue;
+      created.push(this.createOpportunity(projectId, {
+        type: "low_hanging_keyword",
+        affectedUrls: [item.pageUrl],
+        affectedKeywords: [item.query],
+        currentState: `ranks at position ${item.position} for "${item.query}"`,
+        recommendedAction: "Optimize title, meta description and on-page content to move this query into the top 10",
+        expectedImpact: clamp(Math.round(item.impressions / 1000), 1, 5),
+        effort: 2,
+        confidence: 0.6,
+        businessValue,
+        urgency: item.position <= 15 ? 3 : 2,
+        validationMetric: "position_top10",
+        evidence: [{ source: "gsc", sourceConfidence: "B", metric: "position", beforeValue: item.position, currentValue: item.position, timeWindow: capturedAt, affectedEntity: item.query }]
+      }));
+      lowHangingCovered.add(item.query);
+    }
+
+    // Unterperformende Money-Pages (CTR-Gap in den Top-10). Dedupe je URL.
+    const moneyCovered = this.coveredEntities(projectId, "money_page", "affected_urls");
+    for (const item of analyzeCtrGap(rows, { limit: 10 })) {
+      if (moneyCovered.has(item.pageUrl)) continue;
+      created.push(this.createOpportunity(projectId, {
+        type: "money_page",
+        affectedUrls: [item.pageUrl],
+        affectedKeywords: [item.query],
+        currentState: `CTR ${item.ctr} below benchmark ${item.expectedCtr} at position ${item.position} (${item.missedClicks} missed clicks)`,
+        recommendedAction: "Improve the SERP snippet (title, meta description, structured data) to close the CTR gap",
+        expectedImpact: clamp(Math.round(item.missedClicks / 50), 1, 5),
+        effort: 2,
+        confidence: 0.6,
+        businessValue,
+        urgency: 3,
+        validationMetric: "ctr",
+        evidence: [{ source: "gsc", sourceConfidence: "B", metric: "ctr", beforeValue: item.ctr, currentValue: item.ctr, timeWindow: capturedAt, affectedEntity: item.pageUrl }]
+      }));
+      moneyCovered.add(item.pageUrl);
+    }
+
+    // Kannibalisierung (mehrere eigene Seiten je Query). Dedupe je Query.
+    const cannibalCovered = this.coveredEntities(projectId, "cannibalization", "affected_keywords");
+    for (const item of analyzeCannibalization(rows, { limit: 10 })) {
+      if (cannibalCovered.has(item.query)) continue;
+      created.push(this.createOpportunity(projectId, {
+        type: "cannibalization",
+        affectedUrls: item.pages.map((page) => page.pageUrl),
+        affectedKeywords: [item.query],
+        currentState: `${item.pages.length} own pages compete for "${item.query}"`,
+        recommendedAction: "Consolidate or differentiate the competing pages and pick one canonical target",
+        expectedImpact: 3,
+        effort: 3,
+        confidence: 0.6,
+        businessValue,
+        urgency: 2,
+        validationMetric: "single_dominant_page",
+        evidence: [{ source: "gsc", sourceConfidence: "B", metric: "competing_pages", beforeValue: item.pages.length, currentValue: item.pages.length, timeWindow: capturedAt, affectedEntity: item.query }]
+      }));
+      cannibalCovered.add(item.query);
+    }
+
+    return { created: created.length, opportunities: created };
+  }
+
+  generateInternalLinkOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
+    const businessValue = this.siteBusinessValue(projectId, siteId);
+    // Ohne erfassten Linkgraph wäre jede URL ein "Orphan" — dann gibt es kein belastbares Signal.
+    const edgeCount = Number((this.db.prepare(`SELECT COUNT(*) AS c FROM internal_link_edges WHERE site_id = ?`).get(siteId) as { c: number }).c);
+    if (edgeCount === 0) {
+      return { created: 0, opportunities: [] };
+    }
+
+    const orphans = this.db.prepare(`
+      SELECT du.url AS url FROM discovered_urls du
+      WHERE du.site_id = ? AND NOT EXISTS (
+        SELECT 1 FROM internal_link_edges e WHERE e.site_id = du.site_id AND e.to_url = du.normalized_url
+      )
+      ORDER BY du.depth ASC, du.url ASC LIMIT 20
+    `).all(siteId) as Array<{ url: string }>;
+
+    const covered = this.coveredEntities(projectId, "internal_link_gap", "affected_urls");
+    const now = new Date().toISOString();
+    const created: Opportunity[] = [];
+    for (const row of orphans) {
+      if (covered.has(row.url)) continue;
+      created.push(this.createOpportunity(projectId, {
+        type: "internal_link_gap",
+        affectedUrls: [row.url],
+        currentState: "no internal inlinks (orphan)",
+        recommendedAction: "Add internal links from relevant hub and related pages to this URL",
+        expectedImpact: 2,
+        effort: 1,
+        confidence: 0.7,
+        businessValue,
+        urgency: 2,
+        validationMetric: "inlink_count",
+        evidence: [{ source: "crawl", sourceConfidence: "A", metric: "inlink_count", beforeValue: 0, currentValue: 0, timeWindow: now, affectedEntity: row.url }]
+      }));
+      covered.add(row.url);
+    }
+    return { created: created.length, opportunities: created };
+  }
+
+  generateAllOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
+    const opportunities = [
+      ...this.generateIndexabilityOpportunities(projectId, siteId).opportunities,
+      ...this.generateSearchOpportunities(projectId, siteId).opportunities,
+      ...this.generateInternalLinkOpportunities(projectId, siteId).opportunities
+    ];
+    return { created: opportunities.length, opportunities };
+  }
+
+  private siteBusinessValue(projectId: string, siteId: string): number {
+    const site = this.db.prepare(`SELECT business_value FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId) as { business_value?: number } | undefined;
+    if (!site) {
+      throw new RequestError(404, "unknown_site", "Site not found for project");
+    }
+    return typeof site.business_value === "number" ? site.business_value : 50;
+  }
+
+  private coveredEntities(projectId: string, type: OpportunityType, field: "affected_urls" | "affected_keywords"): Set<string> {
+    const rows = this.db.prepare(`SELECT ${field} AS payload FROM opportunities WHERE project_id = ? AND type = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId, type);
+    const covered = new Set<string>();
+    for (const row of rows) {
+      for (const value of JSON.parse(String((row as { payload: string }).payload)) as string[]) {
+        covered.add(value);
+      }
+    }
+    return covered;
+  }
+
+  private latestSearchRows(siteId: string): { capturedAt: string | null; rows: SearchPerformanceMetricRow[] } {
+    const max = this.db.prepare(`SELECT MAX(captured_at) AS c FROM search_performance_rows WHERE site_id = ?`).get(siteId) as { c?: string | null } | undefined;
+    const capturedAt = max && max.c ? String(max.c) : null;
+    if (!capturedAt) {
+      return { capturedAt: null, rows: [] };
+    }
+    const rows = this.db.prepare(`SELECT query, page_url, clicks, impressions, ctr, position FROM search_performance_rows WHERE site_id = ? AND captured_at = ?`).all(siteId, capturedAt) as Array<{ query: string; page_url: string; clicks: number; impressions: number; ctr: number; position: number }>;
+    return {
+      capturedAt,
+      rows: rows.map((row) => ({ query: String(row.query), pageUrl: String(row.page_url), clicks: Number(row.clicks), impressions: Number(row.impressions), ctr: Number(row.ctr), position: Number(row.position) }))
+    };
   }
 
   private assembleOpportunity(row: Record<string, unknown>): Opportunity {

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { OpportunityStatus } from "@seo-tool/domain-model";
-import { generateIndexabilityOpportunities, revalidateOpportunity, transitionOpportunity } from "../../features/content-opportunities";
+import { generateAllOpportunities, revalidateOpportunity, syncSearchPerformance, transitionOpportunity } from "../../features/content-opportunities";
 
 export async function transitionOpportunityAction(formData: FormData) {
   const status = requiredString(formData, "status") as OpportunityStatus;
@@ -28,12 +28,22 @@ export async function revalidateOpportunityAction(formData: FormData) {
 
 export async function generateOpportunitiesAction(formData: FormData) {
   try {
-    await generateIndexabilityOpportunities(requiredString(formData, "projectId"), requiredString(formData, "siteId"));
+    await generateAllOpportunities(requiredString(formData, "projectId"), requiredString(formData, "siteId"));
   } catch (error) {
     redirect(`/content-opportunities?error=${encodeURIComponent(messageFor(error))}`);
   }
   revalidateOpportunityViews();
   redirect("/content-opportunities?generated=1");
+}
+
+export async function syncSearchPerformanceAction(formData: FormData) {
+  try {
+    await syncSearchPerformance(requiredString(formData, "projectId"), requiredString(formData, "siteId"));
+  } catch (error) {
+    redirect(`/content-opportunities?error=${encodeURIComponent(messageFor(error))}`);
+  }
+  revalidateOpportunityViews();
+  redirect("/content-opportunities?synced=1");
 }
 
 function revalidateOpportunityViews(): void {

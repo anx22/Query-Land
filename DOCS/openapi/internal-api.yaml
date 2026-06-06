@@ -757,6 +757,33 @@ paths:
                     type: object
         '404':
           description: Site not found
+  /projects/{projectId}/sites/{siteId}/opportunities/generate:
+    post:
+      summary: Generate all five hard opportunity classes in one idempotent run (§6.1)
+      operationId: generateAllOpportunities
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Generation result across technical_fix, low_hanging_keyword, money_page, cannibalization and internal_link_gap
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Site not found
   /opportunities/{opportunityId}/revalidate:
     post:
       summary: Re-check an implemented indexability fix and set validated or reopened (§6.5)

@@ -13,6 +13,12 @@ export const routeOpportunities: ResourceRoute = (store, method, pathname, searc
     return json(201, { data: store.generateIndexabilityOpportunities(generateMatch[1], generateMatch[2]) });
   }
 
+  // Umbrella-Generator: erzeugt alle fünf harten Opportunity-Klassen in einem Lauf (idempotent).
+  const generateAllMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/opportunities\/generate$/);
+  if (method === "POST" && generateAllMatch) {
+    return json(201, { data: store.generateAllOpportunities(generateAllMatch[1], generateAllMatch[2]) });
+  }
+
   const collectionMatch = pathname.match(/^\/projects\/([^/]+)\/opportunities$/);
   if (collectionMatch) {
     if (method === "GET") {

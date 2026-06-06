@@ -2,7 +2,7 @@ import type { Opportunity, OpportunityStatus } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
 import { loadOpportunityBoard, OPPORTUNITY_STATUSES } from "../../features/content-opportunities";
-import { generateOpportunitiesAction, revalidateOpportunityAction, transitionOpportunityAction } from "./actions";
+import { generateOpportunitiesAction, revalidateOpportunityAction, syncSearchPerformanceAction, transitionOpportunityAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +33,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <form action={generateOpportunitiesAction}>
             <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
             <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject || !data.selectedSite}>Aus Indexierbarkeit generieren</button>
+            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject || !data.selectedSite}>Alle Opportunity-Klassen generieren</button>
+          </form>
+          <form action={syncSearchPerformanceAction}>
+            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+            <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+            <button className="button secondary" type="submit" disabled={!data.connected || !data.selectedProject || !data.selectedSite}>Search Performance synchronisieren</button>
           </form>
         </div>
       </section>
@@ -43,6 +48,51 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
         <MetricCard label="Validiert" value={String(validatedCount)} note="Vorher/Nachher bestätigt" />
         <MetricCard label="Top-Priorität" value={data.opportunities[0] ? String(data.opportunities[0].priority) : "—"} note={data.opportunities[0]?.type ?? "noch keine"} />
+      </section>
+
+      <section className="card">
+        <p className="kicker">Search-Performance-Intelligence · GSC (Klasse B)</p>
+        {data.searchPerformance && data.searchPerformance.summary.rows > 0 ? (
+          <>
+            <div className="badge-row">
+              <span className="badge">{data.searchPerformance.summary.rows} Query/Page-Zeilen</span>
+              <span className="badge primary">{data.searchPerformance.summary.strikingDistance} Striking Distance</span>
+              <span className="badge primary">{data.searchPerformance.summary.ctrGaps} CTR-Gaps</span>
+              <span className="badge primary">{data.searchPerformance.summary.cannibalization} Kannibalisierung</span>
+            </div>
+            <div className="content-grid">
+              <div>
+                <p className="muted">Striking Distance (Pos 11–20)</p>
+                <ul>
+                  {data.searchPerformance.strikingDistance.slice(0, 5).map((item) => (
+                    <li key={`sd-${item.query}-${item.pageUrl}`}>{item.query} · Pos {item.position} · {item.impressions} Imp.</li>
+                  ))}
+                  {data.searchPerformance.strikingDistance.length === 0 ? <li className="muted">—</li> : null}
+                </ul>
+              </div>
+              <div>
+                <p className="muted">CTR-Gaps (entgangene Klicks)</p>
+                <ul>
+                  {data.searchPerformance.ctrGaps.slice(0, 5).map((item) => (
+                    <li key={`cg-${item.query}-${item.pageUrl}`}>{item.query} · Pos {item.position} · {item.missedClicks} Klicks</li>
+                  ))}
+                  {data.searchPerformance.ctrGaps.length === 0 ? <li className="muted">—</li> : null}
+                </ul>
+              </div>
+              <div>
+                <p className="muted">Kannibalisierung</p>
+                <ul>
+                  {data.searchPerformance.cannibalization.slice(0, 5).map((item) => (
+                    <li key={`cn-${item.query}`}>{item.query} · {item.pages.length} Seiten</li>
+                  ))}
+                  {data.searchPerformance.cannibalization.length === 0 ? <li className="muted">—</li> : null}
+                </ul>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p>Noch keine Search-Performance-Daten. Klicke „Search Performance synchronisieren", um die GSC-Matrix (deterministischer Stub) und daraus abgeleitete Signale zu erzeugen.</p>
+        )}
       </section>
 
       <section className="content-grid">
@@ -84,7 +134,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               ))}
             </div>
           ) : (
-            <p>Keine Opportunities im Filter. Lege mit „Aus Indexierbarkeit generieren" erste technische Fixes an (benötigt einen Crawl mit Indexierbarkeits-Blockern).</p>
+            <p>Keine Opportunities im Filter. „Search Performance synchronisieren" und dann „Alle Opportunity-Klassen generieren" erzeugt low_hanging_keyword-, money_page-, cannibalization- (GSC) und internal_link_gap-Opportunities; technische Fixes brauchen zusätzlich einen Crawl mit Indexierbarkeits-Blockern.</p>
           )}
         </div>
       </section>
@@ -129,7 +179,8 @@ function OpportunityForm({ action, opportunityId, disabled, label }: { action: (
 function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
-  if (singleParam(params?.generated)) return { kind: "success", message: "Opportunities aus Indexierbarkeits-Blockern generiert." };
+  if (singleParam(params?.generated)) return { kind: "success", message: "Opportunities generiert (alle fünf Klassen, idempotent)." };
+  if (singleParam(params?.synced)) return { kind: "success", message: "Search-Performance synchronisiert (GSC-Stub, Klasse B)." };
   if (singleParam(params?.revalidated)) return { kind: "success", message: "Opportunity re-validiert (validated oder reopened)." };
   const transition = singleParam(params?.transition);
   if (transition) return { kind: "success", message: `Status gewechselt zu ${transition}.` };
