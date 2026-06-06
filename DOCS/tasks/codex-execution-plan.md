@@ -45,7 +45,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 
 | WP | Modul | Komplexität | Abhängig von | Spec |
 |---|---|---|---|---|
-| WP-0.2 W1 UI-Smoke | web/test | S | — | UX_FLOWS.md |
+| WP-0.2 W1 UI-Smoke ✅ | web/test | S | — | UX_FLOWS.md — erledigt: `apps/api/test/foundation-smoke.test.ts` |
 | WP-0.3 Worker-Härtung + Sitemap-Index + Fixture/Echt-Smoke | crawler | M | — | crawl-engine.md |
 | WP-0.4 Connector-Contract (GSC/PSI Stub real) | integrations/api | M | — | integrations.md |
 | WP-0.5 Web Vitals (PSI/Lighthouse) | api/crawler/web | M | WP-0.4 | crawl-engine.md |
