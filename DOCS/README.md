@@ -27,3 +27,4 @@ Vor Sprintstart abgeschlossen:
 - Welle-2 Audit-Core Story Seeds: `tasks/welle-2-audit-core-stories.md`
 - Roadmap-/Status-Tracking: `tasks/roadmap-tracking.md`
 - Übergabe nächste Sprint-Session: `tasks/next-session-handoff.md`
+- Worker-Smoke WP-0.3: `tasks/worker-smoke.md`

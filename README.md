@@ -70,6 +70,15 @@ Gezielt lokal ausführbar:
 npm test -- --test-name-pattern "Welle 1 UI smoke"
 ```
 
+### Worker-Smoke für WP-0.3
+
+Der reproduzierbare Worker-Smoke ist unter `DOCS/tasks/worker-smoke.md` dokumentiert. Die wichtigsten lokalen Checks sind:
+
+```bash
+npm test -- --test-name-pattern "crawl worker claims crawl_seed job and persists crawl artifacts end-to-end"
+npm test -- --test-name-pattern "sitemap index|redirect loops"
+```
+
 
 ## Vorbereitungsdokumente für Sprintstart
 

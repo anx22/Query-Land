@@ -72,14 +72,14 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 | Slice | Aktueller Stand | Status | Offene Lücke |
 |---|---|---|---|
-| URL Discovery v0 | Domain/API/DB/Tests und Worker-v0-Persistenz vorhanden | in_progress | echte Sitemap-/Seed-Smokes, Sitemap-Index und Scope-Robustheit fehlen |
-| HTTP Fetch Worker v0 | Normalisierungslogik, Persistenz und Worker-v0-Ausführung vorhanden | in_progress | Retry/Timeout robuster machen und echte Site-Smokes nachweisen |
+| URL Discovery v0 | Domain/API/DB/Tests und Worker-v0-Persistenz vorhanden; Sitemap-Index-Auflösung ist begrenzt und in-scope implementiert | in_progress | echte Sitemap-/Seed-Smokes gegen eigene Site fehlen |
+| HTTP Fetch Worker v0 | Normalisierungslogik, Persistenz und Worker-v0-Ausführung vorhanden; Redirect-Loop-Erkennung mit Tiefenlimit ergänzt | in_progress | echte Site-Smokes nachweisen |
 | Indexability Checks v0 | Klassifikation, Persistenz, Worker-Integration und URL-Explorer-Anzeige vorhanden | in_progress | Detail Drawer und Edge-Cases fehlen |
 | Issue Rules Minimum Set | Rules + Persistenz, Resolve-Endpoint, UI-Filter und Issue-Tabelle vorhanden | in_progress | Pagination, serverseitige Filter und Reopen/Dismiss fehlen |
 | Health Score v0 | Score + Snapshots, Worker-Berechnung und Score-UI vorhanden | in_progress | automatische Recompute-Policy fehlt |
 | Crawl Runs | Lifecycle + Summary vorhanden; Worker v0 schließt Fixture-Runs mit Artefakten ab; UI listet Runs | in_progress | Daemon/Betrieb und echte Site-Robustheit fehlen |
 | Interner Linkgraph | nicht implementiert | todo | Link-Extraktion, Edges, Depth, Orphans |
-| Robots/Sitemap robust | erster robots.txt-Disallow-Filter + Scope-Policy vorhanden | in_progress | Crawl-delay/User-Agent-Gruppen, Sitemap-Index |
+| Robots/Sitemap robust | erster robots.txt-Disallow-Filter + Scope-Policy sowie begrenzte in-scope Sitemap-Index-Auflösung vorhanden | in_progress | Crawl-delay/User-Agent-Gruppen und echte Site-Smokes |
 | Web Vitals | nicht implementiert | todo | PSI/Lighthouse Connector oder Stub |
 
 **Welle-2-Entscheidung:** Der API-/Persistenzkern plus Worker-v0 und Technical-Audit-UI reichen für einen vertikalen Slice. Der nächste Schwerpunkt ist Stabilisierung, echte Site-Smokes und Bedienhärtung statt weiterer Tabellen.

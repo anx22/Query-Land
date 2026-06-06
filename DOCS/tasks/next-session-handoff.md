@@ -13,7 +13,7 @@ Die Codebasis ist nach dem Worker-v0- und Technical-Audit-UI-Slice grundsätzlic
 - SQLite-Row-Mapping liegt in `apps/api/src/sqlite-mappers.ts`; `sqlite-store.ts` behält Store-Verhalten, Transaktionen/SQL und Scope-Checks.
 - Web-Demo-Komponenten wurden in kleinere Presentational Components zerlegt (`MetricCard`, `InfoCard`, `StatusList`).
 - Technical-Audit-UI liest echte Crawl Runs, Health Scores, Audit Issues und URL-Explorer-Daten aus API/SQLite.
-- Worker v0 kann `crawl_seed`-Jobs claimen, Crawl-Artefakte schreiben, Health berechnen und Runs abschließen; offen sind Robustheit, echte Site-Smokes und Betrieb.
+- Worker v0 kann `crawl_seed`-Jobs claimen, Crawl-Artefakte schreiben, Health berechnen und Runs abschließen; Sitemap-Index-Auflösung, Redirect-Loop-Erkennung und Graceful-Shutdown-Handler sind ergänzt; offen sind echte Site-Smokes und weiterer Betrieb.
 - Technical-Audit-Start nutzt nun eine gemeinsame Scheduling-Seam: API erstellt Crawl Run und typed `crawl_seed` Job zusammen. Legacy-Worker-Jobs ohne `crawlRunId` bleiben erlaubt; der Worker legt dann selbst einen Crawl Run an.
 - WP-0.2 aus dem Codex-Ausführungsplan ist abgeschlossen: Der Welle-1-Foundation-Smoke in `apps/api/test/app.test.ts` prüft Project → Site → Connector-Stub → Job → erneuten API-Read über echte embedded API-Routen.
 - Domain-Sprache wurde in `CONTEXT.md` ergänzt. Zukünftige Architektur-Reviews sollen diese Begriffe verwenden und neue load-bearing Begriffe dort nachziehen.
@@ -44,7 +44,7 @@ Die Codebasis ist nach dem Worker-v0- und Technical-Audit-UI-Slice grundsätzlic
 
 Ziel: Laut Codex-Ausführungsplan ist nach abgeschlossenem WP-0.2 als nächstes WP-0.3 dran: Worker-v0 von einem funktionierenden Slice zu einem reproduzierbaren Welle-2-Gate mit Fixture- und echter-Site-Smokes härten.
 
-1. Bestehenden `crawl_seed`-Worker-v0 als wiederholbaren Fixture-Smoke dokumentieren und automatisieren.
+1. Bestehenden `crawl_seed`-Worker-v0 als wiederholbaren Fixture-Smoke dokumentieren und automatisieren (`DOCS/tasks/worker-smoke.md` vorhanden).
 2. Echte eigene Test-Site als Smoke-Ziel definieren und Run-Kriterien festhalten.
 3. Retry-/Timeout-/Failure-Modes für Network Error, ungültige Sitemap und Robots-Blocker härten.
 4. Robots-/Sitemap-Details inklusive Sitemap-Index und User-Agent-Gruppen ausbauen.

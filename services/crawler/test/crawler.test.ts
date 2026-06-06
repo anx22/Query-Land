@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assessIndexability, calculateHealthScore, discoverUrlsFromSitemap, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
+import { assessIndexability, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
   const urls = discoverUrlsFromSitemap({
@@ -17,6 +17,32 @@ test("discovers seed and sitemap URLs with source metadata", () => {
   assert.equal(urls[1]?.source, "sitemap");
   assert.equal(urls[1]?.normalizedUrl, "https://example.com/pricing");
   assert.equal(urls[2]?.discoveredFrom, "https://example.com/sitemap.xml");
+});
+
+test("discovers page URLs from a bounded in-scope sitemap index", async () => {
+  const fetched: string[] = [];
+  const urls = await discoverUrlsFromSitemapIndex({
+    projectId: "proj-demo",
+    siteId: "site-demo",
+    baseUrl: "https://example.com/",
+    sitemapUrl: "https://example.com/sitemap.xml",
+    discoveredAt: "2026-06-02T08:00:00Z",
+    sitemapXml: `
+      <sitemapindex>
+        <sitemap><loc>https://example.com/pages-a.xml</loc></sitemap>
+        <sitemap><loc>https://outside.example/pages-b.xml</loc></sitemap>
+      </sitemapindex>
+    `,
+    fetchImpl: async (url: string | URL | Request) => {
+      const requestedUrl = String(url);
+      fetched.push(requestedUrl);
+      return new Response("<urlset><url><loc>https://example.com/pricing/</loc></url><url><loc>https://example.com/blog?a=1&amp;b=2</loc></url></urlset>", { status: 200 });
+    }
+  });
+
+  assert.deepEqual(fetched, ["https://example.com/pages-a.xml"]);
+  assert.deepEqual(urls.map((url) => url.normalizedUrl), ["https://example.com/", "https://example.com/pricing", "https://example.com/blog?a=1&b=2"]);
+  assert.equal(urls[1]?.discoveredFrom, "https://example.com/pages-a.xml");
 });
 
 test("normalizes 200, 3xx and 4xx fixture fetch responses", async () => {
@@ -68,6 +94,21 @@ test("fetchUrl retries deterministic network errors before classifying the fetch
   assert.equal(attempts, 2);
   assert.equal(result.statusClass, "network_error");
   assert.match(result.errorMessage ?? "", /after 2 attempts/);
+});
+
+test("fetchUrl detects redirect loops before exhausting the crawler", async () => {
+  const result = await fetchUrl({
+    url: "https://example.com/a",
+    maxRedirects: 5,
+    fetchImpl: async (url: string | URL | Request) => {
+      const requestedUrl = String(url);
+      const nextUrl = requestedUrl.endsWith("/a") ? "https://example.com/b" : "https://example.com/a";
+      return new Response(null, { status: 302, headers: { location: nextUrl } });
+    }
+  });
+
+  assert.equal(result.statusClass, "network_error");
+  assert.match(result.errorMessage ?? "", /redirect loop detected/);
 });
 
 test("parses robots.txt allow and disallow rules by longest path", () => {
@@ -308,6 +349,42 @@ test("crawl worker marks invalid successful sitemap jobs as failed", async () =>
   store.close();
 });
 
+
+test("crawl worker resolves in-scope sitemap indexes into persisted page URLs", async () => {
+  const store = createSQLiteStore("sqlite::memory:");
+  const app = createApp(store);
+  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  await app("POST", "/jobs", {
+    projectId: "proj-demo",
+    type: "crawl_seed",
+    subject: "https://example.com",
+    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+  });
+
+  const fetched: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const requestedUrl = String(url);
+    fetched.push(requestedUrl);
+    if (requestedUrl.endsWith("/sitemap.xml")) {
+      return new Response("<sitemapindex><sitemap><loc>https://example.com/content-sitemap.xml</loc></sitemap><sitemap><loc>https://outside.example/private.xml</loc></sitemap></sitemapindex>", { status: 200, headers: { "content-type": "application/xml" } });
+    }
+    if (requestedUrl.endsWith("/content-sitemap.xml")) {
+      return new Response("<urlset><url><loc>https://example.com/features</loc></url><url><loc>https://example.com/pricing</loc></url></urlset>", { status: 200, headers: { "content-type": "application/xml" } });
+    }
+    return new Response("<html><head><title>Seed</title></head></html>", { status: 200, headers: { "content-type": "text/html" } });
+  };
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-04T10:00:00.000Z" });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.discoveredUrls, 3);
+  assert.equal(fetched.includes("https://example.com/content-sitemap.xml"), true);
+  assert.equal(fetched.includes("https://outside.example/private.xml"), false);
+
+  const urls = envelopeData<Array<{ normalizedUrl: string; discoveredFrom: string | null }>>(await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls"));
+  assert.deepEqual(urls.map((url) => url.normalizedUrl), ["https://example.com/", "https://example.com/features", "https://example.com/pricing"]);
+  assert.equal(urls[1]?.discoveredFrom, "https://example.com/content-sitemap.xml");
+  store.close();
+});
 
 test("crawl worker keeps out-of-scope sitemap URLs out of the persisted crawl", async () => {
   const store = createSQLiteStore("sqlite::memory:");
