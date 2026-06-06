@@ -55,7 +55,9 @@ export interface OpportunityStore {
   // money_page, cannibalization. Aus dem Linkgraph: internal_link_gap.
   generateSearchOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
   generateInternalLinkOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
-  // Umbrella: alle fünf harten Klassen in einem Lauf, idempotent.
+  // WP-6.2: AEO-Klasse aus content-basierten Assessments (Klasse A; LLM-Signale sind Klasse E und NIE Evidenz).
+  generateAeoOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
+  // Umbrella: alle harten Klassen in einem Lauf, idempotent.
   generateAllOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
 }
 
@@ -457,11 +459,45 @@ class SQLiteOpportunityStore implements OpportunityStore {
     return { created: created.length, opportunities: created };
   }
 
+  generateAeoOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
+    const businessValue = this.siteBusinessValue(projectId, siteId);
+    // Neueste AEO-Bewertung je URL; nur schwache Seiten (Score < 60). Evidenz = Crawl/Content (Klasse A).
+    const weak = this.db.prepare(`
+      SELECT a.url AS url, a.score AS score FROM aeo_assessments a
+      WHERE a.site_id = ? AND a.id = (
+        SELECT x.id FROM aeo_assessments x WHERE x.site_id = a.site_id AND x.url = a.url ORDER BY x.assessed_at DESC, x.id DESC LIMIT 1
+      ) AND a.score < 60
+    `).all(siteId) as Array<{ url: string; score: number }>;
+
+    const covered = this.coveredEntities(projectId, "aeo", "affected_urls");
+    const now = new Date().toISOString();
+    const created: Opportunity[] = [];
+    for (const row of weak) {
+      if (covered.has(row.url)) continue;
+      created.push(this.createOpportunity(projectId, {
+        type: "aeo",
+        affectedUrls: [row.url],
+        currentState: `low AEO readiness (score ${row.score}/100)`,
+        recommendedAction: "Add structured data, concise answers and question-style headings to improve answer-engine readiness",
+        expectedImpact: 2,
+        effort: 2,
+        confidence: 0.7,
+        businessValue,
+        urgency: 2,
+        validationMetric: "aeo_score",
+        evidence: [{ source: "crawl", sourceConfidence: "A", metric: "aeo_score", beforeValue: row.score, currentValue: row.score, timeWindow: now, affectedEntity: row.url }]
+      }));
+      covered.add(row.url);
+    }
+    return { created: created.length, opportunities: created };
+  }
+
   generateAllOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
     const opportunities = [
       ...this.generateIndexabilityOpportunities(projectId, siteId).opportunities,
       ...this.generateSearchOpportunities(projectId, siteId).opportunities,
-      ...this.generateInternalLinkOpportunities(projectId, siteId).opportunities
+      ...this.generateInternalLinkOpportunities(projectId, siteId).opportunities,
+      ...this.generateAeoOpportunities(projectId, siteId).opportunities
     ];
     return { created: opportunities.length, opportunities };
   }

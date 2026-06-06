@@ -1,4 +1,6 @@
 export * from "./auth.js";
+export * from "./aeo.js";
+export * from "./ai-visibility.js";
 export * from "./alerts.js";
 export * from "./backlinks.js";
 export * from "./crawl.js";
@@ -9,6 +11,7 @@ export * from "./keywords.js";
 export * from "./opportunities.js";
 export * from "./platform.js";
 export * from "./project.js";
+export * from "./proposals.js";
 export * from "./rank.js";
 export * from "./reports.js";
 export * from "./search-performance.js";

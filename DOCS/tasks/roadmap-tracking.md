@@ -116,6 +116,29 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 **Offene Follow-ups (nicht gate-kritisch):** echter PDF-Renderer (GAP-REPORT-001); echte Email/Slack-Delivery statt Stub (GAP-REPORT-002, DEC-002); worker-getriebener Cron-Trigger für `runDueSchedules` (GAP-REPORT-003). Architektur-Dokumentation: `architecture/reporting-alerts.md`.
 
+### 4.5 Welle 7 — AI Layer / AEO ✅ abgeschlossen (M6)
+
+**Master-Gate:** Agent beantwortet echte SEO-Fragen über eigene Daten.
+
+| Slice | Backend | UI | Status |
+|---|---|---|---|
+| Domain-Modell AI-Visibility (`ai-visibility.ts`) | Typen `AiPrompt`, `AiAnswerSnapshot`, `AiVisibilityScore`; pure Funktion `computeAiVisibilityScore`; Confidence Klasse E — ausschließlich Signal, nie Evidenz | — | done |
+| Domain-Modell AEO (`aeo.ts`) | Typen `AeoCheck`, `AeoResult`, `AeoAssessment`; pure Funktion `analyzeAeo(content)` (dependency-frei, Klasse A) | — | done |
+| Domain-Modell Proposals (`proposals.ts`) | Typen `Proposal`, `ProposalKind`, `ProposalStatus`; Statusmodell `proposed → accepted \| rejected` | — | done |
+| Migration `012_ai_aeo.sql` | Tabellen `ai_prompts`, `ai_answer_snapshots`, `aeo_assessments`, `proposals` | — | done |
+| AI-Store (`ai-store.ts`) | `createAiPrompt`/`listAiPrompts`, `createAiAnswerSnapshot` (deterministischer LLM-Stub, Klasse E, DEC-002), `getAiVisibilityScore`, `runAeoScan`/`listAeoAssessments` (Klasse A) | — | done |
+| Proposal-Store (`proposal-store.ts`) | `createProposal`, `listProposals`, `acceptProposal`, `rejectProposal` | — | done |
+| AEO-Opportunity-Generator | `generateAeoOpportunities` (Klasse-A-Evidenz) in `opportunity-store`; in Umbrella-Generator `opportunities/generate` eingebunden; sechste harte Opportunity-Klasse `aeo` | — | done |
+| AI-Prompts-Routen (`routes/ai-prompts.ts`) | `POST`/`GET` `/projects/{id}/ai-prompts` + `POST`/`GET` `/ai-prompts/{id}/snapshots` | — | done |
+| AI-Visibility-Route (`routes/ai-visibility.ts`) | `GET /projects/{id}/ai-visibility` (Klasse E, Signal) | — | done |
+| AEO-Routen (`routes/aeo.ts`) | `POST /projects/{id}/aeo/scan` + `GET /projects/{id}/aeo/assessments` | — | done |
+| Proposals-Routen (`routes/proposals.ts`) | `POST /projects/{id}/proposals`, `GET /projects/{id}/proposals`, `POST /proposals/{id}/accept`, `POST /proposals/{id}/reject` | — | done |
+| UI `/ai-visibility` | Prompts, Snapshot-Zähler, `AiVisibilityScore` (als Klasse-E-Signal ausgewiesen), AEO-Assessments mit Check-Details, Proposals mit Review-Aktionen | vorhanden | done |
+| MCP read-only Tools | `get_ai_visibility`, `list_proposals` in `services/mcp` | — | done |
+| MCP Schreibtools (review-gated) | `create_dev_ticket`, `propose_fix_pr`: erzeugen ausschließlich `proposals`-Zeilen im Status `proposed`; keine direkte Produktionsmutation; Annahme/Ablehnung nur durch menschliche Review-Aktion | — | done |
+
+**Offene Follow-ups (nicht gate-kritisch):** echter LLM-Provider statt deterministischem Stub (GAP-AI-001, DEC-002); crawler-gelieferter Seiteninhalt für AEO-Scans statt manuell eingereichtem (GAP-AI-002); echte Ticketing-/PR-Backend-Anbindung hinter `acceptProposal` (GAP-AI-003). Architektur-Dokumentation: `architecture/ai-layer-aeo.md`.
+
 ## 5. Offizielle nächste Sprint-Sequenz
 
 ### Sprint A — Foundation UI echt machen
@@ -209,6 +232,9 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | GAP-REPORT-001 | Reporting / Export | PDF-Export nicht implementiert; `renderReportExport` kennt nur CSV und HTML | Echten PDF-Renderer einbinden (z. B. Puppeteer/headless Chrome); `ReportExport.format` um `pdf` erweitern; Paketgröße auf Serverless beachten | P2 | Welle 6+ |
 | GAP-REPORT-002 | Reporting / Delivery | Email- und Slack-Zustellung sind deterministische Stubs (DEC-002 offen) | Echten SMTP-Adapter (z. B. Resend, Postmark) und Slack-Webhook-Adapter hinter `deliverReport`-Abstraktion einbauen; Confidence-Stufe dann von B auf A | P2 | Welle 6+ |
 | GAP-REPORT-003 | Reporting / Scheduling | `runDueSchedules` muss extern ausgelöst werden; kein In-Environment-Cron verfügbar | Worker-Job oder Vercel-Cron-Trigger einrichten, der `POST /report-schedules/run-due` täglich aufruft | P2 | Welle 6+ |
+| GAP-AI-001 | AI-Visibility / Provider | LLM-Antwort-Snapshots nutzen einen deterministischen Stub (DEC-002 offen); kein echter LLM-API-Aufruf; Confidence bleibt Klasse E | Echten LLM-Provider (z. B. Anthropic Claude API) hinter `createAiAnswerSnapshot`-Abstraktion einbinden; Stub gegen echten Connector austauschen ohne Schemaänderung; Confidence-Klasse E bleibt, da LLM-Output prinzipiell nicht deterministisch | P2 | Welle 7+ |
+| GAP-AI-002 | AEO / Content-Quelle | `analyzeAeo` erhält aktuell vom API-Caller manuell eingereichten Seiteninhalt; Crawler liefert Inhalte noch nicht automatisch | Crawler-Artefakte (`fetch_results.body`) als primäre Content-Quelle für AEO-Scans nutzen; Scan als regulären Worker-Job nach jedem Crawl-Zyklus ausführen; manuelle Einreichung als Fallback behalten | P2 | Welle 7+ |
+| GAP-AI-003 | MCP-Schreibtools / Backend | `create_dev_ticket` und `propose_fix_pr` erzeugen nur Datenbankzeilen im Status `proposed`; kein echter Webhook an Ticketing- oder PR-System | Echten Integrations-Adapter (z. B. GitHub-Issues-API, Jira-REST, Linear) hinter `acceptProposal` einbinden; Webhook erst nach menschlicher Annahme auslösen; Proposal bleibt primäre Review-Instanz | P3 | später |
 
 ## 7. Abschlusskriterien bis App-MVP
 

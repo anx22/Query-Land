@@ -2045,6 +2045,310 @@ paths:
                       type: object
         '404':
           description: Project not found
+  /projects/{projectId}/ai-prompts:
+    get:
+      summary: List tracked AI prompts for a project
+      operationId: listAiPrompts
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AI prompts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Track an AI prompt
+      operationId: createAiPrompt
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - prompt
+              properties:
+                prompt:
+                  type: string
+                market:
+                  type: string
+      responses:
+        '201':
+          description: AI prompt created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/ai-prompts/{promptId}/snapshots:
+    get:
+      summary: List AI answer snapshots for a prompt
+      operationId: listAiSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: promptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AI answer snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Prompt not found
+    post:
+      summary: Record a deterministic LLM answer snapshot (confidence class E, never evidence)
+      operationId: recordAiSnapshot
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: promptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Snapshot recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Prompt not found
+  /projects/{projectId}/ai-visibility:
+    get:
+      summary: AI visibility score (cited share across tracked prompts, class E signal)
+      operationId: aiVisibilityScore
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AI visibility score
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/sites/{siteId}/aeo/scan:
+    post:
+      summary: Scan submitted page content for answer-engine readiness (class A)
+      operationId: scanAeo
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - content
+              properties:
+                url:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '201':
+          description: AEO assessment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/aeo:
+    get:
+      summary: List latest AEO assessments per URL for a site
+      operationId: listAeoAssessments
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AEO assessments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/proposals:
+    get:
+      summary: List review-gated proposals (MCP write-tool artifacts)
+      operationId: listProposals
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Create a review-gated proposal (status proposed; never a direct production change)
+      operationId: createProposal
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - kind
+                - title
+                - body
+              properties:
+                kind:
+                  type: string
+                title:
+                  type: string
+                body:
+                  type: string
+                opportunityId:
+                  type: string
+      responses:
+        '201':
+          description: Proposal created (proposed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /proposals/{proposalId}/transition:
+    post:
+      summary: Decide a proposal (accepted or rejected; once only)
+      operationId: transitionProposal
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Updated proposal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Invalid transition
+        '404':
+          description: Proposal not found
 components:
   securitySchemes:
     bearerAuth:
