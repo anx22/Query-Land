@@ -12,6 +12,17 @@ export interface ConnectorSyncResult {
   normalizedMetricsInserted: number;
 }
 
+export interface ConnectorSyncOptions {
+  siteId?: string;
+}
+
+export interface WebVitalMetric {
+  metric: string;
+  value: number;
+  measuredAt: string;
+  sourceConfidence: string;
+}
+
 export interface ProjectStore {
   listProjects(): Project[];
   createProject(input: Partial<Project>): Project;
@@ -19,7 +30,8 @@ export interface ProjectStore {
   createSite(projectId: string, input: Partial<Site>): Site;
   listIntegrations(): IntegrationAccount[];
   createIntegration(projectId: string, provider: IntegrationProvider): IntegrationAccount;
-  runConnectorSync(integrationId: string): ConnectorSyncResult;
+  runConnectorSync(integrationId: string, options?: ConnectorSyncOptions): ConnectorSyncResult;
+  listSiteWebVitals(projectId: string, siteId: string): WebVitalMetric[];
 }
 
 export function createProjectStore(db: SQLiteDatabase, audit: AuditLog): ProjectStore {
@@ -106,7 +118,7 @@ class SQLiteProjectStore implements ProjectStore {
     return integration;
   }
 
-  runConnectorSync(integrationId: string): ConnectorSyncResult {
+  runConnectorSync(integrationId: string, options: ConnectorSyncOptions = {}): ConnectorSyncResult {
     const row = this.db.prepare(`SELECT * FROM integration_accounts WHERE id = ?`).get(integrationId);
     if (!row) {
       throw new RequestError(404, "unknown_integration", "Integration not found");
@@ -117,8 +129,20 @@ class SQLiteProjectStore implements ProjectStore {
       throw new RequestError(400, "unsupported_connector", `No connector implemented for provider ${integration.provider}`);
     }
 
+    // Optional site-scoped sync (z.B. PageSpeed/Web Vitals pro Site); sonst projektweit.
+    let entityType = "project";
+    let entityId = integration.projectId;
+    if (options.siteId) {
+      const site = this.db.prepare(`SELECT 1 FROM sites WHERE id = ? AND project_id = ?`).get(options.siteId, integration.projectId);
+      if (!site) {
+        throw new RequestError(404, "unknown_site", "Site not found for integration project");
+      }
+      entityType = "site";
+      entityId = options.siteId;
+    }
+
     const now = new Date().toISOString();
-    const ctx = { projectId: integration.projectId, integrationId, now };
+    const ctx = { projectId: integration.projectId, integrationId, now, entityType, entityId };
     try {
       const fetched = connector.fetch(ctx);
       connector.validate(fetched.payload);
@@ -156,5 +180,22 @@ class SQLiteProjectStore implements ProjectStore {
       this.audit("system", "integration.sync_error", "integration_account", integrationId, { provider: integration.provider, message: error instanceof Error ? error.message : String(error) });
       throw new RequestError(502, "connector_sync_failed", error instanceof Error ? error.message : "Connector sync failed");
     }
+  }
+
+  listSiteWebVitals(projectId: string, siteId: string): WebVitalMetric[] {
+    const site = this.db.prepare(`SELECT 1 FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId);
+    if (!site) {
+      throw new RequestError(404, "unknown_site", "Site not found for project");
+    }
+    // Neueste Web-Vitals-Metrik (PSI) je Kennzahl für die Site.
+    const rows = this.db.prepare(`SELECT metric, value, measured_at, source_confidence FROM normalized_metrics WHERE project_id = ? AND entity_type = 'site' AND entity_id = ? AND metric LIKE 'psi\\_%' ESCAPE '\\' ORDER BY measured_at DESC`).all(projectId, siteId);
+    const latest = new Map<string, WebVitalMetric>();
+    for (const row of rows) {
+      const metric = String(row.metric);
+      if (!latest.has(metric)) {
+        latest.set(metric, { metric, value: Number(row.value), measuredAt: String(row.measured_at), sourceConfidence: String(row.source_confidence) });
+      }
+    }
+    return [...latest.values()].sort((left, right) => left.metric.localeCompare(right.metric));
   }
 }

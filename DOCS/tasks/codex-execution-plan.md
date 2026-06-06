@@ -48,7 +48,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 | WP-0.2 W1 UI-Smoke ✅ | web/test | S | — | UX_FLOWS.md — erledigt: `apps/api/test/foundation-smoke.test.ts` |
 | WP-0.3 Worker-Härtung + Sitemap-Index + Fixture/Echt-Smoke | crawler | M | — | crawl-engine.md |
 | WP-0.4 Connector-Contract (GSC/GA4/PSI Stub) ✅ | integrations/api | M | — | integrations.md — Vertrag + Stubs + `runConnectorSync` (raw≠normalized, Confidence B, status/quota/freshness) + `POST /integrations/{id}/sync` + Tests; Follow-up: Worker verarbeitet `connector_sync` über dieses Endpoint |
-| WP-0.5 Web Vitals (PSI/Lighthouse) | api/crawler/web | M | WP-0.4 | crawl-engine.md |
+| WP-0.5 Web Vitals (PSI) ✅ | api/web | M | WP-0.4 | crawl-engine.md — site-skopierter PSI-Sync (`runConnectorSync({siteId})`), `GET /web-vitals` + OpenAPI, Technical-Audit-UI-Karte + Tests; Follow-up: Health-Score-Gewichtung, echte PSI-Fetch im Worker |
 | WP-0.6 Interner Linkgraph (API-seitig) ✅ | domain/api/crawler/web | M | WP-0.3 | crawl-engine.md — Migration `003_internal_link_edges`, `link-graph-store` (Inlinks/Outlinks/Orphans, paginiert), Routen `internal-links`/`orphan-urls` + Tests; Follow-up: Crawler befüllt Edges, UI-Anzeige |
 | WP-0.7 Modularisierung + Kern-Tests ✅ | api/test | M | — | observability-sre.md — Kern-Tests ✅ (`core-coverage.test.ts`); Routen modularisiert ✅ (`apps/api/src/routes/*`); Rest: Validatoren-Split + Log-Korrelation optional |
 | WP-1.1 Source Map real (minimal) | api/web | M | — | source-map.md |
@@ -56,7 +56,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 | WP-1.3 Erster Generator + Re-Check-Scheduler | crawler/api | M | WP-1.2 (1.1 optional) | §6.5/§6.6 |
 | WP-1.4 Opportunity Board v0 + URL Dossier v0 | web | M | WP-1.2/1.3 | UX_FLOWS.md |
 
-**Fortschritt 2026-06-06:** WP-0.2 (Welle-1-Smoke), WP-0.7 (Kern-Tests + Routen-Modularisierung in `apps/api/src/routes/*`) und WP-0.3 (Sitemap-Index-Auflösung, Redirect-Loop-Erkennung, Graceful-Shutdown, Worker-Smoke-Doku `DOCS/tasks/worker-smoke.md`) sind abgeschlossen. Offen in M0: WP-0.4 Connector-Contract (spec-first), WP-0.5 Web Vitals (nach 0.4), WP-0.6 Linkgraph; echte Site-Smokes für den Crawler bleiben auszuführen.
+**Fortschritt 2026-06-06:** **M0 inhaltlich abgeschlossen** — WP-0.2 (Welle-1-Smoke), WP-0.3 (Sitemap-Index/Redirect-Loop/Graceful-Shutdown), WP-0.4 (Connector-Contract GSC/GA4/PSI), WP-0.5 (Web Vitals, API+UI), WP-0.6 (interner Linkgraph, API), WP-0.7 (Kern-Tests + Routen-Modularisierung) sind erledigt. Verbleibende, bewusst herausgelöste Follow-ups: Crawler befüllt Linkgraph-Edges + verarbeitet `connector_sync`/echten PSI-Fetch; Web-Vitals→Health-Score-Gewichtung; echte Site-Crawl-Smokes (GAP-PERSIST-001); AuthZ (WP-Z.1, bewusst ans Ende). Nächster Milestone: **M1 Opportunity-Rückgrat**.
 
 ### Konventionen für jeden Codex-Prompt
 - Wahrheitsebene `docs/PRODUCT_MASTER_SPEC.md`, Detailebene die genannte `specs/<spec>.md`.

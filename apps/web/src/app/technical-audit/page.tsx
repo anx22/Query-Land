@@ -89,6 +89,25 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       <section className="content-grid">
         <div className="card">
+          <p className="kicker">Web Vitals (PSI)</p>
+          <p className="muted">Core Web Vitals aus dem PageSpeed-Connector (Confidence-Klasse B), neueste Messung je Kennzahl.</p>
+          {data.webVitals.length > 0 ? (
+            <div className="table-list">
+              {data.webVitals.map((vital) => (
+                <article key={vital.metric}>
+                  <strong>{webVitalLabel(vital.metric)}</strong>
+                  <span>{formatWebVital(vital.metric, vital.value)} · Quelle {vital.sourceConfidence} · {new Date(vital.measuredAt).toLocaleString("de-DE")}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p>Noch keine Web Vitals. Lege einen PageSpeed-Connector an und synchronisiere ihn für diese Site.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="content-grid">
+        <div className="card">
           <p className="kicker">Issue Tabelle</p>
           <p className="muted">Serverseitig limitiert: {data.auditIssues.length} von {data.auditIssuesMeta.total} Issues geladen.</p>
           <form className="filter-row" action="/technical-audit">
@@ -193,6 +212,21 @@ function feedbackMessage(started: string | string[] | undefined, health: string 
   if (issueValue === "reopen") return { kind: "success", message: "Issue wurde wieder geöffnet und Health neu berechnet." };
   if (issueValue === "resolve") return { kind: "success", message: "Issue wurde als resolved markiert und Health neu berechnet." };
   return null;
+}
+
+const webVitalLabels: Record<string, string> = {
+  psi_lcp_ms: "LCP",
+  psi_cls: "CLS",
+  psi_inp_ms: "INP",
+  psi_ttfb_ms: "TTFB"
+};
+
+function webVitalLabel(metric: string): string {
+  return webVitalLabels[metric] ?? metric;
+}
+
+function formatWebVital(metric: string, value: number): string {
+  return metric.endsWith("_ms") ? `${Math.round(value)} ms` : String(value);
 }
 
 function singleParam(value: string | string[] | undefined): string | undefined {

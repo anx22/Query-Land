@@ -441,6 +441,44 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/AuditIssueRecord'
+  /projects/{projectId}/sites/{siteId}/web-vitals:
+    get:
+      summary: List latest Core Web Vitals metrics for a site
+      operationId: listSiteWebVitals
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest web vitals per metric
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metric:
+                          type: string
+                        value:
+                          type: number
+                        measuredAt:
+                          type: string
+                        sourceConfidence:
+                          type: string
+        '404':
+          description: Site not found
   /integrations:
     get:
       summary: List integration accounts

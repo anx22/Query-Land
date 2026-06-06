@@ -23,6 +23,8 @@ export interface ConnectorContext {
   projectId: string;
   integrationId: string;
   now: string;
+  entityType: string;
+  entityId: string;
 }
 
 export interface Connector {
@@ -52,7 +54,6 @@ function metricConnector(options: {
   sourceConfidence: SourceConfidence;
   rows: MetricRow[];
   prefix: string;
-  entityType: string;
   quotaRemaining: number | null;
 }): Connector {
   return {
@@ -73,8 +74,8 @@ function metricConnector(options: {
     normalize(payload, ctx) {
       return rowsPayload(payload).map((row) => ({
         metric: `${options.prefix}_${row.metric}`,
-        entityType: options.entityType,
-        entityId: ctx.projectId,
+        entityType: ctx.entityType,
+        entityId: ctx.entityId,
         value: row.value,
         measuredAt: ctx.now
       }));
@@ -88,7 +89,6 @@ const gscConnector = metricConnector({
   sourceType: "search_console",
   sourceConfidence: "B",
   prefix: "gsc",
-  entityType: "project",
   quotaRemaining: 1000,
   rows: [
     { metric: "clicks", value: 1280 },
@@ -103,7 +103,6 @@ const ga4Connector = metricConnector({
   sourceType: "analytics",
   sourceConfidence: "B",
   prefix: "ga4",
-  entityType: "project",
   quotaRemaining: 5000,
   rows: [
     { metric: "sessions", value: 3120 },
@@ -117,7 +116,6 @@ const pagespeedConnector = metricConnector({
   sourceType: "pagespeed_insights",
   sourceConfidence: "B",
   prefix: "psi",
-  entityType: "project",
   quotaRemaining: 250,
   rows: [
     { metric: "lcp_ms", value: 2410 },

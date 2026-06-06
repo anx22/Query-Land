@@ -5,7 +5,10 @@ import type { ResourceRoute } from "./shared.js";
 export const routeIntegrations: ResourceRoute = (store, method, pathname, _searchParams, body): ApiResponse | null => {
   const syncMatch = pathname.match(/^\/integrations\/([^/]+)\/sync$/);
   if (method === "POST" && syncMatch) {
-    return json(200, { data: store.runConnectorSync(syncMatch[1]) });
+    const siteId = body && typeof body === "object" && !Array.isArray(body) && typeof (body as { siteId?: unknown }).siteId === "string"
+      ? (body as { siteId: string }).siteId
+      : undefined;
+    return json(200, { data: store.runConnectorSync(syncMatch[1], { siteId }) });
   }
 
   if (pathname !== "/integrations") return null;

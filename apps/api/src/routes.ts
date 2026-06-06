@@ -8,6 +8,7 @@ import { routeInternalLinks } from "./routes/internal-links.js";
 import { routeJobs } from "./routes/jobs.js";
 import { routeSites } from "./routes/sites.js";
 import { routeSourceMap } from "./routes/source-map.js";
+import { routeWebVitals } from "./routes/web-vitals.js";
 import type { ProjectChildStore, ResourceRoute } from "./routes/shared.js";
 
 export type { ProjectChildStore } from "./routes/shared.js";
@@ -21,6 +22,7 @@ const resourceRoutes: ResourceRoute[] = [
   routeAuditIssues,
   routeDiscoveredUrls,
   routeInternalLinks,
+  routeWebVitals,
   routeIntegrations,
   routeJobs,
   routeSourceMap
