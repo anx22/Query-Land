@@ -109,6 +109,80 @@ test("job queue claims a queued job exactly once and completes it", () => {
   store.close();
 });
 
+test("Welle 1 UI smoke persists project, site, connector stub and job through API reads", async () => {
+  const { app, store } = testApp();
+
+  const projectResponse = await app("POST", "/projects", {
+    name: "Welle 1 Smoke",
+    slug: "welle-1-smoke",
+    status: "active",
+    defaultLocale: "de-DE",
+    markets: [
+      { country: "DE", language: "de", device: "desktop", searchEngine: "google" }
+    ]
+  });
+  assert.equal(projectResponse.status, 201);
+  const project = (projectResponse.body as { data: { id: string; slug: string } }).data;
+  assert.equal(project.slug, "welle-1-smoke");
+
+  const siteResponse = await app("POST", `/projects/${project.id}/sites`, {
+    baseUrl: "https://welle-1.example/",
+    scopeType: "domain",
+    crawlFrequency: "weekly",
+    businessValue: 80
+  });
+  assert.equal(siteResponse.status, 201);
+  const site = (siteResponse.body as { data: { id: string; projectId: string; baseUrl: string } }).data;
+  assert.equal(site.projectId, project.id);
+  assert.equal(site.baseUrl, "https://welle-1.example/");
+
+  const connectorResponse = await app("POST", "/integrations", {
+    projectId: project.id,
+    provider: "gsc"
+  });
+  assert.equal(connectorResponse.status, 201);
+  const connector = (connectorResponse.body as { data: { id: string; projectId: string; provider: string; status: string } }).data;
+  assert.equal(connector.projectId, project.id);
+  assert.equal(connector.provider, "gsc");
+  assert.equal(connector.status, "pending");
+
+  const jobResponse = await app("POST", "/jobs", {
+    projectId: project.id,
+    type: "connector_sync",
+    subject: connector.id,
+    payload: { integrationId: connector.id, provider: connector.provider }
+  });
+  assert.equal(jobResponse.status, 201);
+  const job = (jobResponse.body as { data: { id: string; projectId: string; type: string; subject: string; status: string; payload: Record<string, unknown> } }).data;
+  assert.equal(job.projectId, project.id);
+  assert.equal(job.type, "connector_sync");
+  assert.equal(job.subject, connector.id);
+  assert.equal(job.status, "queued");
+  assert.equal(job.payload.integrationId, connector.id);
+
+  const projectsRead = await app("GET", "/projects");
+  assert.equal(projectsRead.status, 200);
+  const projects = (projectsRead.body as { data: Array<{ id: string; slug: string }> }).data;
+  assert.ok(projects.some((item) => item.id === project.id && item.slug === "welle-1-smoke"));
+
+  const sitesRead = await app("GET", `/projects/${project.id}/sites`);
+  assert.equal(sitesRead.status, 200);
+  const sites = (sitesRead.body as { data: Array<{ id: string; baseUrl: string }> }).data;
+  assert.ok(sites.some((item) => item.id === site.id && item.baseUrl === "https://welle-1.example/"));
+
+  const integrationsRead = await app("GET", "/integrations");
+  assert.equal(integrationsRead.status, 200);
+  const integrations = (integrationsRead.body as { data: Array<{ id: string; projectId: string; provider: string }> }).data;
+  assert.ok(integrations.some((item) => item.id === connector.id && item.projectId === project.id && item.provider === "gsc"));
+
+  const jobsRead = await app("GET", "/jobs");
+  assert.equal(jobsRead.status, 200);
+  const jobs = (jobsRead.body as { data: Array<{ id: string; projectId: string; type: string; subject: string; status: string }> }).data;
+  assert.ok(jobs.some((item) => item.id === job.id && item.projectId === project.id && item.type === "connector_sync" && item.subject === connector.id && item.status === "queued"));
+
+  store.close();
+});
+
 test("POST /crawl-runs/schedule creates a crawl run and typed crawl_seed job together", async () => {
   const { app, store } = testApp();
   const response = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs/schedule", {

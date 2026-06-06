@@ -56,6 +56,8 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 | WP-1.3 Erster Generator + Re-Check-Scheduler | crawler/api | M | WP-1.2 (1.1 optional) | §6.5/§6.6 |
 | WP-1.4 Opportunity Board v0 + URL Dossier v0 | web | M | WP-1.2/1.3 | UX_FLOWS.md |
 
+**Fortschritt 2026-06-06:** WP-0.2 ist abgeschlossen. Der reproduzierbare Welle-1-Smoke liegt in `apps/api/test/app.test.ts`, läuft gegen den embedded API-Handler mit `sqlite::memory:` und ist Teil von `npm test`. Nächstes Paket laut Sequenz ist WP-0.3.
+
 ### Konventionen für jeden Codex-Prompt
 - Wahrheitsebene `docs/PRODUCT_MASTER_SPEC.md`, Detailebene die genannte `specs/<spec>.md`.
 - Tests zuerst; `npm run check` muss grün bleiben; keine API-Verträge außerhalb des Scopes ändern.

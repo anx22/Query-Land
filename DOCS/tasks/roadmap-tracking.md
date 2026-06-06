@@ -44,7 +44,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 ### 3.2 Rote / gelbe Befunde
 
 - `npm audit --audit-level=moderate` meldet 2 moderate Findings über Next/PostCSS. `npm audit fix --force` würde laut npm einen Breaking-Downgrade installieren und ist deshalb nicht automatisch anzuwenden.
-- Die Web-App nutzt für Foundation-/Technical-Audit-Flows echte API-/SQLite-Daten, aber Gate-Smokes, Pagination und Details sind noch nicht vollständig.
+- Die Web-App nutzt für Foundation-/Technical-Audit-Flows echte API-/SQLite-Daten; der Welle-1-Foundation-Smoke ist automatisiert, Pagination und Detailansichten bleiben noch unvollständig.
 - `services/crawler` hat Worker-v0-Funktionalität, ist aber noch nicht robust als Betriebskomponente für echte Sites nachgewiesen.
 - SQLite-Schema ist ein großer idempotenter SQL-String; ein versioniertes Migrationssystem fehlt.
 - API-Routing, Request-Validierung und Store-Persistenz wachsen in wenigen großen Dateien und müssen vor weiterem Ausbau modularisiert werden.
@@ -59,12 +59,12 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 | Slice | Backend | UI | Status | Offene Lücke |
 |---|---|---|---|---|
-| Project/Site persistieren | vorhanden | echte API-Formulare/Listen vorhanden | in_progress | UI-Smoke, Validierungsdetails und Rollen-/Scope-Gates fehlen |
-| GSC/GA4 Stub + Sync Job | vorhanden | Connector-UI nutzt echte API-Zustände | in_progress | Job-Planung/Sync-Smoke und OAuth-Produktionspfad fehlen |
+| Project/Site persistieren | vorhanden | echte API-Formulare/Listen vorhanden | smoke_done | Automatisierter Foundation-Smoke vorhanden; Validierungsdetails und Rollen-/Scope-Gates fehlen |
+| GSC/GA4 Stub + Sync Job | vorhanden | Connector-UI nutzt echte API-Zustände | smoke_done | Connector-Stub + `connector_sync`-Job im Smoke nachgewiesen; OAuth-Produktionspfad fehlt |
 | Crawl Seed Job starten/status verfolgen | Queue + Crawl Runs vorhanden; `crawl-runs/schedule` erstellt Run + typed `crawl_seed` Job; Worker v0 kann `crawl_seed` claimen, Legacy-Payloads ohne `crawlRunId` ergänzen, Artefakte schreiben und Runs abschließen | Teilweise | worker_v0_stabilisieren | Gate-Smoke gegen Fixture und echte Site, Robots-Details und Betrieb fehlen |
 | Source Map Refresh + Mapping anzeigen | Listing vorhanden | echte API-Daten sichtbar | in_progress | Refresh-Job-Smoke und Mapping-Detailansicht fehlen |
 
-**Welle-1-Entscheidung:** Backend und erste echte UI-/Worker-Anbindung sind weitgehend vorhanden. Das Gate ist erst geschlossen, wenn UI-Smokes die echten API-Flows reproduzierbar nachweisen.
+**Welle-1-Entscheidung:** Backend und erste echte UI-/Worker-Anbindung sind weitgehend vorhanden. Der Foundation-Smoke weist Projekt, Site, Connector-Stub, Job und erneuten API-Read reproduzierbar nach; offen bleiben Crawl-Gate-Härtung, OAuth-Produktionspfad und AuthZ/Scope-Gates.
 
 ### 4.2 Welle 2 — Audit Core nutzbar machen
 
@@ -100,7 +100,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 **Nicht-Scope:** vollständiges Design-System, Multi-User-Admin, externe OAuth-Flows.
 
-**Done-Gate:** UI-Smoke zeigt: Projekt anlegen → Site anlegen → Connector Stub anlegen → Job sichtbar → Reload hält Daten.
+**Done-Gate:** Der automatisierte Foundation-Smoke zeigt: Projekt anlegen → Site anlegen → Connector Stub anlegen → Job sichtbar → erneuter API-Read hält Daten. Für das vollständige Welle-1-Gate bleiben produktionsnahe Connector-/OAuth- und Crawl-Smokes separat zu schließen.
 
 ### Sprint B — Worker stabilisieren und Gate nachweisen
 
@@ -175,7 +175,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 Die App ist erst MVP-ready, wenn alle folgenden Punkte erfüllt sind:
 
-- Welle-1-Gate per UI-Smoke bestanden.
+- Welle-1-Foundation-Smoke per API/embedded SQLite bestanden; produktionsnaher Connector-/Crawl-Gate-Nachweis bleibt vor MVP separat nötig.
 - Welle-2-Gate per Worker-Crawl auf Fixture und mindestens einer echten eigenen Site bestanden.
 - Technical-Audit UI zeigt Runs, URLs, Issues und Health Score aus SQLite/API.
 - API-Listen sind paginiert oder explizit limitiert.
