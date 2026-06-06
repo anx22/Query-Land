@@ -479,6 +479,141 @@ paths:
                           type: string
         '404':
           description: Site not found
+  /projects/{projectId}/sites/{siteId}/search-performance/sync:
+    post:
+      summary: Sync GSC search-performance rows for a site (deterministic stub, class B)
+      operationId: syncSearchPerformance
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Search-performance batch persisted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inserted:
+                        type: integer
+                      capturedAt:
+                        type: string
+                      market:
+                        type: string
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/search-performance:
+    get:
+      summary: List the latest search-performance batch (query x page matrix)
+      operationId: listSearchPerformance
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest search-performance rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        query:
+                          type: string
+                        pageUrl:
+                          type: string
+                        clicks:
+                          type: integer
+                        impressions:
+                          type: integer
+                        ctr:
+                          type: number
+                        position:
+                          type: number
+                        sourceConfidence:
+                          type: string
+                  meta:
+                    type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/search-performance/intelligence:
+    get:
+      summary: Search-performance intelligence (striking distance, CTR gaps, cannibalization)
+      operationId: searchPerformanceIntelligence
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Derived search-performance signals from the latest batch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      capturedAt:
+                        type: string
+                        nullable: true
+                      strikingDistance:
+                        type: array
+                        items:
+                          type: object
+                      ctrGaps:
+                        type: array
+                        items:
+                          type: object
+                      cannibalization:
+                        type: array
+                        items:
+                          type: object
+                      summary:
+                        type: object
+        '404':
+          description: Site not found
   /projects/{projectId}/opportunities:
     get:
       summary: List opportunities for a project (priority-ordered)

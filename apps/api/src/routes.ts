@@ -9,6 +9,7 @@ import { routeJobs } from "./routes/jobs.js";
 import { routeKeywords } from "./routes/keywords.js";
 import { routeOpportunities } from "./routes/opportunities.js";
 import { routeRank } from "./routes/rank.js";
+import { routeSearchPerformance } from "./routes/search-performance.js";
 import { routeSites } from "./routes/sites.js";
 import { routeSourceMap } from "./routes/source-map.js";
 import { routeWebVitals } from "./routes/web-vitals.js";
@@ -29,6 +30,7 @@ const resourceRoutes: ResourceRoute[] = [
   routeOpportunities,
   routeKeywords,
   routeRank,
+  routeSearchPerformance,
   routeIntegrations,
   routeJobs,
   routeSourceMap

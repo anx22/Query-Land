@@ -12,6 +12,7 @@ import { createLinkGraphStore, type LinkGraphStore } from "./stores/link-graph-s
 import { createOpportunityStore, type OpportunityStore } from "./stores/opportunity-store.js";
 import { createProjectStore, type ProjectStore } from "./stores/project-store.js";
 import { createRankStore, type RankStore } from "./stores/rank-store.js";
+import { createSearchPerformanceStore, type SearchPerformanceStore } from "./stores/search-performance-store.js";
 import { createSourceMapStore, type SourceMapStore } from "./stores/source-map-store.js";
 import { RequestError } from "./stores/store-errors.js";
 import type { SQLiteDatabase } from "./stores/sqlite-types.js";
@@ -27,14 +28,14 @@ export interface HealthStore {
   health(): HealthSnapshot;
 }
 
-export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & {
+export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & {
   close(): void;
 };
 
 export type SQLiteStore = BackendStore;
 
 export { RequestError };
-export type { AuthStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, RankStore, RecordAuditIssuesScope, RegisterInput, SourceMapStore };
+export type { AuthStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, RankStore, RecordAuditIssuesScope, RegisterInput, SearchPerformanceStore, SourceMapStore };
 
 export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): BackendStore {
   const location = sqliteLocation(databaseUrl);
@@ -58,6 +59,7 @@ export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Backen
     withDomainValidation(createOpportunityStore(db, audit)),
     createKeywordStore(db, audit),
     createRankStore(db, audit),
+    createSearchPerformanceStore(db, audit),
     { close: () => db.close() }
   ]);
 }

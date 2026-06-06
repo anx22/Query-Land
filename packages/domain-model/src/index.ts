@@ -8,4 +8,5 @@ export * from "./opportunities.js";
 export * from "./platform.js";
 export * from "./project.js";
 export * from "./rank.js";
+export * from "./search-performance.js";
 export * from "./visibility.js";
