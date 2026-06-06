@@ -7,6 +7,7 @@ import { createAuditLog } from "./stores/audit-log.js";
 import { createAuthStore, type AuthStore, type LoginResult, type RegisterInput } from "./stores/auth-store.js";
 import { createCrawlStore, type CrawlStore, type RecordAuditIssuesScope } from "./stores/crawl-store.js";
 import { createJobStore, type JobStore } from "./stores/job-store.js";
+import { createKeywordStore, type KeywordStore } from "./stores/keyword-store.js";
 import { createLinkGraphStore, type LinkGraphStore } from "./stores/link-graph-store.js";
 import { createOpportunityStore, type OpportunityStore } from "./stores/opportunity-store.js";
 import { createProjectStore, type ProjectStore } from "./stores/project-store.js";
@@ -25,14 +26,14 @@ export interface HealthStore {
   health(): HealthSnapshot;
 }
 
-export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & {
+export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & {
   close(): void;
 };
 
 export type SQLiteStore = BackendStore;
 
 export { RequestError };
-export type { AuthStore, CrawlStore, JobStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, RecordAuditIssuesScope, RegisterInput, SourceMapStore };
+export type { AuthStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, RecordAuditIssuesScope, RegisterInput, SourceMapStore };
 
 export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): BackendStore {
   const location = sqliteLocation(databaseUrl);
@@ -54,6 +55,7 @@ export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Backen
     createSourceMapStore(db, audit),
     createLinkGraphStore(db, audit),
     withDomainValidation(createOpportunityStore(db, audit)),
+    createKeywordStore(db, audit),
     { close: () => db.close() }
   ]);
 }

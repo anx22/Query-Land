@@ -14,7 +14,7 @@ export const moduleRoutes = [
   { label: "Projects", path: "/projects", icon: "folder", description: "Scopes, Märkte, Wettbewerber und Business-Werte", status: "active", plannedWave: 1 },
   { label: "Technical Audit", path: "/technical-audit", icon: "troubleshoot", description: "Crawls, Issues, Health Score und URL Explorer", status: "active", plannedWave: 2 },
   { label: "URL Dossier", path: "/url-dossier", icon: "description", description: "Eine URL als vollständiges SEO-Objekt mit Source-Anker", status: "active", plannedWave: 2 },
-  { label: "Keywords & Rank", path: "/keywords-rank", icon: "key", description: "Keyword-Sets, Rankings, SERP-Diffs und Visibility", status: "planned", plannedWave: 3 },
+  { label: "Keywords & Rank", path: "/keywords-rank", icon: "key", description: "Keyword-Sets, Rankings, SERP-Diffs und Visibility", status: "active", plannedWave: 3 },
   { label: "Content & Opportunities", path: "/content-opportunities", icon: "lightbulb", description: "Opportunity Board, Briefings und Validierung", status: "planned", plannedWave: 4 },
   { label: "Backlinks", path: "/backlinks", icon: "link", description: "Ref-Domains, Link-Events und Authority Delta", status: "planned", plannedWave: 5 },
   { label: "Reports", path: "/reports", icon: "description", description: "Weekly Pulse, Alerts und Exporte", status: "planned", plannedWave: 6 },

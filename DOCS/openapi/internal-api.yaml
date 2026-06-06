@@ -646,6 +646,153 @@ paths:
           description: Opportunity is not in a revalidatable state
         '404':
           description: Opportunity not found
+  /projects/{projectId}/keyword-groups:
+    get:
+      summary: List keyword groups for a project
+      operationId: listKeywordGroups
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Keyword groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Create a keyword group
+      operationId: createKeywordGroup
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                topic:
+                  type: string
+      responses:
+        '201':
+          description: Keyword group created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Duplicate group name
+  /projects/{projectId}/keywords:
+    get:
+      summary: List keywords (filter by groupId, intent, brand, market)
+      operationId: listKeywords
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: intent
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: brand
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Keyword list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Bulk add keywords (auto intent/brand/funnel classification)
+      operationId: addKeywords
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Keywords added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+  /projects/{projectId}/keywords/{keywordId}/map-url:
+    post:
+      summary: Map a keyword to a target URL
+      operationId: mapKeywordToUrl
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetUrl:
+                  type: string
+      responses:
+        '200':
+          description: Updated keyword
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Keyword not found
   /integrations:
     get:
       summary: List integration accounts

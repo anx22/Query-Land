@@ -209,7 +209,7 @@ Akzeptanz: npm run check grün; Board zeigt echte Opportunities und erlaubt Stat
 Für die Wellen 3–7 existieren bereits Basis-Prompts unter `prompts/codex-*.md`. Diese pro Welle nutzen und mit dem
 dann-aktuellen Ist-Zustand-Delta ergänzen. Reihenfolge & Module:
 
-- **M2 (W3, `prompts/codex-keyword-core.md`)**: WP-2.1 Keyword-Bibliothek+Clustering+Intent → WP-2.2 Rank-Tracking+SERP-Snapshots/Diffs (Provider-Abstraktion, kein lizenzierter Provider per DEC-002) → WP-2.3 Visibility-Index. Märkte: DACH (DEC-003, bis anders entschieden).
+- **M2 (W3, `prompts/codex-keyword-core.md`)**: WP-2.1 Keyword-Bibliothek+Clustering+Intent **✅ (Store + Intent/Brand/Funnel-Klassifikation + Routen/OpenAPI/Tests + Keyword-UI)** → WP-2.2 Rank-Tracking+SERP-Snapshots/Diffs (Provider-Abstraktion, kein lizenzierter Provider per DEC-002) → WP-2.3 Visibility-Index. Märkte: DACH (DEC-003, bis anders entschieden).
 - **M3 (W4, `prompts/codex-opportunity-engine.md`)**: Search-Performance-Intelligence (braucht echten GSC-Connector) → fünf Opportunity-Klassen + Prioritätsscore (§6.4) → Source-Map Pre-Merge-Gate (PR-Check) → **MCP read-only** (`prompts/codex-ai-layer.md`, nur Tool-Teil): get_project_summary, get_url_dossier, list_opportunities, get_crawl_issues, explain_opportunity.
 - **M4 (W5, `prompts/codex-backlink-layer.md`)**: GSC-Link-Import → Ref-Domain-Modell → New/Lost → Authority-Gaps.
 - **M5 (W6, `prompts/codex-reporting.md`)**: Report-Typen → Export PDF/CSV → Versand E-Mail/Slack → Alerts.

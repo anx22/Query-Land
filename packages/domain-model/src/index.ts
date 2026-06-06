@@ -3,6 +3,7 @@ export * from "./crawl.js";
 export * from "./errors.js";
 export * from "./integrations.js";
 export * from "./jobs.js";
+export * from "./keywords.js";
 export * from "./opportunities.js";
 export * from "./platform.js";
 export * from "./project.js";
