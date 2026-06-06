@@ -3,6 +3,11 @@ import { createIntegrationRequest } from "../request-validators.js";
 import type { ResourceRoute } from "./shared.js";
 
 export const routeIntegrations: ResourceRoute = (store, method, pathname, _searchParams, body): ApiResponse | null => {
+  const syncMatch = pathname.match(/^\/integrations\/([^/]+)\/sync$/);
+  if (method === "POST" && syncMatch) {
+    return json(200, { data: store.runConnectorSync(syncMatch[1]) });
+  }
+
   if (pathname !== "/integrations") return null;
   if (method === "GET") return json(200, { data: store.listIntegrations() });
   if (method === "POST") {

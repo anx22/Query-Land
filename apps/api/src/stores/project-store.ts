@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { sourceConfidenceForProvider, validateBusinessValue, type IntegrationAccount, type IntegrationProvider, type Project, type Site } from "@seo-tool/domain-model";
+import { getConnector } from "../connectors/index.js";
 import { mapIntegration, mapProject, mapSite } from "../sqlite-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
 import type { SQLiteDatabase } from "./sqlite-types.js";
+
+export interface ConnectorSyncResult {
+  integration: IntegrationAccount;
+  rawEventId: string;
+  normalizedMetricsInserted: number;
+}
 
 export interface ProjectStore {
   listProjects(): Project[];
@@ -12,6 +19,7 @@ export interface ProjectStore {
   createSite(projectId: string, input: Partial<Site>): Site;
   listIntegrations(): IntegrationAccount[];
   createIntegration(projectId: string, provider: IntegrationProvider): IntegrationAccount;
+  runConnectorSync(integrationId: string): ConnectorSyncResult;
 }
 
 export function createProjectStore(db: SQLiteDatabase, audit: AuditLog): ProjectStore {
@@ -96,5 +104,57 @@ class SQLiteProjectStore implements ProjectStore {
     }
     this.audit("system", "integration.create", "integration_account", integration.id, { projectId, provider });
     return integration;
+  }
+
+  runConnectorSync(integrationId: string): ConnectorSyncResult {
+    const row = this.db.prepare(`SELECT * FROM integration_accounts WHERE id = ?`).get(integrationId);
+    if (!row) {
+      throw new RequestError(404, "unknown_integration", "Integration not found");
+    }
+    const integration = mapIntegration(row);
+    const connector = getConnector(integration.provider);
+    if (!connector) {
+      throw new RequestError(400, "unsupported_connector", `No connector implemented for provider ${integration.provider}`);
+    }
+
+    const now = new Date().toISOString();
+    const ctx = { projectId: integration.projectId, integrationId, now };
+    try {
+      const fetched = connector.fetch(ctx);
+      connector.validate(fetched.payload);
+      const metrics = connector.normalize(fetched.payload, ctx);
+      const rawEventId = `raw-${randomUUID()}`;
+
+      this.db.exec("BEGIN");
+      try {
+        // Rohdaten unverändert und getrennt von normalisierten Metriken speichern (§2.7, §3.2).
+        this.db.prepare(`INSERT INTO raw_events (id, integration_account_id, source_type, source_confidence, payload, fetched_at) VALUES (?, ?, ?, ?, ?, ?)`)
+          .run(rawEventId, integrationId, connector.sourceType, connector.sourceConfidence, JSON.stringify(fetched.payload), now);
+        const insertMetric = this.db.prepare(`INSERT INTO normalized_metrics (id, raw_event_id, project_id, metric, entity_type, entity_id, value, measured_at, source_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        for (const metric of metrics) {
+          insertMetric.run(`nm-${randomUUID()}`, rawEventId, integration.projectId, metric.metric, metric.entityType, metric.entityId, metric.value, metric.measuredAt, connector.sourceConfidence);
+        }
+        this.db.prepare(`UPDATE integration_accounts SET status = 'connected', quota_remaining = ?, freshness = ?, updated_at = ? WHERE id = ?`)
+          .run(fetched.quotaRemaining, fetched.freshness, now, integrationId);
+        this.db.exec("COMMIT");
+      } catch (error) {
+        this.db.exec("ROLLBACK");
+        throw error;
+      }
+
+      this.audit("system", "integration.sync", "integration_account", integrationId, { provider: integration.provider, metrics: metrics.length });
+      const updatedRow = this.db.prepare(`SELECT * FROM integration_accounts WHERE id = ?`).get(integrationId);
+      if (!updatedRow) {
+        throw new RequestError(500, "integration_reload_failed", "Integration could not be reloaded after sync");
+      }
+      return { integration: mapIntegration(updatedRow), rawEventId, normalizedMetricsInserted: metrics.length };
+    } catch (error) {
+      if (error instanceof RequestError) {
+        throw error;
+      }
+      this.db.prepare(`UPDATE integration_accounts SET status = 'error', updated_at = ? WHERE id = ?`).run(now, integrationId);
+      this.audit("system", "integration.sync_error", "integration_account", integrationId, { provider: integration.provider, message: error instanceof Error ? error.message : String(error) });
+      throw new RequestError(502, "connector_sync_failed", error instanceof Error ? error.message : "Connector sync failed");
+    }
   }
 }

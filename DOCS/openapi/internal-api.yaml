@@ -476,6 +476,37 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/IntegrationAccount'
+  /integrations/{integrationId}/sync:
+    post:
+      summary: Run a connector sync (fetch -> validate -> normalize) storing raw and normalized data separately
+      operationId: runConnectorSync
+      parameters:
+        - name: integrationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connector sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      integration:
+                        $ref: '#/components/schemas/IntegrationAccount'
+                      rawEventId:
+                        type: string
+                      normalizedMetricsInserted:
+                        type: integer
+        '400':
+          description: Provider has no implemented connector
+        '404':
+          description: Integration not found
   /jobs:
     get:
       summary: List foundation jobs
