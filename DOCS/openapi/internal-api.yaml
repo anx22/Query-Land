@@ -1395,6 +1395,83 @@ paths:
                     type: object
         '404':
           description: Project not found
+  /projects/{projectId}/pr-checks:
+    get:
+      summary: List Source-Map pre-merge gate results for a project (history)
+      operationId: listPrChecks
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PR check history (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Evaluate a Source-Map pre-merge gate for changed repo paths (§4.3)
+      operationId: evaluatePrCheck
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - changedPaths
+              properties:
+                changedPaths:
+                  type: array
+                  items:
+                    type: string
+                prNumber:
+                  type: integer
+                headSha:
+                  type: string
+      responses:
+        '201':
+          description: Gate result (passed | review_required | unmapped) with affected templates and related opportunities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      affectedTemplates:
+                        type: array
+                        items:
+                          type: object
+                      affectedUrlPatterns:
+                        type: array
+                        items:
+                          type: string
+                      relatedOpportunities:
+                        type: array
+                        items:
+                          type: object
+        '400':
+          description: changedPaths missing or empty
+        '404':
+          description: Project not found
 components:
   securitySchemes:
     bearerAuth:

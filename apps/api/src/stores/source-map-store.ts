@@ -39,12 +39,53 @@ export interface DeployMarkerInput {
   metadata?: Record<string, unknown>;
 }
 
+export interface PrCheckInput {
+  changedPaths: string[];
+  prNumber?: number;
+  headSha?: string;
+}
+
+export interface PrCheckAffectedTemplate {
+  repoPath: string;
+  template: string;
+  component: string;
+  urlPattern: string;
+  matchedChangedPath: string;
+}
+
+export interface PrCheckRelatedOpportunity {
+  id: string;
+  type: string;
+  status: string;
+  priority: number;
+  affectedUrls: string[];
+  matchedBy: "url_pattern" | "source_anchor";
+}
+
+export type PrCheckStatus = "passed" | "review_required" | "unmapped";
+
+export interface PrCheckResult {
+  id: string;
+  projectId: string;
+  prNumber: number | null;
+  headSha: string | null;
+  changedPaths: string[];
+  status: PrCheckStatus;
+  affectedTemplates: PrCheckAffectedTemplate[];
+  affectedUrlPatterns: string[];
+  relatedOpportunities: PrCheckRelatedOpportunity[];
+  createdAt: string;
+}
+
 export interface SourceMapStore {
   listSourceMapEntries(): SourceMapEntry[];
   upsertSourceMapEntry(projectId: string, input: SourceMapUpsertInput): SourceMapEntry;
   resolveSourceAnchor(url: string): ResolvedSourceAnchor | null;
   createDeployMarker(projectId: string, input: DeployMarkerInput): DeployMarker;
   listDeployMarkers(projectId: string): DeployMarker[];
+  // WP-3.3: Pre-Merge-Gate — geänderte Repo-Pfade -> betroffene Templates/URLs -> offene Opportunities.
+  evaluatePrCheck(projectId: string, input: PrCheckInput): PrCheckResult;
+  listPrChecks(projectId: string): PrCheckResult[];
 }
 
 export function createSourceMapStore(db: SQLiteDatabase, audit: AuditLog): SourceMapStore {
@@ -170,6 +211,107 @@ class SQLiteSourceMapStore implements SourceMapStore {
       deployedAt: String(row.deployed_at),
       metadata: parseMetadata(row.metadata)
     }));
+  }
+
+  evaluatePrCheck(projectId: string, input: PrCheckInput): PrCheckResult {
+    if (!this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+      throw new RequestError(404, "unknown_project", "Project not found");
+    }
+    const changedPaths = Array.isArray(input.changedPaths) ? input.changedPaths.filter((path) => typeof path === "string" && path.trim() !== "").map((path) => path.trim()) : [];
+    if (changedPaths.length === 0) {
+      throw new RequestError(400, "missing_field", "changedPaths must be a non-empty array of repo paths");
+    }
+
+    // Geänderte Pfade -> betroffene Source-Map-Einträge (Template + URL-Muster).
+    const entries = this.listSourceMapEntries();
+    const affectedTemplates: PrCheckAffectedTemplate[] = [];
+    for (const entry of entries) {
+      const matched = changedPaths.find((changed) => pathsRelated(changed, entry.repoPath));
+      if (matched) {
+        affectedTemplates.push({ repoPath: entry.repoPath, template: entry.template, component: entry.component, urlPattern: entry.urlPattern, matchedChangedPath: matched });
+      }
+    }
+    const affectedUrlPatterns = [...new Set(affectedTemplates.map((template) => template.urlPattern))];
+
+    // Offene Opportunities, die betroffen sind — über URL-Muster oder direkten Source-Anchor.
+    const openRows = this.db.prepare(`SELECT id, type, status, priority, affected_urls, source_anchor FROM opportunities WHERE project_id = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId) as Array<{ id: string; type: string; status: string; priority: number; affected_urls: string; source_anchor: string | null }>;
+    const relatedOpportunities: PrCheckRelatedOpportunity[] = [];
+    for (const row of openRows) {
+      const affectedUrls = safeJsonArray(row.affected_urls);
+      const byUrlPattern = affectedUrls.some((url) => affectedUrlPatterns.some((pattern) => url === pattern || url.startsWith(pattern)));
+      const anchorPath = anchorRepoPath(row.source_anchor);
+      const bySourceAnchor = anchorPath !== null && changedPaths.some((changed) => pathsRelated(changed, anchorPath));
+      if (byUrlPattern || bySourceAnchor) {
+        relatedOpportunities.push({ id: row.id, type: String(row.type), status: String(row.status), priority: Number(row.priority), affectedUrls, matchedBy: bySourceAnchor ? "source_anchor" : "url_pattern" });
+      }
+    }
+    relatedOpportunities.sort((left, right) => right.priority - left.priority);
+
+    let status: PrCheckStatus;
+    if (affectedTemplates.length === 0 && relatedOpportunities.length === 0) {
+      status = "unmapped";
+    } else if (relatedOpportunities.length > 0) {
+      status = "review_required";
+    } else {
+      status = "passed";
+    }
+
+    const id = `prcheck-${randomUUID()}`;
+    const createdAt = new Date().toISOString();
+    const prNumber = typeof input.prNumber === "number" && Number.isFinite(input.prNumber) ? Math.trunc(input.prNumber) : null;
+    const headSha = typeof input.headSha === "string" && input.headSha.trim() !== "" ? input.headSha.trim() : null;
+    this.db.prepare(`INSERT INTO pr_checks (id, project_id, pr_number, head_sha, changed_paths, status, affected_templates, affected_url_patterns, related_opportunity_ids, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      id, projectId, prNumber, headSha, JSON.stringify(changedPaths), status, JSON.stringify(affectedTemplates), JSON.stringify(affectedUrlPatterns), JSON.stringify(relatedOpportunities), createdAt
+    );
+    this.audit("system", "pr_check.evaluate", "pr_check", id, { projectId, status, affected: affectedTemplates.length, related: relatedOpportunities.length });
+    return { id, projectId, prNumber, headSha, changedPaths, status, affectedTemplates, affectedUrlPatterns, relatedOpportunities, createdAt };
+  }
+
+  listPrChecks(projectId: string): PrCheckResult[] {
+    return this.db.prepare(`SELECT * FROM pr_checks WHERE project_id = ? ORDER BY created_at DESC, id ASC`).all(projectId).map((row) => ({
+      id: String(row.id),
+      projectId: String(row.project_id),
+      prNumber: row.pr_number === null || row.pr_number === undefined ? null : Number(row.pr_number),
+      headSha: row.head_sha === null || row.head_sha === undefined ? null : String(row.head_sha),
+      changedPaths: safeJsonArray(row.changed_paths),
+      status: String(row.status) as PrCheckStatus,
+      affectedTemplates: safeJsonValue<PrCheckAffectedTemplate[]>(row.affected_templates, []),
+      affectedUrlPatterns: safeJsonArray(row.affected_url_patterns),
+      relatedOpportunities: safeJsonValue<PrCheckRelatedOpportunity[]>(row.related_opportunity_ids, []),
+      createdAt: String(row.created_at)
+    }));
+  }
+}
+
+// Pfadbezug: identisch oder eines ist Verzeichnis-Präfix des anderen (segmentweise).
+function pathsRelated(changed: string, repoPath: string): boolean {
+  const a = changed.replace(/^\/+|\/+$/g, "");
+  const b = repoPath.replace(/^\/+|\/+$/g, "");
+  if (!a || !b) return false;
+  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+}
+
+function safeJsonArray(raw: unknown): string[] {
+  const value = safeJsonValue<unknown[]>(raw, []);
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function safeJsonValue<T>(raw: unknown, fallback: T): T {
+  try {
+    const parsed = JSON.parse(String(raw)) as unknown;
+    return parsed as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function anchorRepoPath(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { repositoryPath?: unknown };
+    return typeof parsed.repositoryPath === "string" && parsed.repositoryPath.trim() !== "" ? parsed.repositoryPath : null;
+  } catch {
+    return null;
   }
 }
 

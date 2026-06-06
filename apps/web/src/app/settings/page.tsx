@@ -1,7 +1,7 @@
 import { AppShell } from "../../components/app-shell";
 import { StatusList } from "../../components/status-list";
 import { loadFoundationDashboardData } from "../../lib/foundation-api";
-import { createConnectorAction, createSourceMapEntryAction, scheduleConnectorSyncAction } from "./actions";
+import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckAction, scheduleConnectorSyncAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const params = await searchParams;
   const data = await loadFoundationDashboardData();
   const selectedProject = data.selectedProject;
-  const feedback = feedbackMessage(params?.created, params?.scheduled, params?.error, params?.sourcemap);
+  const feedback = feedbackMessage(params);
   const connectorItems = data.integrations.length > 0
     ? data.integrations.map((integration) => ({
       id: integration.id,
@@ -146,6 +146,16 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <p>Noch keine Source-Map-Einträge. Lege oben eine URL→Repo-Zuordnung an.</p>
           )}
         </div>
+        <div className="card">
+          <p className="kicker">Pre-Merge-Gate (§4.3)</p>
+          <h2>Geänderte Repo-Pfade prüfen</h2>
+          <p className="muted">Löst geänderte Dateien über die Source Map auf betroffene Templates/URLs auf und verknüpft offene Opportunities (passed · review_required · unmapped). Für CI als PR-Check gedacht.</p>
+          <form className="form-card" action={evaluatePrCheckAction}>
+            <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
+            <label>Geänderte Pfade (einer pro Zeile)<textarea name="changedPaths" rows={4} placeholder={"src/templates/pricing.tsx\napps/web/app/pricing/page.tsx"} required /></label>
+            <button className="button" type="submit" disabled={!data.connected || !selectedProject}>Gate auswerten</button>
+          </form>
+        </div>
       </section>
 
       <section className="content-grid">
@@ -170,14 +180,22 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   );
 }
 
-function feedbackMessage(created: string | string[] | undefined, scheduled: string | string[] | undefined, error: string | string[] | undefined, sourcemap: string | string[] | undefined): { kind: "success" | "danger"; message: string } | null {
-  const errorValue = Array.isArray(error) ? error[0] : error;
+function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
+  const single = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const errorValue = single(params?.error);
   if (errorValue) return { kind: "danger", message: errorValue };
-  const sourcemapValue = Array.isArray(sourcemap) ? sourcemap[0] : sourcemap;
+  const prcheck = single(params?.prcheck);
+  if (prcheck) {
+    const templates = single(params?.prtemplates) ?? "0";
+    const opps = single(params?.propps) ?? "0";
+    const kind = prcheck === "review_required" ? "danger" : "success";
+    return { kind, message: `Pre-Merge-Gate: ${prcheck} · ${templates} betroffene Templates · ${opps} verknüpfte Opportunities.` };
+  }
+  const sourcemapValue = single(params?.sourcemap);
   if (sourcemapValue) return { kind: "success", message: "Source-Map-Eintrag wurde gespeichert." };
-  const createdValue = Array.isArray(created) ? created[0] : created;
+  const createdValue = single(params?.created);
   if (createdValue) return { kind: "success", message: `${createdValue.toUpperCase()} Connector-Stub wurde gespeichert.` };
-  const scheduledValue = Array.isArray(scheduled) ? scheduled[0] : scheduled;
+  const scheduledValue = single(params?.scheduled);
   if (scheduledValue) return { kind: "success", message: `${scheduledValue.toUpperCase()} Sync-Job wurde geplant.` };
   return null;
 }

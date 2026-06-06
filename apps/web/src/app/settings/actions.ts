@@ -60,6 +60,26 @@ export async function createSourceMapEntryAction(formData: FormData) {
   redirect("/settings?sourcemap=1");
 }
 
+export async function evaluatePrCheckAction(formData: FormData) {
+  let result: { status: string; affectedTemplates: unknown[]; relatedOpportunities: unknown[] };
+  try {
+    const projectId = requiredString(formData, "projectId");
+    const changedPaths = requiredString(formData, "changedPaths")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (changedPaths.length === 0) {
+      throw new Error("Mindestens ein geänderter Pfad ist erforderlich.");
+    }
+    result = await apiPost(`/projects/${projectId}/pr-checks`, { changedPaths });
+  } catch (error) {
+    redirect(`/settings?error=${encodeURIComponent(messageFor(error))}`);
+  }
+
+  revalidateSettingsViews();
+  redirect(`/settings?prcheck=${result.status}&prtemplates=${result.affectedTemplates.length}&propps=${result.relatedOpportunities.length}`);
+}
+
 function revalidateSettingsViews(): void {
   revalidatePath("/");
   revalidatePath("/settings");
