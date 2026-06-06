@@ -60,6 +60,16 @@ docker compose -f infra/docker-compose.yml up -d
 
 Die ersten Foundation-Endpunkte sind in `DOCS/openapi/internal-api.yaml` definiert: `/health`, `/auth/register`, `/auth/login`, `/auth/session`, `/projects`, `/projects/{projectId}/sites`, `/integrations`, `/jobs` und `/source-map`.
 
+### Welle-1-Gate-Smoke
+
+Der reproduzierbare Welle-1-Smoke ist Teil von `npm test` und läuft gegen den embedded API-Handler mit `sqlite::memory:`. Er belegt den Foundation-Flow ohne Fixtures: Projekt anlegen → Site anlegen → Connector-Stub anlegen → `connector_sync`-Job sichtbar machen → erneuter API-Read hält Projekt, Site, Integration und Job.
+
+Gezielt lokal ausführbar:
+
+```bash
+npm test -- --test-name-pattern "Welle 1 UI smoke"
+```
+
 
 ## Vorbereitungsdokumente für Sprintstart
 
