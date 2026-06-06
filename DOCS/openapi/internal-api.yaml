@@ -1654,6 +1654,397 @@ paths:
                       type: object
         '404':
           description: Project not found
+  /projects/{projectId}/reports:
+    get:
+      summary: List generated reports for a project (newest first)
+      operationId: listReports
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Generate a report (weekly_summary, opportunity_digest, authority_report)
+      operationId: generateReport
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+      responses:
+        '201':
+          description: Generated report with sections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Invalid report type
+        '404':
+          description: Project not found
+  /reports/{reportId}:
+    get:
+      summary: Get a generated report
+      operationId: getReport
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Report not found
+  /reports/{reportId}/export:
+    get:
+      summary: Export a report as CSV or printable HTML
+      operationId: exportReport
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [csv, html]
+      responses:
+        '200':
+          description: Export envelope (format, contentType, filename, content)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Report not found
+  /reports/{reportId}/deliver:
+    post:
+      summary: Deliver a report via a stub channel (email/slack)
+      operationId: deliverReport
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - channel
+              properties:
+                channel:
+                  type: string
+                target:
+                  type: string
+      responses:
+        '201':
+          description: Delivery record
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Report not found
+  /reports/{reportId}/deliveries:
+    get:
+      summary: List delivery records for a report
+      operationId: listReportDeliveries
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deliveries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Report not found
+  /projects/{projectId}/report-schedules:
+    get:
+      summary: List report schedules for a project
+      operationId: listReportSchedules
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Schedules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Create a report schedule (cadence weekly/monthly)
+      operationId: createReportSchedule
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - cadence
+              properties:
+                type:
+                  type: string
+                cadence:
+                  type: string
+                channel:
+                  type: string
+                target:
+                  type: string
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/report-schedules/run-due:
+    post:
+      summary: Run all due report schedules (weekly-report automation)
+      operationId: runDueReportSchedules
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Generation result for due schedules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/alert-rules:
+    get:
+      summary: List alert rules for a project
+      operationId: listAlertRules
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Create an alert rule (metric, comparator, threshold)
+      operationId: createAlertRule
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - metric
+                - comparator
+                - threshold
+              properties:
+                metric:
+                  type: string
+                comparator:
+                  type: string
+                threshold:
+                  type: number
+      responses:
+        '201':
+          description: Alert rule created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Invalid metric/comparator/threshold
+        '404':
+          description: Project not found
+  /projects/{projectId}/alert-rules/{ruleId}:
+    delete:
+      summary: Delete an alert rule
+      operationId: deleteAlertRule
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Alert rule not found
+  /projects/{projectId}/alerts/evaluate:
+    post:
+      summary: Evaluate alert rules against current metrics and record events
+      operationId: evaluateAlerts
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Evaluated alert events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/alert-events:
+    get:
+      summary: List alert events (history) for a project
+      operationId: listAlertEvents
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
 components:
   securitySchemes:
     bearerAuth:

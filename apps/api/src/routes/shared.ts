@@ -1,8 +1,8 @@
 import type { ApiResponse } from "../http.js";
-import type { BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, OpportunityStore, ProjectStore, RankStore, SearchPerformanceStore, SourceMapStore } from "../sqlite-store.js";
+import type { AlertStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, OpportunityStore, ProjectStore, RankStore, ReportStore, SearchPerformanceStore, SourceMapStore } from "../sqlite-store.js";
 
 // Store-Slice, den alle ressourcenspezifischen Routen-Module gemeinsam erwarten.
-export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore;
+export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore;
 
 // Einheitliche Signatur jedes Ressourcen-Routers: liefert eine ApiResponse, wenn er den
 // Pfad bedient, sonst null (der Aggregator probiert dann den nächsten Router).

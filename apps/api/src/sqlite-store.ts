@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { DomainValidationError, type HealthSnapshot } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
 import { createAuditLog } from "./stores/audit-log.js";
+import { createAlertStore, type AlertStore } from "./stores/alert-store.js";
 import { createAuthStore, type AuthStore, type LoginResult, type RegisterInput } from "./stores/auth-store.js";
 import { createBacklinkStore, type BacklinkStore } from "./stores/backlink-store.js";
 import { createCrawlStore, type CrawlStore, type RecordAuditIssuesScope } from "./stores/crawl-store.js";
@@ -13,6 +14,7 @@ import { createLinkGraphStore, type LinkGraphStore } from "./stores/link-graph-s
 import { createOpportunityStore, type OpportunityStore } from "./stores/opportunity-store.js";
 import { createProjectStore, type ProjectStore } from "./stores/project-store.js";
 import { createRankStore, type RankStore } from "./stores/rank-store.js";
+import { createReportStore, type ReportStore } from "./stores/report-store.js";
 import { createSearchPerformanceStore, type SearchPerformanceStore } from "./stores/search-performance-store.js";
 import { createSourceMapStore, type SourceMapStore } from "./stores/source-map-store.js";
 import { RequestError } from "./stores/store-errors.js";
@@ -29,14 +31,14 @@ export interface HealthStore {
   health(): HealthSnapshot;
 }
 
-export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & {
+export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore & {
   close(): void;
 };
 
 export type SQLiteStore = BackendStore;
 
 export { RequestError };
-export type { AuthStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, RankStore, RecordAuditIssuesScope, RegisterInput, SearchPerformanceStore, SourceMapStore };
+export type { AlertStore, AuthStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, RankStore, RecordAuditIssuesScope, RegisterInput, ReportStore, SearchPerformanceStore, SourceMapStore };
 
 export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): BackendStore {
   const location = sqliteLocation(databaseUrl);
@@ -62,6 +64,8 @@ export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Backen
     createRankStore(db, audit),
     createSearchPerformanceStore(db, audit),
     createBacklinkStore(db, audit),
+    createReportStore(db, audit),
+    createAlertStore(db, audit),
     { close: () => db.close() }
   ]);
 }

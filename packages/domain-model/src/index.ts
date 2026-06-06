@@ -1,4 +1,5 @@
 export * from "./auth.js";
+export * from "./alerts.js";
 export * from "./backlinks.js";
 export * from "./crawl.js";
 export * from "./errors.js";
@@ -9,5 +10,6 @@ export * from "./opportunities.js";
 export * from "./platform.js";
 export * from "./project.js";
 export * from "./rank.js";
+export * from "./reports.js";
 export * from "./search-performance.js";
 export * from "./visibility.js";

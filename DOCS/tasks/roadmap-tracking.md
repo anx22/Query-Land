@@ -99,6 +99,23 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 
 **Offene Follow-ups (nicht gate-kritisch):** echter GSC-OAuth-Provider (GAP-AUTH-001, DEC-002); Drittanbieter-Backlink-Quellen Klasse D (GAP-AUTH-002); Competitor-Gap-Analyse (GAP-AUTH-003); historische Snapshot-Tiefe aus echtem GSC (GAP-AUTH-004). Architektur-Dokumentation: `architecture/authority-backlinks.md`.
 
+### 4.4 Welle 6 — Reporting/Alerts ✅ abgeschlossen (M5)
+
+**Master-Gate:** Wochenreport automatisiert.
+
+| Slice | Backend | UI | Status |
+|---|---|---|---|
+| Domain-Modell (`reports.ts`, `alerts.ts`) | Typen `Report/ReportSection/ReportDelivery/ReportSchedule/ReportExport/AlertRule/AlertEvent`; pure Funktionen `reportToCsv`/`reportToHtml`/`renderReportExport`/`compareAlert` (dependency-frei) | — | done |
+| Migration `011_reporting.sql` | Tabellen `reports`, `report_deliveries`, `report_schedules`, `alert_rules`, `alert_events` | — | done |
+| Report-Store (`report-store.ts`) | `generateReport` (aggregiert Health, Opportunities, Visibility, Authority), `getReport`/`listReports`, `exportReport` (CSV/HTML), `deliverReport` + `listDeliveries` (Stub-Kanäle email/slack, DEC-002), `createSchedule`/`listSchedules`/`runDueSchedules` (idempotent) | — | done |
+| Alert-Store (`alert-store.ts`) | `createAlertRule`/`listAlertRules`/`updateAlertRule`/`deleteAlertRule`, `evaluateAlerts` (liest visibility_score, health_score, open_opportunities, referring_domains; schreibt `alert_events`), `listAlertEvents` | — | done |
+| Report-Routen (`routes/reports.ts`) | CRUD + Export + Deliver; `POST /report-schedules/run-due` (Gate: ein idempotenter Aufruf erledigt alle fälligen Schedules) | — | done |
+| Alert-Routen (`routes/alerts.ts`) | AlertRule CRUD + `POST /alerts/evaluate` + `GET /alert-events` | — | done |
+| UI `/reports` | Report-Liste, letzter Report in Abschnittsansicht, Export-Schaltflächen (CSV, HTML), Zustellhistorie, Alert-Regeln und -Events | vorhanden | done |
+| Read-only MCP-Tools | `get_latest_report`, `list_alert_events` in `services/mcp` | — | done |
+
+**Offene Follow-ups (nicht gate-kritisch):** echter PDF-Renderer (GAP-REPORT-001); echte Email/Slack-Delivery statt Stub (GAP-REPORT-002, DEC-002); worker-getriebener Cron-Trigger für `runDueSchedules` (GAP-REPORT-003). Architektur-Dokumentation: `architecture/reporting-alerts.md`.
+
 ## 5. Offizielle nächste Sprint-Sequenz
 
 ### Sprint A — Foundation UI echt machen
@@ -189,6 +206,9 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | GAP-AUTH-002 | Authority / Provider | Drittanbieter-Backlink-APIs (Ahrefs, Moz, Majestic) nicht angebunden | Erst bei Lizenzvertrag; separater Provider-Adapter hinter Connector-Interface §4.2; Klasse D kommunizieren | P3 | später |
 | GAP-AUTH-003 | Authority / Analyse | Competitor-Backlink-Gap fehlt (kein fremdes Linkprofil) | Authority-Gap-Analyse als M6+-Erweiterung; setzt GAP-AUTH-002 voraus | P3 | Welle 6+ |
 | GAP-AUTH-004 | Authority / Historisch | Snapshots decken nur laufende Sessions ab | Mit echtem GSC-Provider historische Daten (bis 16 Monate) nachladen; Schema bereits kompatibel | P2 | Welle 5+ |
+| GAP-REPORT-001 | Reporting / Export | PDF-Export nicht implementiert; `renderReportExport` kennt nur CSV und HTML | Echten PDF-Renderer einbinden (z. B. Puppeteer/headless Chrome); `ReportExport.format` um `pdf` erweitern; Paketgröße auf Serverless beachten | P2 | Welle 6+ |
+| GAP-REPORT-002 | Reporting / Delivery | Email- und Slack-Zustellung sind deterministische Stubs (DEC-002 offen) | Echten SMTP-Adapter (z. B. Resend, Postmark) und Slack-Webhook-Adapter hinter `deliverReport`-Abstraktion einbauen; Confidence-Stufe dann von B auf A | P2 | Welle 6+ |
+| GAP-REPORT-003 | Reporting / Scheduling | `runDueSchedules` muss extern ausgelöst werden; kein In-Environment-Cron verfügbar | Worker-Job oder Vercel-Cron-Trigger einrichten, der `POST /report-schedules/run-due` täglich aufruft | P2 | Welle 6+ |
 
 ## 7. Abschlusskriterien bis App-MVP
 

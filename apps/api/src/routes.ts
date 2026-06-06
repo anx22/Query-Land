@@ -1,4 +1,5 @@
 import { apiError, type ApiResponse } from "./http.js";
+import { routeAlerts } from "./routes/alerts.js";
 import { routeAuditIssues } from "./routes/audit-issues.js";
 import { routeBacklinks } from "./routes/backlinks.js";
 import { routeCrawlRuns } from "./routes/crawl-runs.js";
@@ -10,6 +11,7 @@ import { routeJobs } from "./routes/jobs.js";
 import { routeKeywords } from "./routes/keywords.js";
 import { routeOpportunities } from "./routes/opportunities.js";
 import { routeRank } from "./routes/rank.js";
+import { routeReports } from "./routes/reports.js";
 import { routeSearchPerformance } from "./routes/search-performance.js";
 import { routeSites } from "./routes/sites.js";
 import { routeSourceMap } from "./routes/source-map.js";
@@ -33,6 +35,8 @@ const resourceRoutes: ResourceRoute[] = [
   routeRank,
   routeSearchPerformance,
   routeBacklinks,
+  routeReports,
+  routeAlerts,
   routeIntegrations,
   routeJobs,
   routeSourceMap
