@@ -54,7 +54,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 | WP-1.1 Source Map real (minimal) | api/web | M | — | source-map.md |
 | WP-1.2 Opportunity+Evidence Schema/API ✅ | domain/api | L | — | content-opportunities.md, §6 — Migration `004_opportunities`, `opportunity-store` (Evidenz-Pflicht A–C §2.3, Prioritätsscore §6.4, Statusmodell §6.5), Routen `/projects/{}/opportunities` + `/opportunities/{id}`(+`/transition`) + OpenAPI + Tests |
 | WP-1.3 Erster Generator + Re-Check ✅ | api | M | WP-1.2 | §6.5/§6.6 — `generate-indexability` erzeugt technical_fix-Opportunities aus Blockern (idempotent); `revalidate` schaltet implemented→validated\|reopened mit aktualisierter Evidenz + Tests. Follow-up: Re-Check als geplanter Worker-Job statt manuellem Endpoint |
-| WP-1.4 Opportunity Board v0 + URL Dossier v0 | web | M | WP-1.2/1.3 | UX_FLOWS.md |
+| WP-1.4 Opportunity Board v0 (✅) + URL Dossier v0 (offen) | web | M | WP-1.2/1.3 | UX_FLOWS.md — `/content-opportunities` ist jetzt das Opportunity Board: priorisierte Liste, Status-Filter, Statuswechsel + Re-Validieren + „aus Indexierbarkeit generieren". Follow-up: URL Dossier v0 |
 
 **Fortschritt 2026-06-06:** **M0 inhaltlich abgeschlossen** — WP-0.2 (Welle-1-Smoke), WP-0.3 (Sitemap-Index/Redirect-Loop/Graceful-Shutdown), WP-0.4 (Connector-Contract GSC/GA4/PSI), WP-0.5 (Web Vitals, API+UI), WP-0.6 (interner Linkgraph, API), WP-0.7 (Kern-Tests + Routen-Modularisierung) sind erledigt. Verbleibende, bewusst herausgelöste Follow-ups: Crawler befüllt Linkgraph-Edges + verarbeitet `connector_sync`/echten PSI-Fetch; Web-Vitals→Health-Score-Gewichtung; echte Site-Crawl-Smokes (GAP-PERSIST-001); AuthZ (WP-Z.1, bewusst ans Ende). Nächster Milestone: **M1 Opportunity-Rückgrat**.
 
