@@ -10,6 +10,7 @@ export const routeBacklinks: ResourceRoute = (store, method, pathname, searchPar
     return json(202, { data: store.importBacklinks(importMatch[1]) });
   }
 
+  // Reihenfolge wichtig: /backlinks/diff muss VOR dem allgemeineren /backlinks geprüft werden.
   const diffMatch = pathname.match(/^\/projects\/([^/]+)\/backlinks\/diff$/);
   if (method === "GET" && diffMatch) {
     return json(200, { data: store.backlinkDiff(diffMatch[1]) });

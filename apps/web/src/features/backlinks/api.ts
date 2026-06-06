@@ -23,7 +23,11 @@ export async function loadBacklinkAuthority(): Promise<BacklinkAuthorityData> {
     const [authority, referringDomains, diff, snapshots] = await Promise.all([
       apiGet<AuthoritySummary>(`/projects/${projectId}/authority`).catch(() => null),
       apiGet<ReferringDomain[]>(`/projects/${projectId}/referring-domains`).catch(() => []),
-      apiGet<BacklinkDiff>(`/projects/${projectId}/backlinks/diff`).catch(() => null),
+      apiGet<BacklinkDiff>(`/projects/${projectId}/backlinks/diff`).catch((error) => {
+        // 404 = noch keine zwei Snapshots → leerer Zustand; andere Fehler echt durchreichen.
+        if (error instanceof Error && error.message.includes("404")) return null;
+        throw error;
+      }),
       apiGet<BacklinkSnapshot[]>(`/projects/${projectId}/backlink-snapshots`).catch(() => [])
     ]);
     return { ...dashboard, authority, referringDomains, diff, snapshots };

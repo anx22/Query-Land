@@ -87,6 +87,11 @@ test("a second import yields a meaningful new/lost diff", async () => {
     await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://acme.example.com", scopeType: "domain" });
 
     await app("POST", `/projects/${projectId}/backlinks/import`, {});
+    // A single snapshot has no predecessor to diff against -> 404 (not a misleading all-new diff).
+    const oneSnapshot = await app("GET", `/projects/${projectId}/backlinks/diff`);
+    assert.equal(oneSnapshot.status, 404);
+    assert.equal((oneSnapshot.body as { error: { code: string } }).error.code, "no_snapshots");
+
     await app("POST", `/projects/${projectId}/backlinks/import`, {});
 
     const diff = data<{ newReferringDomains: string[]; lostReferringDomains: string[]; newBacklinks: unknown[]; lostBacklinks: unknown[]; netReferringDomainChange: number }>(await app("GET", `/projects/${projectId}/backlinks/diff`));

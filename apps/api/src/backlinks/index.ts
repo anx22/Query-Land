@@ -50,9 +50,10 @@ const deterministicProvider: BacklinkProvider = {
     const anchors = [brand, "click here", "seo tool", "read more", `${brand} review`];
     const rows: BacklinkRow[] = [];
 
-    // Stabiler Grundbestand; je Runde fällt genau eine bestehende Domain weg (Lost).
+    // Stabiler Grundbestand; je Runde fällt kumulativ eine weitere Domain weg (Lost),
+    // sodass ein einmal verlorener Link nicht in späteren Runden wieder auftaucht.
     for (let index = 0; index < BASE_DOMAIN_COUNT; index += 1) {
-      if (round > 0 && index === round - 1) continue;
+      if (index < round) continue;
       const domain = `ref-${index}.example`;
       rows.push({
         sourceUrl: `https://${domain}/post-${index}`,

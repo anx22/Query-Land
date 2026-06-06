@@ -133,11 +133,13 @@ class SQLiteBacklinkStore implements BacklinkStore {
   backlinkDiff(projectId: string): BacklinkDiff {
     this.assertProject(projectId);
     const snapshots = this.db.prepare(`SELECT id FROM backlink_snapshots WHERE project_id = ? ORDER BY captured_at DESC, rowid DESC LIMIT 2`).all(projectId) as Array<{ id: string }>;
-    if (snapshots.length === 0) {
-      throw new RequestError(404, "no_snapshots", "No backlink snapshots imported for this project");
+    // Ein New/Lost-Diff braucht eine Vorgänger-Charge; mit < 2 Snapshots gibt es keinen
+    // sinnvollen Vergleich (sonst wären alle Links irreführend "neu").
+    if (snapshots.length < 2) {
+      throw new RequestError(404, "no_snapshots", "Need at least two backlink snapshots to diff (import again after the first import)");
     }
     const after = this.snapshotBacklinks(String(snapshots[0].id));
-    const before = snapshots[1] ? this.snapshotBacklinks(String(snapshots[1].id)) : [];
+    const before = this.snapshotBacklinks(String(snapshots[1].id));
     return diffBacklinks(before, after);
   }
 
