@@ -1,6 +1,6 @@
 # Übergabe für die nächste Sprint-Session
 
-Stand: 2026-06-05
+Stand: 2026-06-06
 
 ## 1. Aktueller Projektstand
 
@@ -14,6 +14,9 @@ Die Codebasis ist nach dem Worker-v0- und Technical-Audit-UI-Slice grundsätzlic
 - Web-Demo-Komponenten wurden in kleinere Presentational Components zerlegt (`MetricCard`, `InfoCard`, `StatusList`).
 - Technical-Audit-UI liest echte Crawl Runs, Health Scores, Audit Issues und URL-Explorer-Daten aus API/SQLite.
 - Worker v0 kann `crawl_seed`-Jobs claimen, Crawl-Artefakte schreiben, Health berechnen und Runs abschließen; offen sind Robustheit, echte Site-Smokes und Betrieb.
+- Technical-Audit-Start nutzt nun eine gemeinsame Scheduling-Seam: API erstellt Crawl Run und typed `crawl_seed` Job zusammen. Legacy-Worker-Jobs ohne `crawlRunId` bleiben erlaubt; der Worker legt dann selbst einen Crawl Run an.
+- Domain-Sprache wurde in `CONTEXT.md` ergänzt. Zukünftige Architektur-Reviews sollen diese Begriffe verwenden und neue load-bearing Begriffe dort nachziehen.
+- Browser-/Vercel-Smokes sollen gegen `https://queryland-inky.vercel.app/` laufen, wenn eine echte Deployment-Prüfung sinnvoll ist.
 
 ## 2. Qualitätslage nach der Bestandsaufnahme
 
@@ -31,6 +34,7 @@ Die Codebasis ist nach dem Worker-v0- und Technical-Audit-UI-Slice grundsätzlic
 - Request-Validierung ist bewusst leichtgewichtig, aber nicht schema-getrieben. Bei wachsendem OpenAPI-Umfang sollten Validatoren aus gemeinsamen Schemas/Contracts abgeleitet oder zentral getestet werden.
 - Technical-Audit-UI ist v0: Runs, Health, Issues und URL Explorer sind sichtbar; Resolve/Dismiss/Reopen sind bedienbar, aber Detail Drawer, zusätzliche serverseitige Filter und getrennte Dismiss-Reason-Historie fehlen.
 - Worker v0 ist vorhanden, aber noch nicht als robuster Betrieb gegen echte Sites nachgewiesen; echte Site-Smokes, Robots-/Sitemap-Details, Daemon-Verhalten und Run-/Job-Korrelation fehlen.
+- `crawl_seed` Payloads sind typed, aber absichtlich zweistufig: Scheduling-Jobs tragen `crawlRunId`; ältere/programmatische Jobs dürfen ohne `crawlRunId` starten und werden vom Worker vervollständigt. Diese Kompatibilität nicht versehentlich entfernen.
 - Security-, Session-, Connector- und AuthZ-Aspekte sind noch Foundation-Level und nicht production-grade.
 
 ## 3. Empfohlene nächste Sprint-Reihenfolge
@@ -76,6 +80,8 @@ Aktueller Stand: Technical-Audit-UI zeigt bereits Crawl Runs, Health, Issues und
 - SQLite-Schema-Änderungen nur mit Migrationsstrategie dokumentieren; keine stillen Spalten-/Constraint-Änderungen ohne Tests.
 - Bestehende API-Pfade aus `DOCS/openapi/internal-api.yaml` nicht umbenennen, solange UI/Worker noch darauf aufbauen.
 - Demo-Fixtures nicht als Produktlogik behandeln; bestehende echte Technical-Audit-Datenintegration nicht wieder durch Fixture-Daten ersetzen.
+- `CONTEXT.md` ist die Domain-Vokabular-Datei. Wenn neue Begriffe wie Issue Lifecycle, Source Anchor oder Crawl Seed Scheduling geschärft werden, dort und in den passenden DOCS/tasks nachziehen.
+- Der Backend Proxy Adapter muss Query-Strings erhalten; sonst unterscheiden sich Browser- und interne API-Interfaces bei Pagination/Filtern.
 
 ## 5. Pflicht-Checks vor Übergabe
 

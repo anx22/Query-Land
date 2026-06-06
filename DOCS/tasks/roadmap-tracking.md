@@ -57,7 +57,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 |---|---|---|---|---|
 | Project/Site persistieren | vorhanden | echte API-Formulare/Listen vorhanden | in_progress | UI-Smoke, Validierungsdetails und Rollen-/Scope-Gates fehlen |
 | GSC/GA4 Stub + Sync Job | vorhanden | Connector-UI nutzt echte API-Zustände | in_progress | Job-Planung/Sync-Smoke und OAuth-Produktionspfad fehlen |
-| Crawl Seed Job starten/status verfolgen | Queue + Crawl Runs vorhanden; Worker v0 kann `crawl_seed` claimen, Artefakte schreiben und Runs abschließen | Teilweise | worker_v0_stabilisieren | Gate-Smoke gegen Fixture und echte Site, Robots-Details und Betrieb fehlen |
+| Crawl Seed Job starten/status verfolgen | Queue + Crawl Runs vorhanden; `crawl-runs/schedule` erstellt Run + typed `crawl_seed` Job; Worker v0 kann `crawl_seed` claimen, Legacy-Payloads ohne `crawlRunId` ergänzen, Artefakte schreiben und Runs abschließen | Teilweise | worker_v0_stabilisieren | Gate-Smoke gegen Fixture und echte Site, Robots-Details und Betrieb fehlen |
 | Source Map Refresh + Mapping anzeigen | Listing vorhanden | echte API-Daten sichtbar | in_progress | Refresh-Job-Smoke und Mapping-Detailansicht fehlen |
 
 **Welle-1-Entscheidung:** Backend und erste echte UI-/Worker-Anbindung sind weitgehend vorhanden. Das Gate ist erst geschlossen, wenn UI-Smokes die echten API-Flows reproduzierbar nachweisen.
@@ -125,7 +125,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 1. Pagination oder harte Limits für Crawl Runs, URL Explorer und Issue-Liste.
 2. URL-/Issue-Detail Drawer mit Fetch-, Indexability-, Rule- und Run-Kontext.
 3. Serverseitige Filter für Issue-Status, Severity, Rule, URL und Run/Site-Kontext.
-4. Issue-Aktionen vervollständigen: Reopen und Dismiss zusätzlich zu Resolve. **Status 2026-06-05:** API- und UI-Aktionen für Resolve, Dismiss und Reopen vorhanden; getrennte Dismiss-Reason-Historie bleibt offen.
+4. Issue-Aktionen vervollständigen: Reopen und Dismiss zusätzlich zu Resolve. **Status 2026-06-06:** API- und UI-Aktionen für Resolve, Dismiss und Reopen vorhanden; Technical-Audit-Start läuft über eine gemeinsame `crawl-runs/schedule` Seam. Getrennte Dismiss-Reason-Historie bleibt offen.
 5. Empty/Error/Loading States für die neuen Listen-/Detailzustände nachziehen.
 
 **Nicht-Scope:** Deep Segmentation, Export, Alerts, Web Vitals.
@@ -163,6 +163,8 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | GAP-OBS-001 | Observability | Job-/Run-Korrelation minimal | structured logs + runId/jobId/requestId | P1 | D |
 | GAP-WV-001 | Audit | Web Vitals fehlt | Lighthouse/PSI Stub und spätere Provider-Abstraktion | P2 | Welle 2+ |
 | GAP-MOD-001 | Produktmodule | Wellen 3–7 nur Navigation/Specs | nach Welle-2-Gate Keyword Core starten | P2 | Welle 3 |
+| GAP-DOC-001 | Domain-Dokumentation | `CONTEXT.md` ist neu und muss bei Architekturentscheidungen mitgeführt werden | Neue load-bearing Domain-Begriffe aus Reviews sofort in `CONTEXT.md` und passende Task-/Spec-Dokumente übernehmen | P1 | laufend |
+| GAP-SMOKE-001 | Deployment-Smoke | Production Smoke Target ist definiert, aber noch nicht automatisiert | Browser-/Log-Smokes gegen `https://queryland-inky.vercel.app/` als manuelles Gate dokumentieren und später automatisieren | P1 | B/C |
 
 ## 7. Abschlusskriterien bis App-MVP
 

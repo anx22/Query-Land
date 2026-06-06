@@ -1,16 +1,17 @@
-import { calculateHealthScore, makeIdempotencyKey, type FoundationJob } from "@seo-tool/domain-model";
+import { calculateHealthScore, makeIdempotencyKey, validateCrawlSeedJobPayload, type FoundationJob } from "@seo-tool/domain-model";
 import type { CrawlSeedInput } from "./types.js";
 
 export function createCrawlSeedJob(input: CrawlSeedInput): FoundationJob {
   const now = new Date().toISOString();
+  const payload = validateCrawlSeedJobPayload({ baseUrl: input.baseUrl, siteId: input.siteId });
   return {
-    id: `job-crawl-seed-${input.siteId}`,
+    id: `job-crawl-seed-${payload.siteId}`,
     projectId: input.projectId,
     type: "crawl_seed",
     status: "queued",
-    idempotencyKey: makeIdempotencyKey(input.projectId, "crawl_seed", input.baseUrl),
-    subject: input.baseUrl,
-    payload: { baseUrl: input.baseUrl, siteId: input.siteId, subject: input.baseUrl },
+    idempotencyKey: makeIdempotencyKey(input.projectId, "crawl_seed", payload.baseUrl),
+    subject: payload.baseUrl,
+    payload: { ...payload, subject: payload.baseUrl },
     attempts: 0,
     createdAt: now,
     updatedAt: now

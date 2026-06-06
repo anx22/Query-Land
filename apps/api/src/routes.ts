@@ -1,8 +1,8 @@
-import type { FoundationJob } from "@seo-tool/domain-model";
+import { createCrawlSeedJobInput, type FoundationJob } from "@seo-tool/domain-model";
 import type { ApiResponse } from "./http.js";
 import { apiError, json } from "./http.js";
 import type { CrawlStore, JobStore, ProjectStore, SourceMapStore } from "./sqlite-store.js";
-import { completeCrawlRunRequest, completeJobRequest, createCrawlRunRequest, createIntegrationRequest, createJobRequest, createSiteRequest, recordAuditIssuesRequest, recordDiscoveredUrlsRequest, recordFetchResultRequest, recordIndexabilityRequest } from "./request-validators.js";
+import { completeCrawlRunRequest, completeJobRequest, createCrawlRunRequest, createIntegrationRequest, createJobRequest, createSiteRequest, recordAuditIssuesRequest, recordDiscoveredUrlsRequest, recordFetchResultRequest, recordIndexabilityRequest, scheduleCrawlSeedRequest } from "./request-validators.js";
 
 export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore;
 
@@ -23,6 +23,15 @@ export async function routeProjectChildren(store: ProjectChildStore, method: str
   if (method === "POST" && crawlRunsMatch) {
     const input = createCrawlRunRequest(body);
     return json(201, { data: store.createCrawlRun(crawlRunsMatch[1], crawlRunsMatch[2], input.trigger) });
+  }
+
+  const scheduleCrawlSeedMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/schedule$/);
+  if (method === "POST" && scheduleCrawlSeedMatch) {
+    const input = scheduleCrawlSeedRequest(body);
+    const crawlRun = store.createCrawlRun(scheduleCrawlSeedMatch[1], scheduleCrawlSeedMatch[2], input.trigger);
+    const crawlSeedJob = createCrawlSeedJobInput({ siteId: scheduleCrawlSeedMatch[2], baseUrl: input.baseUrl, crawlRunId: crawlRun.id, sitemapUrl: input.sitemapUrl });
+    const result = store.createJob(scheduleCrawlSeedMatch[1], crawlSeedJob.type, crawlSeedJob.subject, { ...crawlSeedJob.payload });
+    return json(result.idempotent ? 200 : 201, { data: { crawlRun, job: result.job }, idempotent: result.idempotent });
   }
   const completeCrawlRunMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/([^/]+)\/complete$/);
   if (method === "POST" && completeCrawlRunMatch) {

@@ -39,3 +39,17 @@
 - **Recommendation:** Open-source-first self-hostable Foundation Core with hybrid, replaceable provider adapters for optional external services. The current EU digital-sovereignty and Open-Source strategy signal (June 2026) reinforces this as a product guardrail, not as a late procurement checkbox.
 - **Impact:** Keeps Foundation data, crawl/audit evidence and connector contracts portable; requires dependency/license review before production hardening and avoids mandatory SaaS lock-in in Welle 1-2.
 - **Decide by:** Before production connector credentials, hosted deployments or paid provider adapters are introduced.
+
+## DEC-006 — Crawl Seed Scheduling Seam
+
+- **Status:** accepted in code, document if revisited
+- **Decision:** UI-triggered crawls should use a single Technical Audit scheduling seam that creates the Crawl Run and the typed `crawl_seed` Job together. Worker-created or legacy `crawl_seed` Jobs may omit `crawlRunId`; the Worker then creates the Crawl Run before crawling.
+- **Reason:** Keeps the UI from knowing the low-level Job payload/subject convention while preserving backwards-compatible Worker behaviour.
+- **Impact:** Future refactors must not make `crawlRunId` globally required for every claimed `crawl_seed` payload; only scheduled job creation requires it.
+
+## DEC-007 — Production Smoke Target
+
+- **Status:** accepted for manual test usage
+- **Decision:** Use `https://queryland-inky.vercel.app/` for manual browser checks, internal logs and deployment smoke tests until a dedicated staging URL exists.
+- **Reason:** Gives agents and humans a shared, stable URL for Vercel/runtime validation.
+- **Impact:** Future handoffs and QA notes should cite this target when asking for browser or runtime smoke validation.

@@ -175,6 +175,40 @@ paths:
                   data:
                     $ref: '#/components/schemas/Site'
 
+  /projects/{projectId}/sites/{siteId}/crawl-runs/schedule:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    post:
+      summary: Create a crawl run and schedule its typed crawl_seed job
+      operationId: scheduleCrawlSeedRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [baseUrl]
+              properties:
+                trigger: { type: string, enum: [manual, scheduled, deploy], default: manual }
+                baseUrl: { type: string, format: uri }
+                sitemapUrl: { type: string, format: uri }
+      responses:
+        '201':
+          description: Crawl run and crawl_seed job scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      crawlRun: { type: object, additionalProperties: true }
+                      job:
+                        $ref: '#/components/schemas/FoundationJob'
+                  idempotent: { type: boolean }
+
   /projects/{projectId}/sites/{siteId}/discovered-urls:
     parameters:
       - $ref: '#/components/parameters/ProjectId'

@@ -1,8 +1,8 @@
 import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
 import { StatusList } from "../../components/status-list";
-import { loadTechnicalAuditData } from "../../lib/foundation-api";
-import { computeHealthAction, dismissIssueAction, reopenIssueAction, resolveIssueAction, startCrawlAction } from "./actions";
+import { loadTechnicalAuditData } from "../../features/technical-audit";
+import { computeHealthAction, dismissIssueAction, reopenIssueAction, resolveIssueAction, startCrawlAction } from "../../features/technical-audit/actions";
 
 export const dynamic = "force-dynamic";
 
