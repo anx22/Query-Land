@@ -52,7 +52,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 | WP-0.6 Interner Linkgraph (API-seitig) ✅ | domain/api/crawler/web | M | WP-0.3 | crawl-engine.md — Migration `003_internal_link_edges`, `link-graph-store` (Inlinks/Outlinks/Orphans, paginiert), Routen `internal-links`/`orphan-urls` + Tests; Follow-up: Crawler befüllt Edges, UI-Anzeige |
 | WP-0.7 Modularisierung + Kern-Tests ✅ | api/test | M | — | observability-sre.md — Kern-Tests ✅ (`core-coverage.test.ts`); Routen modularisiert ✅ (`apps/api/src/routes/*`); Rest: Validatoren-Split + Log-Korrelation optional |
 | WP-1.1 Source Map real (minimal) | api/web | M | — | source-map.md |
-| WP-1.2 Opportunity+Evidence Schema/API | domain/api | L | — | content-opportunities.md, §6 |
+| WP-1.2 Opportunity+Evidence Schema/API ✅ | domain/api | L | — | content-opportunities.md, §6 — Migration `004_opportunities`, `opportunity-store` (Evidenz-Pflicht A–C §2.3, Prioritätsscore §6.4, Statusmodell §6.5), Routen `/projects/{}/opportunities` + `/opportunities/{id}`(+`/transition`) + OpenAPI + Tests |
 | WP-1.3 Erster Generator + Re-Check-Scheduler | crawler/api | M | WP-1.2 (1.1 optional) | §6.5/§6.6 |
 | WP-1.4 Opportunity Board v0 + URL Dossier v0 | web | M | WP-1.2/1.3 | UX_FLOWS.md |
 

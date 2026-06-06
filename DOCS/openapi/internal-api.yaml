@@ -479,6 +479,122 @@ paths:
                           type: string
         '404':
           description: Site not found
+  /projects/{projectId}/opportunities:
+    get:
+      summary: List opportunities for a project (priority-ordered)
+      operationId: listOpportunities
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Opportunity list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Create an opportunity (requires evidence of confidence class A-C)
+      operationId: createOpportunity
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Opportunity created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Missing fields or insufficient evidence
+        '404':
+          description: Project not found
+  /opportunities/{opportunityId}:
+    get:
+      summary: Get a single opportunity with its evidence
+      operationId: getOpportunity
+      parameters:
+        - name: opportunityId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Opportunity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Opportunity not found
+  /opportunities/{opportunityId}/transition:
+    post:
+      summary: Transition an opportunity status along the lifecycle (§6.5)
+      operationId: transitionOpportunity
+      parameters:
+        - name: opportunityId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Updated opportunity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Illegal status transition
+        '404':
+          description: Opportunity not found
   /integrations:
     get:
       summary: List integration accounts
