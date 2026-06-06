@@ -49,7 +49,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 | WP-0.3 Worker-Härtung + Sitemap-Index + Fixture/Echt-Smoke | crawler | M | — | crawl-engine.md |
 | WP-0.4 Connector-Contract (GSC/GA4/PSI Stub) ✅ | integrations/api | M | — | integrations.md — Vertrag + Stubs + `runConnectorSync` (raw≠normalized, Confidence B, status/quota/freshness) + `POST /integrations/{id}/sync` + Tests; Follow-up: Worker verarbeitet `connector_sync` über dieses Endpoint |
 | WP-0.5 Web Vitals (PSI/Lighthouse) | api/crawler/web | M | WP-0.4 | crawl-engine.md |
-| WP-0.6 Interner Linkgraph | domain/api/crawler/web | M | WP-0.3 | crawl-engine.md |
+| WP-0.6 Interner Linkgraph (API-seitig) ✅ | domain/api/crawler/web | M | WP-0.3 | crawl-engine.md — Migration `003_internal_link_edges`, `link-graph-store` (Inlinks/Outlinks/Orphans, paginiert), Routen `internal-links`/`orphan-urls` + Tests; Follow-up: Crawler befüllt Edges, UI-Anzeige |
 | WP-0.7 Modularisierung + Kern-Tests ✅ | api/test | M | — | observability-sre.md — Kern-Tests ✅ (`core-coverage.test.ts`); Routen modularisiert ✅ (`apps/api/src/routes/*`); Rest: Validatoren-Split + Log-Korrelation optional |
 | WP-1.1 Source Map real (minimal) | api/web | M | — | source-map.md |
 | WP-1.2 Opportunity+Evidence Schema/API | domain/api | L | — | content-opportunities.md, §6 |

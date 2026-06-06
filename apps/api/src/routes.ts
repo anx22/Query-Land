@@ -4,6 +4,7 @@ import { routeCrawlRuns } from "./routes/crawl-runs.js";
 import { routeDiscoveredUrls } from "./routes/discovered-urls.js";
 import { routeHealthScores } from "./routes/health-scores.js";
 import { routeIntegrations } from "./routes/integrations.js";
+import { routeInternalLinks } from "./routes/internal-links.js";
 import { routeJobs } from "./routes/jobs.js";
 import { routeSites } from "./routes/sites.js";
 import { routeSourceMap } from "./routes/source-map.js";
@@ -19,6 +20,7 @@ const resourceRoutes: ResourceRoute[] = [
   routeHealthScores,
   routeAuditIssues,
   routeDiscoveredUrls,
+  routeInternalLinks,
   routeIntegrations,
   routeJobs,
   routeSourceMap
