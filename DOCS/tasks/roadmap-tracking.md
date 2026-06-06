@@ -3,6 +3,10 @@
 > Zweck: offizielles Tracking-Dokument für den aktuellen Implementierungsstand nach der Foundation- und Crawl-Pipeline-Arbeit. Dieses Dokument ergänzt `docs/PRODUCT_MASTER_SPEC.md` §10 und die Wave-Backlogs in `tasks/`.
 >
 > Stand: 2026-06-05 · Quelle: Code-/Test-Bestandsaufnahme inklusive Worker-v0- und Technical-Audit-UI-Slice.
+>
+> **Operative Umsetzung:** Die nach Komplexität/Abhängigkeit/Modul geschnittenen Arbeitspakete und kopierbaren
+> Codex-Prompts stehen in `tasks/codex-execution-plan.md` (Milestone-Leiter M0–M6). Dieses Dokument bleibt die
+> Bestandsaufnahme/Gate-Ebene; der Ausführungsplan ist die Arbeitsebene.
 
 ## 1. Dokumentationsstruktur und Wahrheitsebenen
 
