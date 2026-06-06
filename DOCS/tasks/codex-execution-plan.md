@@ -50,7 +50,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 | WP-0.4 Connector-Contract (GSC/PSI Stub real) | integrations/api | M | — | integrations.md |
 | WP-0.5 Web Vitals (PSI/Lighthouse) | api/crawler/web | M | WP-0.4 | crawl-engine.md |
 | WP-0.6 Interner Linkgraph | domain/api/crawler/web | M | WP-0.3 | crawl-engine.md |
-| WP-0.7 Modularisierung + Kern-Tests | api/test | M | — | observability-sre.md |
+| WP-0.7 Modularisierung + Kern-Tests | api/test | M | — | observability-sre.md — Kern-Tests ✅ (`apps/api/test/core-coverage.test.ts`); Modularisierung offen |
 | WP-1.1 Source Map real (minimal) | api/web | M | — | source-map.md |
 | WP-1.2 Opportunity+Evidence Schema/API | domain/api | L | — | content-opportunities.md, §6 |
 | WP-1.3 Erster Generator + Re-Check-Scheduler | crawler/api | M | WP-1.2 (1.1 optional) | §6.5/§6.6 |
