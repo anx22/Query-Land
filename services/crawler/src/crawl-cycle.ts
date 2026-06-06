@@ -4,7 +4,7 @@ import { evaluateAuditIssues } from "./audit-rules.js";
 import { fetchUrl } from "./fetch-url.js";
 import { extractOutgoingLinks } from "./link-extraction.js";
 import { isRobotsAllowed, loadRobotsPolicy } from "./robots.js";
-import { createDiscoveredUrl, discoverUrlsFromSitemap, extractSitemapLocations } from "./sitemap.js";
+import { createDiscoveredUrl, discoverUrlsFromSitemapIndex, extractSitemapLocations } from "./sitemap.js";
 import type { AuditPageInput, CrawlWorkerCycleOptions, CrawlWorkerCycleResult, RobotsPolicy } from "./types.js";
 import { isInCrawlScope, normalizeCrawlUrl } from "./url-normalization.js";
 
@@ -42,7 +42,19 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     const sitemapFetch = await fetchUrl({ url: sitemapUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
     const sitemapXml = sitemapFetch.responseBody ?? "";
     const discovered = sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300
-      ? discoverUrlsFromSitemap({ projectId: job.projectId, siteId, baseUrl, sitemapUrl, sitemapXml, discoveredAt: now() })
+      ? await discoverUrlsFromSitemapIndex({
+        projectId: job.projectId,
+        siteId,
+        baseUrl,
+        sitemapUrl,
+        sitemapXml,
+        discoveredAt: now(),
+        fetchImpl: options.fetchImpl,
+        timeoutMs: options.fetchTimeoutMs,
+        retry: options.retry,
+        maxIndexDepth: options.maxSitemapIndexDepth,
+        maxSitemapFetches: options.maxSitemapFetches
+      })
       : [createDiscoveredUrl({ projectId: job.projectId, siteId, baseUrl, url: baseUrl, source: "seed", depth: 0, discoveredAt: now() })];
 
     if (sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300 && extractSitemapLocations(sitemapXml).length === 0) {
@@ -72,7 +84,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
         continue;
       }
 
-      const fetchResult = await fetchUrl({ url: discoveredUrl.normalizedUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
+      const fetchResult = await fetchUrl({ url: discoveredUrl.normalizedUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5 });
       fetchesByUrl.set(discoveredUrl.normalizedUrl, fetchResult);
       const storedFetch = await options.apiClient.recordFetchResult(job.projectId, siteId, discoveredUrl.id, fetchResult);
       const page: AuditPageInput = {
@@ -147,7 +159,7 @@ async function populateOutgoingLinkStatuses(input: {
 
   for (const link of remainingChecks) {
     if (input.fetchesByUrl.has(link)) continue;
-    const result = await fetchUrl({ url: link, fetchImpl: input.options.fetchImpl, fetchedAt: input.now(), timeoutMs: input.options.fetchTimeoutMs, retry: input.options.retry });
+    const result = await fetchUrl({ url: link, fetchImpl: input.options.fetchImpl, fetchedAt: input.now(), timeoutMs: input.options.fetchTimeoutMs, retry: input.options.retry, maxRedirects: input.options.maxRedirects ?? 5 });
     input.fetchesByUrl.set(link, result);
   }
 

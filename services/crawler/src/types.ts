@@ -19,6 +19,14 @@ export interface SitemapDiscoveryInput extends CrawlSeedInput {
   discoveredAt?: string;
 }
 
+export interface SitemapIndexDiscoveryInput extends SitemapDiscoveryInput {
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+  retry?: FetchRetryPolicy;
+  maxIndexDepth?: number;
+  maxSitemapFetches?: number;
+}
+
 export interface FetchRetryPolicy {
   maxAttempts: number;
   delayMs?: number;
@@ -30,6 +38,7 @@ export interface FetchWorkerInput {
   fetchedAt?: string;
   timeoutMs?: number;
   retry?: FetchRetryPolicy;
+  maxRedirects?: number;
 }
 
 export interface AuditPageInput {
@@ -71,7 +80,10 @@ export interface CrawlWorkerCycleOptions {
   maxUrls?: number;
   fetchTimeoutMs?: number;
   retry?: FetchRetryPolicy;
+  maxRedirects?: number;
   maxOutgoingLinkChecks?: number;
+  maxSitemapIndexDepth?: number;
+  maxSitemapFetches?: number;
 }
 
 export interface CrawlWorkerCycleResult {
