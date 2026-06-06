@@ -2,7 +2,7 @@
 
 > Zweck: offizielles Tracking-Dokument für den aktuellen Implementierungsstand nach der Foundation- und Crawl-Pipeline-Arbeit. Dieses Dokument ergänzt `docs/PRODUCT_MASTER_SPEC.md` §10 und die Wave-Backlogs in `tasks/`.
 >
-> Stand: 2026-06-05 · Quelle: Code-/Test-Bestandsaufnahme inklusive Worker-v0- und Technical-Audit-UI-Slice.
+> Stand: 2026-06-06 · Quelle: Code-/Test-Bestandsaufnahme inklusive Worker-v0-, Technical-Audit-UI-Slice und M4-Authority-Modul.
 >
 > **Operative Umsetzung:** Die nach Komplexität/Abhängigkeit/Modul geschnittenen Arbeitspakete und kopierbaren
 > Codex-Prompts stehen in `tasks/codex-execution-plan.md` (Milestone-Leiter M0–M6). Dieses Dokument bleibt die
@@ -83,6 +83,21 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | Web Vitals | nicht implementiert | todo | PSI/Lighthouse Connector oder Stub |
 
 **Welle-2-Entscheidung:** Der API-/Persistenzkern plus Worker-v0 und Technical-Audit-UI reichen für einen vertikalen Slice. Der nächste Schwerpunkt ist Stabilisierung, echte Site-Smokes und Bedienhärtung statt weiterer Tabellen.
+
+### 4.3 Welle 5 — Authority/Backlinks ✅ abgeschlossen (M4)
+
+**Master-Gate:** neue/verlorene Links nachvollziehbar.
+
+| Slice | Backend | UI | Status |
+|---|---|---|---|
+| GSC-Links-Import (Stub Klasse B) | `importBacklinks` in `backlink-store`; deterministischer Stub variiert pro Snapshot-Runde | Import-Button auf `/backlinks` | done |
+| Snapshot-Modell (`010_backlinks.sql`) | `backlink_snapshots` + `backlinks`; aktuell = letzter Snapshot je Projekt | — | done |
+| Referring-Domain-Aggregation | `aggregateReferringDomains` + `GET /referring-domains` | Tabelle auf `/backlinks` | done |
+| New/Lost-Diff | `diffBacklinks` (letzter vs. vorletzter Snapshot) + `GET /backlinks/diff` | Diff-Anzeige auf `/backlinks` | done |
+| Authority-Intelligence | `summarizeAuthority` (Follow-Ratio, Top-Domains, Top-Anchors, Top-Target-URLs) + `GET /authority` | Summary-Karte auf `/backlinks` | done |
+| Read-only MCP-Tools | `get_authority_summary`, `list_referring_domains`, `get_backlink_changes` in `services/mcp` | — | done |
+
+**Offene Follow-ups (nicht gate-kritisch):** echter GSC-OAuth-Provider (GAP-AUTH-001, DEC-002); Drittanbieter-Backlink-Quellen Klasse D (GAP-AUTH-002); Competitor-Gap-Analyse (GAP-AUTH-003); historische Snapshot-Tiefe aus echtem GSC (GAP-AUTH-004). Architektur-Dokumentation: `architecture/authority-backlinks.md`.
 
 ## 5. Offizielle nächste Sprint-Sequenz
 
@@ -170,6 +185,10 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | GAP-PERSIST-001 | Persistenz/Infra | Production nutzt ephemeres `/tmp`-SQLite (kein geteilter/dauerhafter Zustand auf Vercel-Serverless) | **Ganz späteres Vorhaben:** Persistenz in netzwerk-erreichbaren Dienst auslagern (Turso/libSQL als geringster Umbau, alternativ Neon-Postgres). Architektur-Skizze: `architecture/serverless-persistence-turso.md` | P3 | später (≥ Welle 3, vor produktiver Mehrnutzer-Persistenz) |
 | GAP-DOC-001 | Domain-Dokumentation | `CONTEXT.md` ist neu und muss bei Architekturentscheidungen mitgeführt werden | Neue load-bearing Domain-Begriffe aus Reviews sofort in `CONTEXT.md` und passende Task-/Spec-Dokumente übernehmen | P1 | laufend |
 | GAP-SMOKE-001 | Deployment-Smoke | Production Smoke Target ist definiert, aber noch nicht automatisiert | Browser-/Log-Smokes gegen `https://queryland-inky.vercel.app/` als manuelles Gate dokumentieren und später automatisieren | P1 | B/C |
+| GAP-AUTH-001 | Authority / Provider | GSC-Link-Import nutzt deterministischen Stub (DEC-002 offen) | Echten GSC-OAuth-Connector implementieren; refresh token, quota, normalisierte Links; Confidence bleibt Klasse B | P2 | Welle 5+ |
+| GAP-AUTH-002 | Authority / Provider | Drittanbieter-Backlink-APIs (Ahrefs, Moz, Majestic) nicht angebunden | Erst bei Lizenzvertrag; separater Provider-Adapter hinter Connector-Interface §4.2; Klasse D kommunizieren | P3 | später |
+| GAP-AUTH-003 | Authority / Analyse | Competitor-Backlink-Gap fehlt (kein fremdes Linkprofil) | Authority-Gap-Analyse als M6+-Erweiterung; setzt GAP-AUTH-002 voraus | P3 | Welle 6+ |
+| GAP-AUTH-004 | Authority / Historisch | Snapshots decken nur laufende Sessions ab | Mit echtem GSC-Provider historische Daten (bis 16 Monate) nachladen; Schema bereits kompatibel | P2 | Welle 5+ |
 
 ## 7. Abschlusskriterien bis App-MVP
 

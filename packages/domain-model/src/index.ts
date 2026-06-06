@@ -1,4 +1,5 @@
 export * from "./auth.js";
+export * from "./backlinks.js";
 export * from "./crawl.js";
 export * from "./errors.js";
 export * from "./integrations.js";

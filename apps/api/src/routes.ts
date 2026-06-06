@@ -1,5 +1,6 @@
 import { apiError, type ApiResponse } from "./http.js";
 import { routeAuditIssues } from "./routes/audit-issues.js";
+import { routeBacklinks } from "./routes/backlinks.js";
 import { routeCrawlRuns } from "./routes/crawl-runs.js";
 import { routeDiscoveredUrls } from "./routes/discovered-urls.js";
 import { routeHealthScores } from "./routes/health-scores.js";
@@ -31,6 +32,7 @@ const resourceRoutes: ResourceRoute[] = [
   routeKeywords,
   routeRank,
   routeSearchPerformance,
+  routeBacklinks,
   routeIntegrations,
   routeJobs,
   routeSourceMap

@@ -1472,6 +1472,188 @@ paths:
           description: changedPaths missing or empty
         '404':
           description: Project not found
+  /projects/{projectId}/backlinks/import:
+    post:
+      summary: Import a GSC backlinks snapshot (deterministic stub, class B, §5 Modul 5)
+      operationId: importBacklinks
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Snapshot imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      snapshotId:
+                        type: string
+                      totalBacklinks:
+                        type: integer
+                      referringDomains:
+                        type: integer
+                      capturedAt:
+                        type: string
+        '400':
+          description: No site configured for the project
+        '404':
+          description: Project not found
+  /projects/{projectId}/backlinks:
+    get:
+      summary: List backlinks from the latest snapshot
+      operationId: listBacklinks
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backlinks (latest snapshot)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  meta:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/backlinks/diff:
+    get:
+      summary: New/lost backlinks and referring domains (latest vs previous snapshot)
+      operationId: backlinkDiff
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backlink diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      newBacklinks:
+                        type: array
+                        items:
+                          type: object
+                      lostBacklinks:
+                        type: array
+                        items:
+                          type: object
+                      newReferringDomains:
+                        type: array
+                        items:
+                          type: string
+                      lostReferringDomains:
+                        type: array
+                        items:
+                          type: string
+                      netBacklinkChange:
+                        type: integer
+                      netReferringDomainChange:
+                        type: integer
+        '404':
+          description: No backlink snapshots imported yet
+  /projects/{projectId}/referring-domains:
+    get:
+      summary: Aggregated referring domains from the latest snapshot
+      operationId: listReferringDomains
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Referring domains
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/authority:
+    get:
+      summary: Authority summary (follow ratio, top referring domains, anchors, targets)
+      operationId: authoritySummary
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authority summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/backlink-snapshots:
+    get:
+      summary: Backlink snapshot history for a project
+      operationId: listBacklinkSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Snapshot history (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
 components:
   securitySchemes:
     bearerAuth:

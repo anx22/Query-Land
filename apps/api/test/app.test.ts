@@ -19,7 +19,7 @@ test("SQLite migrations are versioned and idempotent", () => {
   const db = new DatabaseSync(":memory:");
   try {
     const first = runSQLiteMigrations(db);
-    assert.deepEqual(first.applied.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql"]);
+    assert.deepEqual(first.applied.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql"]);
     assert.deepEqual(first.skipped, []);
 
     const recorded = db.prepare(`SELECT version, name FROM schema_migrations ORDER BY version`).all()
@@ -33,12 +33,13 @@ test("SQLite migrations are versioned and idempotent", () => {
       { version: 6, name: "rank_serp" },
       { version: 7, name: "visibility" },
       { version: 8, name: "search_performance" },
-      { version: 9, name: "pr_checks" }
+      { version: 9, name: "pr_checks" },
+      { version: 10, name: "backlinks" }
     ]);
 
     const second = runSQLiteMigrations(db);
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql"]);
+    assert.deepEqual(second.skipped.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql"]);
   } finally {
     db.close();
   }
