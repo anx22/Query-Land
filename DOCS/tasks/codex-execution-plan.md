@@ -12,14 +12,14 @@
 |---|---|---|
 | Plattform-Typ (DEC-001) | **Content + SaaS** | Crawl-Fixtures (W2) und Opportunity-Klassen (W4) auf Content/SaaS zuschneiden; kein Shop-Facetten-Sonderfall vorerst |
 | MCP/Agent-Timing (DEC-004) | **Nach Welle 4** | MCP-Tools erst bauen, wenn Opportunities existieren (sinnvolle `list_opportunities`/`explain_opportunity`) |
-| AuthZ-Tiefe | **Single-Tenant intern, minimal** | Session-Gate vor Business-Endpunkten genügt; volle per-Projekt-RBAC erst vor produktivem Mehrnutzer-Einsatz |
+| AuthZ-Tiefe | **Single-Tenant intern, minimal — ans Ende verschoben** | Bewusst KEIN Login-Gate während der Entwicklung (schnelleres, login-freies Testen/Frickeln). Das minimale Session-Gate kommt als letztes Paket vor produktivem Einsatz; volle per-Projekt-RBAC noch später. |
 | Vorgehen/Reihenfolge | **An Agent delegiert** | Sequenz siehe unten (Begründung: erst Gates + günstige Härtung, dann Opportunity-Rückgrat als konzeptionelles Zentrum, dann Wellen 3→7) |
 
 Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Empfehlung DACH), DEC-005 (Open-Source/Souveränität), GAP-PERSIST-001 (Turso/Neon vor produktivem Dauerbetrieb, siehe `architecture/serverless-persistence-turso.md`).
 
 ## Sequenz-Begründung
 
-1. **M0 zuerst** — billig, hohe Hebelwirkung: die schon fast fertigen W1/W2-Gates formal schließen und die in der Roadmap unterrepräsentierten *gate-kritischen* Posten (interner Linkgraph, Web Vitals) nachziehen. Härten, bevor wir mehr darauf bauen.
+1. **M0 zuerst** — billig, hohe Hebelwirkung: die schon fast fertigen W1/W2-Gates formal schließen und die in der Roadmap unterrepräsentierten *gate-kritischen* Posten (interner Linkgraph, Web Vitals) nachziehen. Härten, bevor wir mehr darauf bauen. **AuthZ ist bewusst NICHT in M0** — kein Login-Gate während der Entwicklung, damit login-frei getestet werden kann (siehe „Spätestes Paket").
 2. **M1 danach** — das **Opportunity-Rückgrat (§6)** ist das konzeptionelle Zentrum des Produkts. Früh ein minimales Rückgrat + den ersten Generator (§6.6, binär validierbarer Indexierbarkeits-Fix) zu bauen, lässt Audit-Issues schon als echte Opportunities entstehen und beweist den Validierungsloop — ohne die volle Welle 4. Minimale **Source Map** kommt mit, weil `source_anchor` ein Opportunity-Feld und der Differenzierer (§1.3) ist.
 3. **M2→M6** folgen der Master-Wellen-Reihenfolge (Keyword → Opportunity-Engine-Vollausbau → Authority → Reporting → AI), MCP nach W4 eingeschoben.
 
@@ -31,7 +31,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 
 | Milestone | Welle | Inhalt | Gate |
 |---|---|---|---|
-| **M0 Gates & Härtung** | 1–2 | AuthZ-minimal, W1-UI-Smoke, Worker-Härtung+Echt-Site-Smoke, Linkgraph, Web Vitals, Connector-Contract, Modularisierung+Tests | W1 & W2 Gates bewiesen, `npm run check` grün |
+| **M0 Gates & Härtung** | 1–2 | W1-UI-Smoke, Worker-Härtung+Echt-Site-Smoke, Linkgraph, Web Vitals, Connector-Contract, Modularisierung+Tests (**ohne AuthZ**) | W1 & W2 Gates bewiesen, `npm run check` grün |
 | **M1 Opportunity-Rückgrat** | 4 (vorgezogen) | Minimale Source Map real, Opportunity+Evidence-Schema/API, erster Generator + Re-Check-Scheduler, Opportunity Board v0 + URL Dossier v0 | Ein Indexierbarkeits-Fix durchläuft open→implemented→validated mit echter Vorher/Nachher-Messung |
 | **M2 Keyword Core** | 3 | Keyword-Bibliothek+Clustering+Intent, Rank-Tracking+SERP-Snapshots/Diffs, Visibility-Index | tägliche Verläufe, Export, Alerts |
 | **M3 Opportunity Engine + MCP** | 4 | Search-Performance-Intelligence (GSC), 5 Opportunity-Klassen, Prioritätsscore, Source-Map Pre-Merge-Gate, **MCP read-only** | jede Empfehlung mit Evidenz+Score+Validierungsmetrik; Agent beantwortet read-only Fragen |
@@ -45,8 +45,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 
 | WP | Modul | Komplexität | Abhängig von | Spec |
 |---|---|---|---|---|
-| WP-0.1 AuthZ-minimal | api | S | — | security-privacy.md |
-| WP-0.2 W1 UI-Smoke | web/test | S | WP-0.1 | UX_FLOWS.md |
+| WP-0.2 W1 UI-Smoke | web/test | S | — | UX_FLOWS.md |
 | WP-0.3 Worker-Härtung + Sitemap-Index + Fixture/Echt-Smoke | crawler | M | — | crawl-engine.md |
 | WP-0.4 Connector-Contract (GSC/PSI Stub real) | integrations/api | M | — | integrations.md |
 | WP-0.5 Web Vitals (PSI/Lighthouse) | api/crawler/web | M | WP-0.4 | crawl-engine.md |
@@ -67,21 +66,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 
 ## Kopierbare Codex-Prompts
 
-### WP-0.1 — AuthZ-minimal (Session-Gate, single-tenant)
-```text
-Nutze docs/PRODUCT_MASTER_SPEC.md (§4.1, §12.4) und specs/security-privacy.md als Detailebene.
-Scope: NUR minimale Autorisierung für den internen Single-Tenant-Betrieb. KEINE volle per-Projekt-RBAC.
-Ist-Zustand: Auth (scrypt, Sessions, Bearer-Token) existiert in apps/api/src/stores/auth-store.ts; Business-Endpunkte in
-apps/api/src/routes.ts/app.ts haben aber KEIN Session-Gate (alle öffentlich).
-Aufgabe:
-- Führe eine Gate-Funktion in apps/api/src/app.ts ein, die für alle nicht-/auth- und nicht-/health-Routen einen gültigen
-  Bearer-Token verlangt (über getUserBySessionToken). Ungültig/fehlend -> 401 im bestehenden Fehlerformat.
-- Schreibe Audit-Log-Einträge (audit-log.ts) für abgelehnte Zugriffe.
-- Rufe cleanupExpiredSessions() periodisch oder beim Login auf (derzeit tote Funktion).
-Tests zuerst: Zugriff ohne/mit ungültigem/mit gültigem Token auf je einen Lese- und Schreib-Endpunkt.
-Akzeptanz: npm run check grün; geschützte Endpunkte ohne Token -> 401; mit Token -> wie bisher.
-Lege alle Annahmen offen. Dokumentiere, was bewusst NICHT abgedeckt ist (per-Projekt-RBAC = späteres Paket).
-```
+> **AuthZ ist bewusst ans Ende verschoben** (login-freies Testen). Der Prompt steht unter „Spätestes Paket — vor produktivem Einsatz" am Dokumentende.
 
 ### WP-0.2 — Welle-1-UI-Smoke
 ```text
@@ -226,4 +211,28 @@ dann-aktuellen Ist-Zustand-Delta ergänzen. Reihenfolge & Module:
 - **M5 (W6, `prompts/codex-reporting.md`)**: Report-Typen → Export PDF/CSV → Versand E-Mail/Slack → Alerts.
 - **M6 (W7, `prompts/codex-ai-layer.md`)**: Prompt/Citation/Mention/Referral-Tracking → AEO-Checks → MCP-Schreibtools (create_dev_ticket/propose_fix_pr, reviewpflichtig §4.4).
 
-**Querschnitt vor produktivem Dauerbetrieb:** GAP-PERSIST-001 (Persistenz-Dienst, `architecture/serverless-persistence-turso.md`) und volle per-Projekt-RBAC.
+**Querschnitt vor produktivem Dauerbetrieb:** WP-Z.1 (AuthZ-minimal, siehe unten), GAP-PERSIST-001 (Persistenz-Dienst, `architecture/serverless-persistence-turso.md`) und volle per-Projekt-RBAC.
+
+---
+
+## Spätestes Paket — vor produktivem Einsatz
+
+> Bewusst ganz am Ende: Während der gesamten Entwicklung läuft alles **ohne Login-Gate**, damit schnell und login-frei
+> getestet werden kann. Erst unmittelbar vor produktivem Einsatz wird das minimale Session-Gate aktiviert.
+
+### WP-Z.1 — AuthZ-minimal (Session-Gate, single-tenant)
+```text
+Nutze docs/PRODUCT_MASTER_SPEC.md (§4.1, §12.4) und specs/security-privacy.md als Detailebene.
+Scope: NUR minimale Autorisierung für den internen Single-Tenant-Betrieb. KEINE volle per-Projekt-RBAC.
+Ist-Zustand: Auth (scrypt, Sessions, Bearer-Token) existiert in apps/api/src/stores/auth-store.ts; Business-Endpunkte in
+apps/api/src/routes.ts/app.ts haben bewusst KEIN Session-Gate (login-freie Entwicklung). Jetzt aktivieren.
+Aufgabe:
+- Führe eine Gate-Funktion in apps/api/src/app.ts ein, die für alle nicht-/auth- und nicht-/health-Routen einen gültigen
+  Bearer-Token verlangt (über getUserBySessionToken). Ungültig/fehlend -> 401 im bestehenden Fehlerformat.
+- Optional per ENV (z.B. AUTH_GATE_ENABLED) schaltbar, damit lokales login-freies Testen weiter möglich bleibt.
+- Schreibe Audit-Log-Einträge (audit-log.ts) für abgelehnte Zugriffe.
+- Rufe cleanupExpiredSessions() periodisch oder beim Login auf (derzeit tote Funktion).
+Tests zuerst: Zugriff ohne/mit ungültigem/mit gültigem Token auf je einen Lese- und Schreib-Endpunkt.
+Akzeptanz: npm run check grün; bei aktivem Gate geschützte Endpunkte ohne Token -> 401, mit Token -> wie bisher.
+Lege alle Annahmen offen. Dokumentiere, was bewusst NICHT abgedeckt ist (per-Projekt-RBAC = noch späteres Paket).
+```
