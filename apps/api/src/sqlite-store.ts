@@ -51,7 +51,7 @@ export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Backen
     withDomainValidation(createProjectStore(db, audit)),
     createCrawlStore(db, audit),
     createJobStore(db, audit),
-    createSourceMapStore(db),
+    createSourceMapStore(db, audit),
     createLinkGraphStore(db, audit),
     withDomainValidation(createOpportunityStore(db, audit)),
     { close: () => db.close() }

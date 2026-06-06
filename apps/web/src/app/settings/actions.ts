@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { apiPost } from "../../lib/api-client";
 import { createFoundationIntegration, createFoundationJob } from "../../lib/foundation-api";
 
 const allowedProviders = ["gsc", "ga4"] as const;
@@ -38,6 +39,25 @@ export async function scheduleConnectorSyncAction(formData: FormData) {
 
   revalidateSettingsViews();
   redirect(`/settings?scheduled=${provider}`);
+}
+
+export async function createSourceMapEntryAction(formData: FormData) {
+  try {
+    const projectId = requiredString(formData, "projectId");
+    await apiPost("/source-map", {
+      projectId,
+      repoUrl: requiredString(formData, "repoUrl"),
+      urlPattern: requiredString(formData, "urlPattern"),
+      templateName: requiredString(formData, "templateName"),
+      component: requiredString(formData, "component"),
+      repoPath: requiredString(formData, "repoPath")
+    });
+  } catch (error) {
+    redirect(`/settings?error=${encodeURIComponent(messageFor(error))}`);
+  }
+
+  revalidateSettingsViews();
+  redirect("/settings?sourcemap=1");
 }
 
 function revalidateSettingsViews(): void {

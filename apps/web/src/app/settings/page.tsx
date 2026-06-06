@@ -1,7 +1,7 @@
 import { AppShell } from "../../components/app-shell";
 import { StatusList } from "../../components/status-list";
 import { loadFoundationDashboardData } from "../../lib/foundation-api";
-import { createConnectorAction, scheduleConnectorSyncAction } from "./actions";
+import { createConnectorAction, createSourceMapEntryAction, scheduleConnectorSyncAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const params = await searchParams;
   const data = await loadFoundationDashboardData();
   const selectedProject = data.selectedProject;
-  const feedback = feedbackMessage(params?.created, params?.scheduled, params?.error);
+  const feedback = feedbackMessage(params?.created, params?.scheduled, params?.error, params?.sourcemap);
   const connectorItems = data.integrations.length > 0
     ? data.integrations.map((integration) => ({
       id: integration.id,
@@ -117,6 +117,39 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       <section className="content-grid">
         <div className="card">
+          <p className="kicker">Source Map (§4.3)</p>
+          <h2>URL → Template → Repo</h2>
+          <p className="muted">Der Differenzierer: ordne URLs ihrem Quellcode zu, damit Opportunities einen Source-Anker tragen (ein Fix am Template korrigiert alle betroffenen URLs).</p>
+          <form className="form-card" action={createSourceMapEntryAction}>
+            <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
+            <label>URL-Pattern<input name="urlPattern" placeholder="https://example.com/pricing" required /></label>
+            <label>Repo-URL<input name="repoUrl" placeholder="https://github.com/acme/site" required /></label>
+            <label>Template<input name="templateName" placeholder="PricingPage" required /></label>
+            <label>Component<input name="component" placeholder="Pricing" required /></label>
+            <label>Repo-Pfad<input name="repoPath" placeholder="apps/web/app/pricing/page.tsx" required /></label>
+            <button className="button" type="submit" disabled={!data.connected || !selectedProject}>Mapping speichern</button>
+          </form>
+        </div>
+        <div className="card">
+          <p className="kicker">Aktuelle Source-Map-Einträge</p>
+          {data.sourceMap.length > 0 ? (
+            <div className="table-list">
+              {data.sourceMap.map((entry) => (
+                <article key={entry.id}>
+                  <strong>{entry.urlPattern}</strong>
+                  <span>{entry.template} · {entry.repoPath}</span>
+                  <span className="muted">Confidence: {entry.confidence}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p>Noch keine Source-Map-Einträge. Lege oben eine URL→Repo-Zuordnung an.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="content-grid">
+        <div className="card">
           <p className="kicker">Open Source &amp; Souveränität</p>
           <h2>Open-source-first Guardrails</h2>
           <p>
@@ -137,9 +170,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   );
 }
 
-function feedbackMessage(created: string | string[] | undefined, scheduled: string | string[] | undefined, error: string | string[] | undefined): { kind: "success" | "danger"; message: string } | null {
+function feedbackMessage(created: string | string[] | undefined, scheduled: string | string[] | undefined, error: string | string[] | undefined, sourcemap: string | string[] | undefined): { kind: "success" | "danger"; message: string } | null {
   const errorValue = Array.isArray(error) ? error[0] : error;
   if (errorValue) return { kind: "danger", message: errorValue };
+  const sourcemapValue = Array.isArray(sourcemap) ? sourcemap[0] : sourcemap;
+  if (sourcemapValue) return { kind: "success", message: "Source-Map-Eintrag wurde gespeichert." };
   const createdValue = Array.isArray(created) ? created[0] : created;
   if (createdValue) return { kind: "success", message: `${createdValue.toUpperCase()} Connector-Stub wurde gespeichert.` };
   const scheduledValue = Array.isArray(scheduled) ? scheduled[0] : scheduled;

@@ -814,6 +814,102 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/SourceMapEntry'
+    post:
+      summary: Upsert a url->template->repo source map entry (§4.3)
+      operationId: upsertSourceMapEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Source map entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SourceMapEntry'
+        '400':
+          description: Missing fields
+        '404':
+          description: Project not found
+  /source-map/resolve:
+    get:
+      summary: Resolve the source anchor for a URL (exact or longest-prefix match)
+      operationId: resolveSourceAnchor
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved anchor or null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+  /projects/{projectId}/deploy-markers:
+    get:
+      summary: List deploy markers for a project
+      operationId: listDeployMarkers
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deploy markers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Create a deploy marker (for crawl/GSC delta correlation, §4.3)
+      operationId: createDeployMarker
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                commitSha:
+                  type: string
+      responses:
+        '201':
+          description: Deploy marker created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
 components:
   securitySchemes:
     bearerAuth:
