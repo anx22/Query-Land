@@ -109,6 +109,28 @@ test("job queue claims a queued job exactly once and completes it", () => {
   store.close();
 });
 
+test("POST /crawl-runs/schedule creates a crawl run and typed crawl_seed job together", async () => {
+  const { app, store } = testApp();
+  const response = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs/schedule", {
+    trigger: "manual",
+    baseUrl: "https://example.com",
+    sitemapUrl: "https://example.com/sitemap.xml"
+  });
+  assert.equal(response.status, 201);
+  const body = response.body as { data: { crawlRun: { id: string; status: string }; job: { type: string; subject: string; payload: Record<string, unknown> } } };
+  assert.equal(body.data.crawlRun.status, "running");
+  assert.equal(body.data.job.type, "crawl_seed");
+  assert.equal(body.data.job.subject, `https://example.com/:run:${body.data.crawlRun.id}`);
+  assert.deepEqual(body.data.job.payload, {
+    siteId: "site-demo",
+    baseUrl: "https://example.com/",
+    crawlRunId: body.data.crawlRun.id,
+    sitemapUrl: "https://example.com/sitemap.xml",
+    subject: `https://example.com/:run:${body.data.crawlRun.id}`
+  });
+  store.close();
+});
+
 test("POST /integrations assigns provider source confidence", async () => {
   const { app, store } = testApp();
   const response = await app("POST", "/integrations", { projectId: "proj-demo", provider: "matomo" });

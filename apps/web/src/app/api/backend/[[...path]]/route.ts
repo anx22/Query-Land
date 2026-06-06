@@ -18,7 +18,7 @@ async function handle(request: NextRequest, context: RouteContext): Promise<Next
     return NextResponse.json({ error: { code: "invalid_json", message: "Request body must be valid JSON", requestId } }, { status: 400 });
   }
 
-  const apiResponse = await callInternalApi(request.method, `/${path.join("/")}`, body, {
+  const apiResponse = await callInternalApi(request.method, forwardedPath(path, request.nextUrl.search), body, {
     headers: {
       authorization: request.headers.get("authorization") ?? undefined,
       "x-request-id": requestId
@@ -26,6 +26,10 @@ async function handle(request: NextRequest, context: RouteContext): Promise<Next
   });
 
   return NextResponse.json(apiResponse.body, { status: apiResponse.status });
+}
+
+function forwardedPath(path: string[], search: string): string {
+  return `/${path.join("/")}${search}`;
 }
 
 async function parseJsonBody(request: NextRequest): Promise<unknown> {

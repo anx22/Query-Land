@@ -138,6 +138,36 @@ function apiClientForStore(store: SQLiteStore): CrawlWorkerApiClient {
   };
 }
 
+test("crawl worker creates a crawl run when legacy crawl_seed payload has no crawlRunId", async () => {
+  const store = createSQLiteStore("sqlite::memory:");
+  const app = createApp(store);
+  await app("POST", "/jobs", {
+    projectId: "proj-demo",
+    type: "crawl_seed",
+    subject: "https://example.com",
+    payload: { siteId: "site-demo", baseUrl: "https://example.com", sitemapUrl: "https://example.com/sitemap.xml" }
+  });
+
+  const result = await runCrawlWorkerCycle({
+    apiClient: apiClientForStore(store),
+    fetchImpl: async (url: string | URL | Request) => {
+      const requestedUrl = String(url);
+      if (requestedUrl.endsWith("/sitemap.xml")) {
+        return new Response("<urlset><url><loc>https://example.com</loc></url></urlset>", { status: 200, headers: { "content-type": "application/xml" } });
+      }
+      return new Response("<html><head><title>Seed</title></head></html>", { status: 200, headers: { "content-type": "text/html" } });
+    },
+    now: () => "2026-06-03T10:00:00.000Z"
+  });
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(typeof result.crawlRunId, "string");
+  const runs = envelopeData<Array<{ id: string; status: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/crawl-runs"));
+  assert.equal(runs[0]?.id, result.crawlRunId);
+  assert.equal(runs[0]?.status, "succeeded");
+  store.close();
+});
+
 test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end", async () => {
   const store = createSQLiteStore("sqlite::memory:");
   const app = createApp(store);

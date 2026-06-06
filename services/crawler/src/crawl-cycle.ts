@@ -1,4 +1,4 @@
-import type { DiscoveredUrl, FetchResult } from "@seo-tool/domain-model";
+import { validateCrawlSeedJobPayload, type DiscoveredUrl, type FetchResult } from "@seo-tool/domain-model";
 import { assessIndexability } from "./indexability.js";
 import { evaluateAuditIssues } from "./audit-rules.js";
 import { fetchUrl } from "./fetch-url.js";
@@ -22,16 +22,17 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     return { claimed: true, jobId: job.id, status: completed.status };
   }
 
-  const payload = job.payload ?? {};
-  const siteId = stringPayload(payload, "siteId");
-  const baseUrl = stringPayload(payload, "baseUrl") || job.subject;
-  const sitemapUrl = stringPayload(payload, "sitemapUrl") || normalizeCrawlUrl("/sitemap.xml", baseUrl);
-  let crawlRunId = stringPayload(payload, "crawlRunId");
+  let siteId = "";
+  let baseUrl = "";
+  let sitemapUrl = "";
+  let crawlRunId = "";
 
   try {
-    if (!siteId || !baseUrl) {
-      throw new Error("crawl_seed job payload requires siteId and baseUrl");
-    }
+    const payload = validateCrawlSeedJobPayload(job.payload ?? {});
+    siteId = payload.siteId;
+    baseUrl = payload.baseUrl;
+    sitemapUrl = payload.sitemapUrl ?? normalizeCrawlUrl("/sitemap.xml", baseUrl);
+    crawlRunId = payload.crawlRunId ?? "";
     if (!crawlRunId) {
       crawlRunId = (await options.apiClient.createCrawlRun(job.projectId, siteId, "manual")).id;
     }
@@ -161,7 +162,3 @@ function filterInScopeUrls(urls: DiscoveredUrl[], baseUrl: string): DiscoveredUr
   return urls.filter((url) => isInCrawlScope(url.normalizedUrl, baseUrl));
 }
 
-function stringPayload(payload: Record<string, unknown>, key: string): string {
-  const value = payload[key];
-  return typeof value === "string" ? value : "";
-}

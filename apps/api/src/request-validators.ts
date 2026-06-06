@@ -5,6 +5,7 @@ type MarketInput = { country: string; language: string; device: "desktop" | "mob
 type CreateProjectRequest = { name: string; slug: string; status?: ProjectStatus; defaultLocale?: string; markets?: MarketInput[] };
 type CreateSiteRequest = { baseUrl: string; scopeType: SiteScopeType; crawlFrequency?: "manual" | "daily" | "weekly"; businessValue?: number };
 type CreateCrawlRunRequest = { trigger: CrawlRun["trigger"] };
+type ScheduleCrawlSeedRequest = { trigger: CrawlRun["trigger"]; baseUrl: string; sitemapUrl?: string };
 type CompleteCrawlRunRequest = { status: Extract<CrawlRunStatus, "succeeded" | "failed">; errorMessage?: string };
 type RecordDiscoveredUrlsRequest = { urls: DiscoveredUrl[] };
 type RecordFetchResultRequest = Omit<UrlFetchRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
@@ -66,6 +67,15 @@ export function createSiteRequest(body: unknown): CreateSiteRequest {
 export function createCrawlRunRequest(body: unknown): CreateCrawlRunRequest {
   const input = objectBody(body);
   return { trigger: enumField(input, crawlRunTriggers, "trigger") };
+}
+
+export function scheduleCrawlSeedRequest(body: unknown): ScheduleCrawlSeedRequest {
+  const input = objectBody(body);
+  return {
+    trigger: input.trigger === undefined ? "manual" : enumField(input, crawlRunTriggers, "trigger"),
+    baseUrl: urlField(input, "baseUrl"),
+    sitemapUrl: input.sitemapUrl === undefined ? undefined : urlField(input, "sitemapUrl")
+  };
 }
 
 export function completeCrawlRunRequest(body: unknown): CompleteCrawlRunRequest {

@@ -3,7 +3,7 @@ import test from "node:test";
 import { normalizeEmail, validatePassword } from "../src/auth.js";
 import { calculateHealthScore } from "../src/crawl.js";
 import { sourceConfidenceForProvider } from "../src/integrations.js";
-import { makeIdempotencyKey } from "../src/jobs.js";
+import { createCrawlSeedJobInput, makeIdempotencyKey, validateCrawlSeedJobPayload } from "../src/jobs.js";
 import { hasRequiredEvidence, scoreOpportunity, type Opportunity } from "../src/opportunities.js";
 import { validateBusinessValue, type Market, type Project, type Site } from "../src/project.js";
 
@@ -46,8 +46,15 @@ test("crawl health score applies severity penalties with a lower bound", () => {
   assert.equal(calculateHealthScore(Array.from({ length: 10 }, () => ({ severity: "critical" as const }))), 0);
 });
 
-test("jobs create stable idempotency keys", () => {
+test("jobs create stable idempotency keys and typed crawl seed inputs", () => {
   assert.equal(makeIdempotencyKey("project-1", "connector_sync", "GSC Daily"), "project-1:connector_sync:gsc-daily");
+  const input = createCrawlSeedJobInput({ siteId: "site-1", baseUrl: "https://example.com", crawlRunId: "crawl-1", sitemapUrl: "https://example.com/sitemap.xml" });
+  assert.equal(input.type, "crawl_seed");
+  assert.equal(input.subject, "https://example.com/:run:crawl-1");
+  assert.deepEqual(input.payload, { siteId: "site-1", baseUrl: "https://example.com/", crawlRunId: "crawl-1", sitemapUrl: "https://example.com/sitemap.xml" });
+  assert.deepEqual(validateCrawlSeedJobPayload(input.payload), input.payload);
+  assert.deepEqual(validateCrawlSeedJobPayload({ siteId: "site-1", baseUrl: "https://example.com" }), { siteId: "site-1", baseUrl: "https://example.com/" });
+  assert.throws(() => validateCrawlSeedJobPayload({ siteId: "site-1", baseUrl: "not-a-url", crawlRunId: "crawl-1" }), /baseUrl/);
 });
 
 test("integrations map providers to source confidence classes", () => {
