@@ -42,10 +42,12 @@ CREATE TABLE IF NOT EXISTS proposals (
   kind TEXT NOT NULL CHECK (kind IN ('dev_ticket', 'fix_pr')),
   title TEXT NOT NULL,
   body TEXT NOT NULL,
-  opportunity_id TEXT,
+  opportunity_id TEXT REFERENCES opportunities(id) ON DELETE SET NULL,
   status TEXT NOT NULL CHECK (status IN ('proposed', 'accepted', 'rejected')) DEFAULT 'proposed',
   source TEXT NOT NULL DEFAULT 'mcp',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_proposals_project ON proposals (project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_answer_snapshots_project ON ai_answer_snapshots (project_id);
+CREATE INDEX IF NOT EXISTS idx_aeo_assessments_project ON aeo_assessments (project_id);

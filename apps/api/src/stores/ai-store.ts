@@ -115,14 +115,16 @@ class SQLiteAiStore implements AiStore {
 
   aiVisibilityScore(projectId: string): AiVisibilityScore {
     this.assertProject(projectId);
-    // Neuester Snapshot je Prompt (das getrackte Set).
+    // ALLE getrackten Prompts bilden den Nenner; je Prompt der neueste Snapshot (fehlt einer,
+    // zählt der Prompt als "nicht zitiert"). So divergieren Score-Nenner und Prompt-Anzahl nicht.
     const rows = this.db.prepare(`
       SELECT s.our_cited AS our_cited, s.brand_mentioned AS brand_mentioned
-      FROM ai_answer_snapshots s
-      WHERE s.project_id = ? AND s.id = (
-        SELECT x.id FROM ai_answer_snapshots x WHERE x.prompt_id = s.prompt_id ORDER BY x.captured_at DESC, x.id DESC LIMIT 1
+      FROM ai_prompts p
+      LEFT JOIN ai_answer_snapshots s ON s.id = (
+        SELECT x.id FROM ai_answer_snapshots x WHERE x.prompt_id = p.id ORDER BY x.captured_at DESC, x.id DESC LIMIT 1
       )
-    `).all(projectId) as Array<{ our_cited: number; brand_mentioned: number }>;
+      WHERE p.project_id = ?
+    `).all(projectId) as Array<{ our_cited: number | null; brand_mentioned: number | null }>;
     return computeAiVisibilityScore(rows.map((row) => ({ ourCited: Number(row.our_cited) === 1, brandMentioned: Number(row.brand_mentioned) === 1 })));
   }
 

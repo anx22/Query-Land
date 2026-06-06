@@ -28,9 +28,10 @@ export interface AeoAssessment {
 const CHECKS: Array<{ check: string; test: (content: string) => boolean }> = [
   { check: "h1", test: (content) => /<h1[\s>]/i.test(content) },
   { check: "structured_data", test: (content) => /application\/ld\+json/i.test(content) || /schema\.org/i.test(content) },
-  { check: "question_heading", test: (content) => /<h[2-3][^>]*>[^<]*\?\s*<\/h[2-3]>/i.test(content) },
+  { check: "question_heading", test: (content) => /<h([2-3])[^>]*>[^<]*\?\s*<\/h\1>/i.test(content) },
   { check: "list", test: (content) => /<(ul|ol)[\s>]/i.test(content) },
-  { check: "concise_answer", test: (content) => /<p[\s>][\s\S]{40,400}?<\/p>/i.test(content) }
+  // [^<] hält den Match innerhalb EINES <p>-Elements (kein Überspringen von </p><p>-Grenzen).
+  { check: "concise_answer", test: (content) => /<p[\s>][^<]{40,400}<\/p>/i.test(content) }
 ];
 
 export function analyzeAeo(content: string): AeoResult {
