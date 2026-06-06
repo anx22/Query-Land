@@ -330,3 +330,64 @@ test("list_alert_events returns >= 1 event after rule creation and evaluation", 
   assert.equal(events[0].metric, "open_opportunities");
   assert.equal(events[0].triggered, true);
 });
+
+// ── AI Visibility / Proposal tools (M6) ────────────────────────────────────
+
+test("get_ai_visibility returns numeric prompts and score after snapshot recorded", () => {
+  const { store, projectId, siteId } = seed();
+  const tools = createSeoMcpTools(store);
+
+  // Seed a prompt and record a snapshot so the score is meaningful.
+  const aiPrompt = store.createAiPrompt(projectId, { prompt: "best widget shop" });
+  store.recordAiSnapshot(projectId, aiPrompt.id);
+
+  const score = callTool(tools, "get_ai_visibility", { projectId }) as {
+    prompts: number;
+    citedPrompts: number;
+    brandMentions: number;
+    score: number;
+  };
+
+  assert.ok(typeof score.prompts === "number", "prompts should be a number");
+  assert.ok(typeof score.score === "number", "score should be a number");
+  assert.ok(score.prompts >= 1, "prompts should be >= 1 after seeding");
+  assert.ok(score.score >= 0 && score.score <= 100, "score should be 0-100");
+
+  void siteId;
+});
+
+test("create_dev_ticket returns a proposed dev_ticket; propose_fix_pr returns fix_pr; list_proposals returns both", () => {
+  const { store, projectId } = seed();
+  const tools = createSeoMcpTools(store);
+
+  // create_dev_ticket
+  const ticket = callTool(tools, "create_dev_ticket", {
+    projectId,
+    title: "Fix missing title tags",
+    body: "The product template is missing <title> elements. Add unique titles to every product page."
+  }) as { id: string; kind: string; status: string; source: string };
+
+  assert.equal(ticket.status, "proposed", "dev ticket should be in proposed status");
+  assert.equal(ticket.kind, "dev_ticket", "kind should be dev_ticket");
+  assert.equal(ticket.source, "mcp", "source should be mcp");
+
+  // propose_fix_pr
+  const pr = callTool(tools, "propose_fix_pr", {
+    projectId,
+    title: "Add title tags to product template",
+    body: "PR to insert unique <title> tags into the product template component."
+  }) as { id: string; kind: string; status: string; source: string };
+
+  assert.equal(pr.status, "proposed", "fix PR should be in proposed status");
+  assert.equal(pr.kind, "fix_pr", "kind should be fix_pr");
+  assert.equal(pr.source, "mcp", "source should be mcp");
+
+  // list_proposals should return >= 2 entries
+  const proposals = callTool(tools, "list_proposals", { projectId }) as Array<{ id: string; kind: string }>;
+  assert.ok(Array.isArray(proposals), "proposals should be an array");
+  assert.ok(proposals.length >= 2, "should have at least 2 proposals after creating ticket and PR");
+
+  const kinds = proposals.map((p) => p.kind);
+  assert.ok(kinds.includes("dev_ticket"), "proposals should include dev_ticket");
+  assert.ok(kinds.includes("fix_pr"), "proposals should include fix_pr");
+});

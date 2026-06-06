@@ -1,4 +1,5 @@
 import type {
+  AiVisibilityScore,
   AlertEvent,
   AuditIssueRecord,
   AuditIssueSeverity,
@@ -9,6 +10,7 @@ import type {
   IndexabilityRecord,
   Opportunity,
   OpportunityStatus,
+  Proposal,
   ReferringDomain,
   Report,
   Site,
@@ -495,6 +497,86 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
       handler(args): AlertEvent[] {
         const projectId = requireProjectId(store, args);
         return store.listAlertEvents(projectId);
+      }
+    },
+    {
+      name: "get_ai_visibility",
+      description:
+        "Return the AI visibility score for a project: the fraction of tracked prompts in which the project's own domain is cited by an LLM, plus brand mention counts. Requires at least one AI prompt and snapshot to have been recorded.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier (e.g. proj-acme)." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args): AiVisibilityScore {
+        const projectId = requireProjectId(store, args);
+        return store.aiVisibilityScore(projectId);
+      }
+    },
+    {
+      name: "list_proposals",
+      description:
+        "Return all proposals for a project (dev tickets and fix-PR proposals), ordered newest first. Each proposal includes its kind, title, body, status, and optional linked opportunity.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier (e.g. proj-acme)." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args): Proposal[] {
+        const projectId = requireProjectId(store, args);
+        return store.listProposals(projectId);
+      }
+    },
+    {
+      name: "create_dev_ticket",
+      description:
+        "Create a draft developer ticket proposal for a project. This tool is REVIEW-GATED (§4.4): it creates a proposed artifact only — never a direct production change. A human must accept or reject the proposal before any action is taken. Optionally links to an opportunity.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier (e.g. proj-acme)." },
+          title: { type: "string", description: "Short title for the dev ticket." },
+          body: { type: "string", description: "Full description / acceptance criteria for the ticket." },
+          opportunityId: { type: "string", description: "Optional opportunity identifier to link this ticket to." }
+        },
+        required: ["projectId", "title", "body"],
+        additionalProperties: false
+      },
+      handler(args): Proposal {
+        const projectId = requireProjectId(store, args);
+        const title = requireString(args, "title");
+        const body = requireString(args, "body");
+        const opportunityId = optionalString(args, "opportunityId");
+        return store.createProposal(projectId, { kind: "dev_ticket", title, body, opportunityId, source: "mcp" });
+      }
+    },
+    {
+      name: "propose_fix_pr",
+      description:
+        "Create a draft fix-PR proposal for a project. This tool is REVIEW-GATED (§4.4): it creates a proposed artifact only — never a direct production change. A human must accept or reject the proposal before any action is taken. Optionally links to an opportunity.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier (e.g. proj-acme)." },
+          title: { type: "string", description: "Short title for the fix PR." },
+          body: { type: "string", description: "Full description of the fix, including the change rationale and implementation notes." },
+          opportunityId: { type: "string", description: "Optional opportunity identifier to link this PR proposal to." }
+        },
+        required: ["projectId", "title", "body"],
+        additionalProperties: false
+      },
+      handler(args): Proposal {
+        const projectId = requireProjectId(store, args);
+        const title = requireString(args, "title");
+        const body = requireString(args, "body");
+        const opportunityId = optionalString(args, "opportunityId");
+        return store.createProposal(projectId, { kind: "fix_pr", title, body, opportunityId, source: "mcp" });
       }
     }
   ];
