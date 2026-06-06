@@ -38,11 +38,19 @@ export interface OpportunityPage {
   nextCursor: string | null;
 }
 
+export interface GenerateOpportunitiesResult {
+  created: number;
+  opportunities: Opportunity[];
+}
+
 export interface OpportunityStore {
   createOpportunity(projectId: string, input: CreateOpportunityInput): Opportunity;
   listOpportunitiesPage(projectId: string, options?: { limit?: number; offset?: number }, filters?: OpportunityListFilters): OpportunityPage;
   getOpportunity(opportunityId: string): Opportunity;
   transitionOpportunity(opportunityId: string, nextStatus: OpportunityStatus): Opportunity;
+  // §6.6 erster Generator + §6.5 Validierungsloop (binär: Indexierbarkeit).
+  generateIndexabilityOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
+  revalidateOpportunity(opportunityId: string): Opportunity;
 }
 
 // Statusmodell §6.5: open -> planned -> in_progress -> implemented -> validated | reopened | dismissed | expired.
@@ -73,6 +81,15 @@ function normalizeLimit(limit?: number): number {
 function normalizeOffset(offset?: number): number {
   if (!offset || !Number.isFinite(offset)) return 0;
   return Math.max(0, Math.trunc(offset));
+}
+
+function parseReasons(raw: unknown): string {
+  try {
+    const reasons = JSON.parse(String(raw)) as unknown;
+    return Array.isArray(reasons) ? reasons.join(", ") : "";
+  } catch {
+    return "";
+  }
 }
 
 function requireString(value: unknown, field: string): string {
@@ -240,6 +257,80 @@ class SQLiteOpportunityStore implements OpportunityStore {
     this.db.prepare(`UPDATE opportunities SET status = ?, updated_at = ? WHERE id = ?`).run(nextStatus, now, opportunityId);
     this.audit("system", "opportunity.transition", "opportunity", opportunityId, { from: current, to: nextStatus });
     return this.assembleOpportunity(this.db.prepare(`SELECT * FROM opportunities WHERE id = ?`).get(opportunityId) as Record<string, unknown>);
+  }
+
+  generateIndexabilityOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
+    const site = this.db.prepare(`SELECT business_value FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId) as { business_value?: number } | undefined;
+    if (!site) {
+      throw new RequestError(404, "unknown_site", "Site not found for project");
+    }
+    const businessValue = typeof site.business_value === "number" ? site.business_value : 50;
+
+    // Neueste Indexability-Bewertung je URL; nur Blocker (is_indexable = 0).
+    const blocked = this.db.prepare(`
+      SELECT du.url AS url, a.reasons AS reasons, a.state AS state
+      FROM discovered_urls du
+      JOIN url_indexability_assessments a ON a.id = (
+        SELECT x.id FROM url_indexability_assessments x WHERE x.discovered_url_id = du.id ORDER BY x.assessed_at DESC, x.id DESC LIMIT 1
+      )
+      WHERE du.site_id = ? AND a.is_indexable = 0
+    `).all(siteId) as Array<{ url: string; reasons: string; state: string }>;
+
+    // Bereits abgedeckte URLs aus aktiven technical_fix-Opportunities (Dedupe).
+    const activeRows = this.db.prepare(`SELECT affected_urls FROM opportunities WHERE project_id = ? AND type = 'technical_fix' AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId);
+    const covered = new Set<string>();
+    for (const row of activeRows) {
+      for (const url of JSON.parse(String((row as { affected_urls: string }).affected_urls)) as string[]) {
+        covered.add(url);
+      }
+    }
+
+    const now = new Date().toISOString();
+    const created: Opportunity[] = [];
+    for (const row of blocked) {
+      if (covered.has(row.url)) continue;
+      const reasons = parseReasons(row.reasons);
+      const opportunity = this.createOpportunity(projectId, {
+        type: "technical_fix",
+        affectedUrls: [row.url],
+        currentState: `not indexable (${row.state})${reasons ? `: ${reasons}` : ""}`,
+        recommendedAction: "Resolve the indexability blocker in the responsible template and re-crawl",
+        expectedImpact: 3,
+        effort: 2,
+        confidence: 0.7,
+        businessValue,
+        urgency: 3,
+        validationMetric: "indexable",
+        evidence: [{ source: "crawl", sourceConfidence: "A", metric: "indexable", beforeValue: "false", currentValue: "false", timeWindow: now, affectedEntity: row.url }]
+      });
+      covered.add(row.url);
+      created.push(opportunity);
+    }
+    return { created: created.length, opportunities: created };
+  }
+
+  revalidateOpportunity(opportunityId: string): Opportunity {
+    const opportunity = this.getOpportunity(opportunityId);
+    if (opportunity.type !== "technical_fix" || opportunity.validationMetric !== "indexable") {
+      throw new RequestError(400, "not_revalidatable", "Only indexability technical_fix opportunities can be revalidated");
+    }
+    if (opportunity.status !== "implemented") {
+      throw new RequestError(409, "invalid_state", "Opportunity must be 'implemented' before it can be revalidated");
+    }
+    const url = opportunity.affectedUrls[0];
+    if (!url) {
+      throw new RequestError(400, "no_affected_url", "Opportunity has no affected URL to revalidate");
+    }
+    // Asynchrone, binäre Validierung (§2.10/§6.5): neueste Indexierbarkeit der URL erneut messen.
+    const row = this.db.prepare(`
+      SELECT a.is_indexable AS is_indexable FROM discovered_urls du
+      JOIN url_indexability_assessments a ON a.discovered_url_id = du.id
+      WHERE du.project_id = ? AND (du.url = ? OR du.normalized_url = ?)
+      ORDER BY a.assessed_at DESC, a.id DESC LIMIT 1
+    `).get(opportunity.projectId, url, url) as { is_indexable?: number } | undefined;
+    const indexable = !!row && Number(row.is_indexable) === 1;
+    this.db.prepare(`UPDATE opportunity_evidence SET current_value = ? WHERE opportunity_id = ? AND metric = 'indexable'`).run(JSON.stringify(indexable ? "true" : "false"), opportunityId);
+    return this.transitionOpportunity(opportunityId, indexable ? "validated" : "reopened");
   }
 
   private assembleOpportunity(row: Record<string, unknown>): Opportunity {

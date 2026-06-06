@@ -595,6 +595,57 @@ paths:
           description: Illegal status transition
         '404':
           description: Opportunity not found
+  /projects/{projectId}/sites/{siteId}/opportunities/generate-indexability:
+    post:
+      summary: Generate technical_fix opportunities from current indexability blockers (§6.6)
+      operationId: generateIndexabilityOpportunities
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Generation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Site not found
+  /opportunities/{opportunityId}/revalidate:
+    post:
+      summary: Re-check an implemented indexability fix and set validated or reopened (§6.5)
+      operationId: revalidateOpportunity
+      parameters:
+        - name: opportunityId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated opportunity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Opportunity is not in a revalidatable state
+        '404':
+          description: Opportunity not found
   /integrations:
     get:
       summary: List integration accounts

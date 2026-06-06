@@ -8,6 +8,11 @@ const STATUSES: readonly OpportunityStatus[] = ["open", "planned", "in_progress"
 const TYPES = ["technical_fix", "low_hanging_keyword", "cannibalization", "money_page", "internal_link_gap", "aeo"] as const;
 
 export const routeOpportunities: ResourceRoute = (store, method, pathname, searchParams, body): ApiResponse | null => {
+  const generateMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/opportunities\/generate-indexability$/);
+  if (method === "POST" && generateMatch) {
+    return json(201, { data: store.generateIndexabilityOpportunities(generateMatch[1], generateMatch[2]) });
+  }
+
   const collectionMatch = pathname.match(/^\/projects\/([^/]+)\/opportunities$/);
   if (collectionMatch) {
     if (method === "GET") {
@@ -30,6 +35,11 @@ export const routeOpportunities: ResourceRoute = (store, method, pathname, searc
       throw new RequestError(400, "invalid_field", `status must be one of ${STATUSES.join(", ")}`);
     }
     return json(200, { data: store.transitionOpportunity(transitionMatch[1], status as OpportunityStatus) });
+  }
+
+  const revalidateMatch = pathname.match(/^\/opportunities\/([^/]+)\/revalidate$/);
+  if (method === "POST" && revalidateMatch) {
+    return json(200, { data: store.revalidateOpportunity(revalidateMatch[1]) });
   }
 
   const singleMatch = pathname.match(/^\/opportunities\/([^/]+)$/);
