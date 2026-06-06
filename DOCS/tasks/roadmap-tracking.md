@@ -163,6 +163,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | GAP-OBS-001 | Observability | Job-/Run-Korrelation minimal | structured logs + runId/jobId/requestId | P1 | D |
 | GAP-WV-001 | Audit | Web Vitals fehlt | Lighthouse/PSI Stub und spätere Provider-Abstraktion | P2 | Welle 2+ |
 | GAP-MOD-001 | Produktmodule | Wellen 3–7 nur Navigation/Specs | nach Welle-2-Gate Keyword Core starten | P2 | Welle 3 |
+| GAP-PERSIST-001 | Persistenz/Infra | Production nutzt ephemeres `/tmp`-SQLite (kein geteilter/dauerhafter Zustand auf Vercel-Serverless) | **Ganz späteres Vorhaben:** Persistenz in netzwerk-erreichbaren Dienst auslagern (Turso/libSQL als geringster Umbau, alternativ Neon-Postgres). Architektur-Skizze: `architecture/serverless-persistence-turso.md` | P3 | später (≥ Welle 3, vor produktiver Mehrnutzer-Persistenz) |
 | GAP-DOC-001 | Domain-Dokumentation | `CONTEXT.md` ist neu und muss bei Architekturentscheidungen mitgeführt werden | Neue load-bearing Domain-Begriffe aus Reviews sofort in `CONTEXT.md` und passende Task-/Spec-Dokumente übernehmen | P1 | laufend |
 | GAP-SMOKE-001 | Deployment-Smoke | Production Smoke Target ist definiert, aber noch nicht automatisiert | Browser-/Log-Smokes gegen `https://queryland-inky.vercel.app/` als manuelles Gate dokumentieren und später automatisieren | P1 | B/C |
 
