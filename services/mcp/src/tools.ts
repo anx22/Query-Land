@@ -1,11 +1,14 @@
 import type {
   AuditIssueRecord,
   AuditIssueSeverity,
+  AuthoritySummary,
+  BacklinkDiff,
   CrawlHealthScore,
   DiscoveredUrl,
   IndexabilityRecord,
   Opportunity,
   OpportunityStatus,
+  ReferringDomain,
   Site,
   UrlFetchRecord
 } from "@seo-tool/domain-model";
@@ -395,6 +398,66 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
           validationMetric: opportunity.validationMetric,
           sourceAnchor: opportunity.sourceAnchor ?? sourceAnchor
         };
+      }
+    },
+    {
+      name: "get_authority_summary",
+      description:
+        "Return an authority summary for a project: total backlinks, referring domain count, follow ratio, top referring domains, top anchors, and top target URLs. Based on the latest imported backlink snapshot.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args): AuthoritySummary {
+        const projectId = requireProjectId(store, args);
+        return store.authoritySummary(projectId);
+      }
+    },
+    {
+      name: "list_referring_domains",
+      description:
+        "Return all referring domains from the latest backlink snapshot for a project. Each entry includes domain, backlink count, unique target URL count, follow share, and first/last seen dates.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args): ReferringDomain[] {
+        const projectId = requireProjectId(store, args);
+        return store.listReferringDomains(projectId);
+      }
+    },
+    {
+      name: "get_backlink_changes",
+      description:
+        "Return the diff between the two most recent backlink snapshots: new/lost backlinks, new/lost referring domains, and net change counts. Requires at least one snapshot to exist; throws no_snapshots when none are present.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args): BacklinkDiff {
+        const projectId = requireProjectId(store, args);
+        try {
+          return store.backlinkDiff(projectId);
+        } catch (error) {
+          // The backlink store throws a RequestError with code "no_snapshots" when
+          // no snapshots have been imported yet. Surface this as a clean ToolError.
+          if (error instanceof Error && "code" in error && (error as { code: string }).code === "no_snapshots") {
+            throw new ToolError("no_snapshots", "No backlink snapshots have been imported for this project yet. Run an import first.");
+          }
+          throw error;
+        }
       }
     }
   ];

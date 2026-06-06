@@ -219,3 +219,77 @@ test("callTool rejects unknown tool names and missing required args", () => {
   assert.throws(() => callTool(tools, "get_project_summary", {}), (error: unknown) => error instanceof ToolError && error.code === "missing_field");
   void projectId;
 });
+
+// ── Backlink / Authority tools ──────────────────────────────────────────────
+
+interface BacklinkSeeded {
+  store: BackendStore;
+  projectId: string;
+}
+
+function seedBacklinks(): BacklinkSeeded {
+  const store = createSQLiteStore("sqlite::memory:");
+  const project = store.createProject({ name: "Backlink Test", slug: `bl-test-${Math.random().toString(36).slice(2)}` });
+  store.createSite(project.id, { baseUrl: "https://bl.example", scopeType: "domain", businessValue: 50 });
+  // Two imports to produce a meaningful diff.
+  store.importBacklinks(project.id);
+  store.importBacklinks(project.id);
+  return { store, projectId: project.id };
+}
+
+test("get_authority_summary returns totalBacklinks > 0 and a followRatio", () => {
+  const { store, projectId } = seedBacklinks();
+  const tools = createSeoMcpTools(store);
+  const summary = callTool(tools, "get_authority_summary", { projectId }) as {
+    totalBacklinks: number;
+    referringDomains: number;
+    followRatio: number;
+  };
+
+  assert.ok(summary.totalBacklinks > 0, "totalBacklinks should be > 0 after import");
+  assert.ok(typeof summary.followRatio === "number", "followRatio should be a number");
+  assert.ok(summary.referringDomains >= 0, "referringDomains should be >= 0");
+});
+
+test("list_referring_domains returns a non-empty array after import", () => {
+  const { store, projectId } = seedBacklinks();
+  const tools = createSeoMcpTools(store);
+  const domains = callTool(tools, "list_referring_domains", { projectId }) as Array<{ domain: string; backlinks: number }>;
+
+  assert.ok(Array.isArray(domains), "result should be an array");
+  assert.ok(domains.length > 0, "should have at least one referring domain after import");
+  assert.ok(typeof domains[0].domain === "string", "each entry should have a domain string");
+  assert.ok(typeof domains[0].backlinks === "number", "each entry should have a backlinks count");
+});
+
+test("get_backlink_changes returns newReferringDomains and lostReferringDomains arrays", () => {
+  const { store, projectId } = seedBacklinks();
+  const tools = createSeoMcpTools(store);
+  const diff = callTool(tools, "get_backlink_changes", { projectId }) as {
+    newReferringDomains: string[];
+    lostReferringDomains: string[];
+    newBacklinks: unknown[];
+    lostBacklinks: unknown[];
+    netBacklinkChange: number;
+    netReferringDomainChange: number;
+  };
+
+  assert.ok(Array.isArray(diff.newReferringDomains), "newReferringDomains should be an array");
+  assert.ok(Array.isArray(diff.lostReferringDomains), "lostReferringDomains should be an array");
+  assert.ok(Array.isArray(diff.newBacklinks), "newBacklinks should be an array");
+  assert.ok(Array.isArray(diff.lostBacklinks), "lostBacklinks should be an array");
+  assert.ok(typeof diff.netBacklinkChange === "number", "netBacklinkChange should be a number");
+  assert.ok(typeof diff.netReferringDomainChange === "number", "netReferringDomainChange should be a number");
+});
+
+test("get_backlink_changes throws no_snapshots for a project with no imports", () => {
+  const store = createSQLiteStore("sqlite::memory:");
+  const project = store.createProject({ name: "Empty Project", slug: `empty-${Math.random().toString(36).slice(2)}` });
+  store.createSite(project.id, { baseUrl: "https://empty.example", scopeType: "domain", businessValue: 50 });
+  const tools = createSeoMcpTools(store);
+
+  assert.throws(
+    () => callTool(tools, "get_backlink_changes", { projectId: project.id }),
+    (error: unknown) => error instanceof ToolError && error.code === "no_snapshots"
+  );
+});
