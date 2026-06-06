@@ -1,11 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { compareAlert, type AlertComparator, type AlertEvent, type AlertMetric, type AlertRule } from "@seo-tool/domain-model";
+import { ALERT_COMPARATORS, ALERT_METRICS, compareAlert, type AlertComparator, type AlertEvent, type AlertMetric, type AlertRule } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { SQLiteDatabase } from "./sqlite-types.js";
-
-const ALERT_METRICS: readonly AlertMetric[] = ["visibility_score", "health_score", "open_opportunities", "referring_domains"];
-const ALERT_COMPARATORS: readonly AlertComparator[] = ["lt", "lte", "gt", "gte"];
 
 export interface AlertRuleInput {
   metric: AlertMetric;
@@ -103,28 +100,36 @@ class SQLiteAlertStore implements AlertStore {
     const evaluatedAt = new Date().toISOString();
     const events: AlertEvent[] = [];
     const insert = this.db.prepare(`INSERT INTO alert_events (id, project_id, rule_id, metric, comparator, threshold, observed_value, triggered, evaluated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    for (const rule of rules) {
-      const observedValue = this.observe(projectId, rule.metric);
-      const triggered = compareAlert(observedValue, rule.comparator, rule.threshold);
-      const event: AlertEvent = {
-        id: `aevt-${randomUUID()}`,
-        projectId,
-        ruleId: rule.id,
-        metric: rule.metric,
-        comparator: rule.comparator,
-        threshold: rule.threshold,
-        observedValue,
-        triggered,
-        evaluatedAt
-      };
-      insert.run(event.id, event.projectId, event.ruleId, event.metric, event.comparator, event.threshold, event.observedValue, triggered ? 1 : 0, event.evaluatedAt);
-      events.push(event);
+    this.db.exec("BEGIN");
+    try {
+      for (const rule of rules) {
+        const observedValue = this.observe(projectId, rule.metric);
+        const triggered = compareAlert(observedValue, rule.comparator, rule.threshold);
+        const event: AlertEvent = {
+          id: `aevt-${randomUUID()}`,
+          projectId,
+          ruleId: rule.id,
+          metric: rule.metric,
+          comparator: rule.comparator,
+          threshold: rule.threshold,
+          observedValue,
+          triggered,
+          evaluatedAt
+        };
+        insert.run(event.id, event.projectId, event.ruleId, event.metric, event.comparator, event.threshold, event.observedValue, triggered ? 1 : 0, event.evaluatedAt);
+        events.push(event);
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
     }
     this.audit("system", "alerts.evaluate", "project", projectId, { rules: rules.length, triggered: events.filter((event) => event.triggered).length });
     return events;
   }
 
   listAlertEvents(projectId: string): AlertEvent[] {
+    this.assertProject(projectId);
     return this.db.prepare(`SELECT * FROM alert_events WHERE project_id = ? ORDER BY evaluated_at DESC, id DESC`).all(projectId).map((row) => this.mapEvent(row as Record<string, unknown>));
   }
 

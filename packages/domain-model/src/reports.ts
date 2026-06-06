@@ -59,7 +59,7 @@ export interface ReportExport {
 
 function csvEscape(value: string | number): string {
   const text = String(value);
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 export function reportToCsv(report: Report): string {

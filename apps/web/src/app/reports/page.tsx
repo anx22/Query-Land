@@ -93,8 +93,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               </div>
             ))}
             <div className="action-row">
-              <a className="button secondary" href={`/api/backend/reports/${data.latestReport.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV exportieren</a>
-              <a className="button secondary" href={`/api/backend/reports/${data.latestReport.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML exportieren</a>
+              <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV exportieren</a>
+              <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML exportieren</a>
             </div>
             <div>
               <p className="kicker">Report versenden</p>
@@ -132,8 +132,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 <span className="badge">{labelForReportType(report.type)}</span>
                 <span className="muted">{report.generatedAt}</span>
                 <div className="inline-actions">
-                  <a className="button secondary compact" href={`/api/backend/reports/${report.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV</a>
-                  <a className="button secondary compact" href={`/api/backend/reports/${report.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML</a>
+                  <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV</a>
+                  <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML</a>
                 </div>
               </article>
             ))}

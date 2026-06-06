@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
+  DELIVERY_CHANNELS,
+  REPORT_CADENCES,
+  REPORT_TYPES,
   renderReportExport,
   type DeliveryChannel,
   type Report,
@@ -15,9 +18,6 @@ import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { SQLiteDatabase } from "./sqlite-types.js";
 
-const REPORT_TYPES: readonly ReportType[] = ["weekly_summary", "opportunity_digest", "authority_report"];
-const DELIVERY_CHANNELS: readonly DeliveryChannel[] = ["email", "slack"];
-const CADENCES: readonly ReportCadence[] = ["weekly", "monthly"];
 const CADENCE_DAYS: Record<ReportCadence, number> = { weekly: 7, monthly: 30 };
 
 export interface ReportScheduleInput {
@@ -60,7 +60,8 @@ class SQLiteReportStore implements ReportStore {
   }
 
   private count(sql: string, ...args: unknown[]): number {
-    return Number((this.db.prepare(sql).get(...args) as { c: number }).c);
+    const row = this.db.prepare(sql).get(...args) as { c?: number } | undefined;
+    return Number(row?.c ?? 0);
   }
 
   private overviewSection(projectId: string): ReportSection {
@@ -160,6 +161,7 @@ class SQLiteReportStore implements ReportStore {
   }
 
   listReports(projectId: string): Report[] {
+    this.requireProject(projectId);
     return this.db.prepare(`SELECT * FROM reports WHERE project_id = ? ORDER BY generated_at DESC, id DESC`).all(projectId).map((row) => this.mapReport(row as Record<string, unknown>));
   }
 
@@ -208,8 +210,8 @@ class SQLiteReportStore implements ReportStore {
     if (!REPORT_TYPES.includes(input.type)) {
       throw new RequestError(400, "invalid_field", `type must be one of ${REPORT_TYPES.join(", ")}`);
     }
-    if (!CADENCES.includes(input.cadence)) {
-      throw new RequestError(400, "invalid_field", `cadence must be one of ${CADENCES.join(", ")}`);
+    if (!REPORT_CADENCES.includes(input.cadence)) {
+      throw new RequestError(400, "invalid_field", `cadence must be one of ${REPORT_CADENCES.join(", ")}`);
     }
     const channel = input.channel && DELIVERY_CHANNELS.includes(input.channel) ? input.channel : null;
     const schedule: ReportSchedule = {
@@ -230,6 +232,7 @@ class SQLiteReportStore implements ReportStore {
   }
 
   listReportSchedules(projectId: string): ReportSchedule[] {
+    this.requireProject(projectId);
     return this.db.prepare(`SELECT * FROM report_schedules WHERE project_id = ? ORDER BY created_at ASC, id ASC`).all(projectId).map((row) => this.mapSchedule(row as Record<string, unknown>));
   }
 
@@ -241,15 +244,24 @@ class SQLiteReportStore implements ReportStore {
     const now = Date.now();
     const schedules = this.listReportSchedules(projectId);
     const reports: Report[] = [];
-    for (const schedule of schedules) {
-      const due = schedule.lastRunAt === null || (now - Date.parse(schedule.lastRunAt)) >= CADENCE_DAYS[schedule.cadence] * 24 * 60 * 60 * 1000;
-      if (!due) continue;
-      const report = this.generateReport(projectId, schedule.type);
-      if (schedule.channel) {
-        this.deliverReport(report.id, schedule.channel, schedule.target);
+    this.db.exec("BEGIN");
+    try {
+      for (const schedule of schedules) {
+        const lastRun = schedule.lastRunAt === null ? NaN : Date.parse(schedule.lastRunAt);
+        // null oder unparsebar -> fällig (ein korruptes last_run_at darf einen Schedule nicht für immer blockieren).
+        const due = schedule.lastRunAt === null || Number.isNaN(lastRun) || (now - lastRun) >= CADENCE_DAYS[schedule.cadence] * 24 * 60 * 60 * 1000;
+        if (!due) continue;
+        const report = this.generateReport(projectId, schedule.type);
+        if (schedule.channel) {
+          this.deliverReport(report.id, schedule.channel, schedule.target);
+        }
+        this.db.prepare(`UPDATE report_schedules SET last_run_at = ? WHERE id = ?`).run(new Date().toISOString(), schedule.id);
+        reports.push(report);
       }
-      this.db.prepare(`UPDATE report_schedules SET last_run_at = ? WHERE id = ?`).run(new Date().toISOString(), schedule.id);
-      reports.push(report);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
     }
     this.audit("system", "report_schedule.run_due", "project", projectId, { generated: reports.length });
     return { generated: reports.length, reports };
