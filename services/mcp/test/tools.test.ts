@@ -293,3 +293,40 @@ test("get_backlink_changes throws no_snapshots for a project with no imports", (
     (error: unknown) => error instanceof ToolError && error.code === "no_snapshots"
   );
 });
+
+// ── Report / Alert tools ────────────────────────────────────────────────────
+
+test("get_latest_report returns the most recent report after generation", () => {
+  const { store, projectId } = seed();
+  const tools = createSeoMcpTools(store);
+
+  // Before any report is generated, the result should be null.
+  const empty = callTool(tools, "get_latest_report", { projectId }) as { report: null };
+  assert.equal(empty.report, null);
+
+  // Generate a report, then the tool should return it.
+  store.generateReport(projectId, "weekly_summary");
+  const result = callTool(tools, "get_latest_report", { projectId }) as { report: { id: string; type: string } };
+  assert.ok(result.report !== null, "report should be present after generation");
+  assert.equal(result.report.type, "weekly_summary");
+});
+
+test("list_alert_events returns >= 1 event after rule creation and evaluation", () => {
+  const { store, projectId } = seed();
+  const tools = createSeoMcpTools(store);
+
+  // Before any rule is created, the list should be empty.
+  const before = callTool(tools, "list_alert_events", { projectId }) as unknown[];
+  assert.ok(Array.isArray(before), "result should be an array");
+  assert.equal(before.length, 0);
+
+  // Create a rule that will always trigger (open_opportunities >= 0).
+  store.createAlertRule(projectId, { metric: "open_opportunities", comparator: "gte", threshold: 0 });
+  store.evaluateAlerts(projectId);
+
+  const events = callTool(tools, "list_alert_events", { projectId }) as Array<{ id: string; triggered: boolean; metric: string }>;
+  assert.ok(Array.isArray(events), "result should be an array");
+  assert.ok(events.length >= 1, "should have at least one alert event after evaluation");
+  assert.equal(events[0].metric, "open_opportunities");
+  assert.equal(events[0].triggered, true);
+});

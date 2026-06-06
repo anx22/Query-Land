@@ -1,4 +1,5 @@
 import type {
+  AlertEvent,
   AuditIssueRecord,
   AuditIssueSeverity,
   AuthoritySummary,
@@ -9,6 +10,7 @@ import type {
   Opportunity,
   OpportunityStatus,
   ReferringDomain,
+  Report,
   Site,
   UrlFetchRecord
 } from "@seo-tool/domain-model";
@@ -458,6 +460,41 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
           }
           throw error;
         }
+      }
+    },
+    {
+      name: "get_latest_report",
+      description:
+        "Return the most recently generated report for a project. The response shape is `{ report: Report | null }`: `report` is `null` when no report has been generated yet, otherwise the full Report object (id, projectId, type, title, sections, generatedAt).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier (e.g. proj-acme)." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args): { report: Report | null } {
+        const projectId = requireProjectId(store, args);
+        const report = store.listReports(projectId)[0] ?? null;
+        return { report };
+      }
+    },
+    {
+      name: "list_alert_events",
+      description:
+        "Return all alert evaluation events for a project, ordered newest first. Each event records the rule that was evaluated, the observed metric value, the threshold, and whether the alert was triggered.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier (e.g. proj-acme)." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args): AlertEvent[] {
+        const projectId = requireProjectId(store, args);
+        return store.listAlertEvents(projectId);
       }
     }
   ];
