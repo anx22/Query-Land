@@ -7,3 +7,5 @@ export * from "./keywords.js";
 export * from "./opportunities.js";
 export * from "./platform.js";
 export * from "./project.js";
+export * from "./rank.js";
+export * from "./visibility.js";

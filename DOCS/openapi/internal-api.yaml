@@ -793,6 +793,182 @@ paths:
                     type: object
         '404':
           description: Keyword not found
+  /projects/{projectId}/keywords/{keywordId}/rank-snapshots:
+    get:
+      summary: List rank snapshots (own position history) for a keyword
+      operationId: listRankSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rank snapshot history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Record a rank/SERP snapshot via the SERP provider (stub, DEC-002)
+      operationId: recordRankSnapshot
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                market:
+                  type: string
+                device:
+                  type: string
+      responses:
+        '201':
+          description: Snapshot recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Keyword not found
+  /projects/{projectId}/keywords/{keywordId}/serp-snapshots:
+    get:
+      summary: List SERP snapshots for a keyword
+      operationId: listSerpSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SERP snapshot history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+  /projects/{projectId}/keywords/{keywordId}/serp-diff:
+    get:
+      summary: Diff the two latest SERP snapshots for a keyword
+      operationId: serpDiff
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SERP diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: No SERP snapshots
+  /projects/{projectId}/visibility:
+    get:
+      summary: List visibility score history for a project
+      operationId: listVisibilityScores
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Visibility history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+  /projects/{projectId}/visibility/compute:
+    post:
+      summary: Compute the project visibility index over the tracked keyword set (§8)
+      operationId: computeVisibility
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                market:
+                  type: string
+      responses:
+        '201':
+          description: Visibility score
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
   /integrations:
     get:
       summary: List integration accounts

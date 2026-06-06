@@ -8,6 +8,7 @@ import { routeInternalLinks } from "./routes/internal-links.js";
 import { routeJobs } from "./routes/jobs.js";
 import { routeKeywords } from "./routes/keywords.js";
 import { routeOpportunities } from "./routes/opportunities.js";
+import { routeRank } from "./routes/rank.js";
 import { routeSites } from "./routes/sites.js";
 import { routeSourceMap } from "./routes/source-map.js";
 import { routeWebVitals } from "./routes/web-vitals.js";
@@ -27,6 +28,7 @@ const resourceRoutes: ResourceRoute[] = [
   routeWebVitals,
   routeOpportunities,
   routeKeywords,
+  routeRank,
   routeIntegrations,
   routeJobs,
   routeSourceMap

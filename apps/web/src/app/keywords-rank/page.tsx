@@ -1,7 +1,7 @@
 import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
 import { KEYWORD_INTENT_OPTIONS, loadKeywordLibrary } from "../../features/keyword-rank";
-import { addKeywordsAction, createKeywordGroupAction } from "./actions";
+import { addKeywordsAction, computeVisibilityAction, createKeywordGroupAction, recordRankAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +27,19 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+        <div className="action-row">
+          <form action={computeVisibilityAction}>
+            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+            <button className="button secondary" type="submit" disabled={!data.connected || !data.selectedProject}>Visibility neu berechnen</button>
+          </form>
+        </div>
       </section>
 
       <section className="metric-grid">
+        <MetricCard label="Visibility-Index" value={data.visibility ? String(data.visibility.score) : "—"} note={data.visibility ? `${data.visibility.trackedKeywords} getrackt · Ø Pos ${data.visibility.averagePosition ?? "—"}` : "noch nicht berechnet"} />
         <MetricCard label="Keywords" value={String(data.keywordsMeta.total)} note={`${data.keywords.length} im Filter`} />
         <MetricCard label="Cluster" value={String(data.groups.length)} note="Themen-/Keyword-Gruppen" />
         <MetricCard label="Brand" value={String(brandCount)} note="im aktuellen Filter" />
-        <MetricCard label="Markt" value="DACH" note="DE Standard (DEC-003)" />
       </section>
 
       <section className="content-grid">
@@ -82,6 +88,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <strong>{keyword.phrase}</strong>
                   <span>{keyword.intent} · {keyword.funnelStage}{keyword.brand ? " · brand" : ""} · {keyword.market}</span>
                   <span className="muted">{keyword.targetUrl ? `→ ${keyword.targetUrl}` : "keine Ziel-URL"} · Quelle {keyword.sourceConfidence}</span>
+                  <div className="inline-actions">
+                    <form action={recordRankAction}>
+                      <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+                      <input type="hidden" name="keywordId" value={keyword.id} />
+                      <button className="button secondary compact" type="submit" disabled={!data.connected}>Rang erfassen</button>
+                    </form>
+                  </div>
                 </article>
               ))}
             </div>
@@ -99,6 +112,8 @@ function feedbackMessage(params: Record<string, string | string[] | undefined> |
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.added)) return { kind: "success", message: "Keywords klassifiziert und gespeichert." };
   if (singleParam(params?.group)) return { kind: "success", message: "Keyword-Cluster angelegt." };
+  if (singleParam(params?.ranked)) return { kind: "success", message: "Rang-Snapshot erfasst (SERP-Provider-Stub)." };
+  if (singleParam(params?.visibility)) return { kind: "success", message: "Visibility-Index neu berechnet." };
   return null;
 }
 

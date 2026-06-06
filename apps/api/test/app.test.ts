@@ -19,7 +19,7 @@ test("SQLite migrations are versioned and idempotent", () => {
   const db = new DatabaseSync(":memory:");
   try {
     const first = runSQLiteMigrations(db);
-    assert.deepEqual(first.applied.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql"]);
+    assert.deepEqual(first.applied.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql"]);
     assert.deepEqual(first.skipped, []);
 
     const recorded = db.prepare(`SELECT version, name FROM schema_migrations ORDER BY version`).all()
@@ -29,12 +29,14 @@ test("SQLite migrations are versioned and idempotent", () => {
       { version: 2, name: "rebuild_indexability_state_constraint" },
       { version: 3, name: "internal_link_edges" },
       { version: 4, name: "opportunities" },
-      { version: 5, name: "keywords" }
+      { version: 5, name: "keywords" },
+      { version: 6, name: "rank_serp" },
+      { version: 7, name: "visibility" }
     ]);
 
     const second = runSQLiteMigrations(db);
     assert.deepEqual(second.applied, []);
-    assert.deepEqual(second.skipped.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql"]);
+    assert.deepEqual(second.skipped.map((migration) => migration.filename), ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql"]);
   } finally {
     db.close();
   }

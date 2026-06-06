@@ -45,6 +45,29 @@ export async function addKeywordsAction(formData: FormData) {
   redirect("/keywords-rank?added=1");
 }
 
+export async function recordRankAction(formData: FormData) {
+  try {
+    const projectId = requiredString(formData, "projectId");
+    const keywordId = requiredString(formData, "keywordId");
+    await apiPost(`/projects/${projectId}/keywords/${keywordId}/rank-snapshots`, {});
+  } catch (error) {
+    redirect(`/keywords-rank?error=${encodeURIComponent(messageFor(error))}`);
+  }
+  revalidateKeywordViews();
+  redirect("/keywords-rank?ranked=1");
+}
+
+export async function computeVisibilityAction(formData: FormData) {
+  try {
+    const projectId = requiredString(formData, "projectId");
+    await apiPost(`/projects/${projectId}/visibility/compute`, {});
+  } catch (error) {
+    redirect(`/keywords-rank?error=${encodeURIComponent(messageFor(error))}`);
+  }
+  revalidateKeywordViews();
+  redirect("/keywords-rank?visibility=1");
+}
+
 function revalidateKeywordViews(): void {
   revalidatePath("/");
   revalidatePath("/keywords-rank");

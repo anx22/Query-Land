@@ -35,7 +35,7 @@ Offen (später, blockieren nichts): DEC-002 (Provider), DEC-003 (Märkte — Emp
 |---|---|---|---|
 | **M0 Gates & Härtung** | 1–2 | W1-UI-Smoke, Worker-Härtung+Echt-Site-Smoke, Linkgraph, Web Vitals, Connector-Contract, Modularisierung+Tests (**ohne AuthZ**) | W1 & W2 Gates bewiesen, `npm run check` grün |
 | **M1 Opportunity-Rückgrat** | 4 (vorgezogen) | Minimale Source Map real, Opportunity+Evidence-Schema/API, erster Generator + Re-Check-Scheduler, Opportunity Board v0 + URL Dossier v0 | Ein Indexierbarkeits-Fix durchläuft open→implemented→validated mit echter Vorher/Nachher-Messung |
-| **M2 Keyword Core** | 3 | Keyword-Bibliothek+Clustering+Intent, Rank-Tracking+SERP-Snapshots/Diffs, Visibility-Index | tägliche Verläufe, Export, Alerts |
+| **M2 Keyword Core** ✅ | 3 | Keyword-Bibliothek+Clustering+Intent, Rank-Tracking+SERP-Snapshots/Diffs (Provider-Stub), Visibility-Index | Verläufe vorhanden; Export/Alerts = Follow-up |
 | **M3 Opportunity Engine + MCP** | 4 | Search-Performance-Intelligence (GSC), 5 Opportunity-Klassen, Prioritätsscore, Source-Map Pre-Merge-Gate, **MCP read-only** | jede Empfehlung mit Evidenz+Score+Validierungsmetrik; Agent beantwortet read-only Fragen |
 | **M4 Authority** | 5 | GSC-Link-Import, Ref-Domain-Modell, New/Lost, Authority-Gaps | neue/verlorene Links nachvollziehbar |
 | **M5 Reporting** | 6 | Report-Typen, Export PDF/CSV, E-Mail/Slack, Alerts | Wochenreport automatisiert |
@@ -209,7 +209,7 @@ Akzeptanz: npm run check grün; Board zeigt echte Opportunities und erlaubt Stat
 Für die Wellen 3–7 existieren bereits Basis-Prompts unter `prompts/codex-*.md`. Diese pro Welle nutzen und mit dem
 dann-aktuellen Ist-Zustand-Delta ergänzen. Reihenfolge & Module:
 
-- **M2 (W3, `prompts/codex-keyword-core.md`)**: WP-2.1 Keyword-Bibliothek+Clustering+Intent **✅ (Store + Intent/Brand/Funnel-Klassifikation + Routen/OpenAPI/Tests + Keyword-UI)** → WP-2.2 Rank-Tracking+SERP-Snapshots/Diffs (Provider-Abstraktion, kein lizenzierter Provider per DEC-002) → WP-2.3 Visibility-Index. Märkte: DACH (DEC-003, bis anders entschieden).
+- **M2 (W3) ✅ abgeschlossen**: WP-2.1 Keyword-Bibliothek+Clustering+Intent ✅ → WP-2.2 Rank-Tracking+SERP-Snapshots/Diffs ✅ (deterministischer SERP-Provider-Stub, DEC-002; rank_snapshots/serp_snapshots + serp-diff) → WP-2.3 Visibility-Index ✅ (transparente Positions-CTR-Formel, Verlauf). Märkte: DACH (DE-Default, DEC-003). UI: `/keywords-rank` mit Keyword-Bibliothek, „Rang erfassen" und Visibility-Index. Gate-Reste (Export/Alerts) als Follow-up.
 - **M3 (W4, `prompts/codex-opportunity-engine.md`)**: Search-Performance-Intelligence (braucht echten GSC-Connector) → fünf Opportunity-Klassen + Prioritätsscore (§6.4) → Source-Map Pre-Merge-Gate (PR-Check) → **MCP read-only** (`prompts/codex-ai-layer.md`, nur Tool-Teil): get_project_summary, get_url_dossier, list_opportunities, get_crawl_issues, explain_opportunity.
 - **M4 (W5, `prompts/codex-backlink-layer.md`)**: GSC-Link-Import → Ref-Domain-Modell → New/Lost → Authority-Gaps.
 - **M5 (W6, `prompts/codex-reporting.md`)**: Report-Typen → Export PDF/CSV → Versand E-Mail/Slack → Alerts.
