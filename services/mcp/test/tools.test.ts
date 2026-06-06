@@ -1,0 +1,221 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createSQLiteStore, type SQLiteStore as BackendStore } from "@seo-tool/api";
+import type { AuditIssueRecord, DiscoveredUrl, Opportunity } from "@seo-tool/domain-model";
+import { callTool } from "../src/dispatch.js";
+import { createSeoMcpTools, ToolError } from "../src/tools.js";
+
+interface Seeded {
+  store: BackendStore;
+  projectId: string;
+  siteId: string;
+  url: string;
+  discoveredUrl: DiscoveredUrl;
+  opportunity: Opportunity;
+}
+
+function seed(): Seeded {
+  const store = createSQLiteStore("sqlite::memory:");
+  const project = store.createProject({ name: "MCP Test", slug: `mcp-test-${Math.random().toString(36).slice(2)}` });
+  const site = store.createSite(project.id, { baseUrl: "https://shop.example", scopeType: "domain", businessValue: 70 });
+  const url = "https://shop.example/product/widget";
+  const otherUrl = "https://shop.example/about";
+
+  const discovered = store.recordDiscoveredUrls(project.id, site.id, [
+    {
+      id: "du-widget",
+      projectId: project.id,
+      siteId: site.id,
+      url,
+      normalizedUrl: url,
+      source: "seed",
+      discoveredFrom: null,
+      depth: 0,
+      discoveredAt: new Date().toISOString()
+    },
+    {
+      id: "du-about",
+      projectId: project.id,
+      siteId: site.id,
+      url: otherUrl,
+      normalizedUrl: otherUrl,
+      source: "link",
+      discoveredFrom: url,
+      depth: 1,
+      discoveredAt: new Date().toISOString()
+    }
+  ]);
+  const discoveredUrl = discovered.urls.find((candidate) => candidate.url === url);
+  assert.ok(discoveredUrl, "seeded discovered URL must exist");
+
+  const fetch = store.recordFetchResult(project.id, site.id, discoveredUrl.id, {
+    url,
+    finalUrl: url,
+    statusCode: 200,
+    statusClass: "success",
+    headers: { "content-type": "text/html" },
+    redirectChain: [],
+    fetchedAt: new Date().toISOString()
+  });
+  store.recordIndexabilityAssessment(project.id, site.id, discoveredUrl.id, {
+    url,
+    state: "indexable",
+    isIndexable: true,
+    reasons: [],
+    canonicalUrl: url,
+    fetchResultId: fetch.id,
+    assessedAt: new Date().toISOString()
+  });
+
+  // Internal links: about -> widget (inlink to widget), widget -> about (outlink from widget).
+  store.recordInternalLinks(project.id, site.id, [
+    { fromUrl: otherUrl, toUrl: url, anchor: "Widget", rel: null },
+    { fromUrl: url, toUrl: otherUrl, anchor: "About", rel: null }
+  ]);
+
+  const issue: AuditIssueRecord = {
+    id: "issue-widget-title",
+    projectId: project.id,
+    siteId: site.id,
+    discoveredUrlId: discoveredUrl.id,
+    url,
+    rule: "missing_title",
+    severity: "high",
+    message: "Page is missing a <title> element",
+    detectedAt: new Date().toISOString(),
+    resolvedAt: null
+  };
+  store.recordAuditIssues(project.id, site.id, [issue], { checkedDiscoveredUrlIds: [discoveredUrl.id] });
+
+  store.computeHealthScore(project.id, site.id);
+
+  const opportunity = store.createOpportunity(project.id, {
+    type: "technical_fix",
+    affectedUrls: [url],
+    currentState: "Page is missing a title tag",
+    recommendedAction: "Add a unique title tag in the product template",
+    expectedImpact: 3,
+    effort: 2,
+    confidence: 0.8,
+    businessValue: 70,
+    urgency: 3,
+    validationMetric: "indexable",
+    evidence: [
+      { source: "crawl", sourceConfidence: "A", metric: "title_present", beforeValue: "false", currentValue: "false", timeWindow: new Date().toISOString(), affectedEntity: url },
+      { source: "gsc", sourceConfidence: "B", metric: "impressions", beforeValue: 100, currentValue: 120, timeWindow: "2026-05", affectedEntity: url },
+      { source: "ga4", sourceConfidence: "C", metric: "sessions", beforeValue: 10, currentValue: 12, timeWindow: "2026-05", affectedEntity: url }
+    ]
+  });
+
+  return { store, projectId: project.id, siteId: site.id, url, discoveredUrl, opportunity };
+}
+
+test("get_project_summary returns project, sites with health, counts and top issues", () => {
+  const { store, projectId, siteId } = seed();
+  const tools = createSeoMcpTools(store);
+  const summary = callTool(tools, "get_project_summary", { projectId }) as {
+    project: { id: string };
+    sites: Array<{ site: { id: string }; latestHealthScore: { score: number } | null; openIssueCount: number }>;
+    openOpportunityCount: number;
+    topOpenAuditIssues: Array<{ id: string; severity: string }>;
+  };
+
+  assert.equal(summary.project.id, projectId);
+  assert.equal(summary.sites.length, 1);
+  assert.equal(summary.sites[0].site.id, siteId);
+  assert.ok(summary.sites[0].latestHealthScore, "latest health score present");
+  assert.equal(summary.sites[0].openIssueCount, 1);
+  assert.equal(summary.openOpportunityCount, 1);
+  assert.equal(summary.topOpenAuditIssues.length, 1);
+  assert.equal(summary.topOpenAuditIssues[0].severity, "high");
+});
+
+test("get_url_dossier resolves a URL with fetch/index/links/issues/opportunities/anchor", () => {
+  const { store, projectId, url } = seed();
+  const tools = createSeoMcpTools(store);
+  const dossier = callTool(tools, "get_url_dossier", { projectId, url }) as {
+    discoveredUrl: { url: string };
+    fetchHistory: unknown[];
+    indexabilityAssessments: unknown[];
+    inlinks: unknown[];
+    outlinks: unknown[];
+    auditIssues: Array<{ id: string }>;
+    relatedOpportunities: Array<{ id: string }>;
+    sourceAnchor: unknown;
+  };
+
+  assert.equal(dossier.discoveredUrl.url, url);
+  assert.equal(dossier.fetchHistory.length, 1);
+  assert.equal(dossier.indexabilityAssessments.length, 1);
+  assert.equal(dossier.inlinks.length, 1);
+  assert.equal(dossier.outlinks.length, 1);
+  assert.equal(dossier.auditIssues.length, 1);
+  assert.equal(dossier.relatedOpportunities.length, 1);
+
+  // Unknown URL surfaces a ToolError.
+  assert.throws(() => callTool(tools, "get_url_dossier", { projectId, url: "https://shop.example/missing" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_url");
+});
+
+test("list_opportunities returns a priority-sorted page with evidence and validationMetric", () => {
+  const { store, projectId, opportunity } = seed();
+  const tools = createSeoMcpTools(store);
+  const page = callTool(tools, "list_opportunities", { projectId, status: "open" }) as {
+    data: Array<{ id: string; priority: number; validationMetric: string; evidence: unknown[] }>;
+    total: number;
+  };
+
+  assert.equal(page.total, 1);
+  assert.equal(page.data.length, 1);
+  assert.equal(page.data[0].id, opportunity.id);
+  assert.equal(page.data[0].validationMetric, "indexable");
+  assert.equal(page.data[0].evidence.length, 3);
+  assert.ok(page.data[0].priority > 0);
+
+  // Filtering by a non-matching type yields an empty page.
+  const filtered = callTool(tools, "list_opportunities", { projectId, type: "money_page" }) as { total: number };
+  assert.equal(filtered.total, 0);
+});
+
+test("get_crawl_issues returns an audit issue page and validates the site scope", () => {
+  const { store, projectId, siteId } = seed();
+  const tools = createSeoMcpTools(store);
+  const page = callTool(tools, "get_crawl_issues", { projectId, siteId, status: "open", severity: "high" }) as {
+    data: Array<{ id: string; rule: string }>;
+    total: number;
+  };
+
+  assert.equal(page.total, 1);
+  assert.equal(page.data[0].rule, "missing_title");
+
+  assert.throws(() => callTool(tools, "get_crawl_issues", { projectId, siteId: "site-nope" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_site");
+});
+
+test("explain_opportunity returns the full record with evidence and resolved anchor", () => {
+  const { store, opportunity } = seed();
+  const tools = createSeoMcpTools(store);
+  const explained = callTool(tools, "explain_opportunity", { opportunityId: opportunity.id }) as {
+    opportunity: { id: string };
+    evidence: unknown[];
+    currentState: string;
+    recommendedAction: string;
+    priority: number;
+    validationMetric: string;
+  };
+
+  assert.equal(explained.opportunity.id, opportunity.id);
+  assert.equal(explained.evidence.length, 3);
+  assert.equal(explained.validationMetric, "indexable");
+  assert.ok(explained.recommendedAction.length > 0);
+  assert.ok(explained.priority > 0);
+
+  assert.throws(() => callTool(tools, "explain_opportunity", { opportunityId: "opp-missing" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_opportunity");
+});
+
+test("callTool rejects unknown tool names and missing required args", () => {
+  const { store, projectId } = seed();
+  const tools = createSeoMcpTools(store);
+
+  assert.throws(() => callTool(tools, "not_a_tool", {}), (error: unknown) => error instanceof ToolError && error.code === "unknown_tool");
+  assert.throws(() => callTool(tools, "get_project_summary", {}), (error: unknown) => error instanceof ToolError && error.code === "missing_field");
+  void projectId;
+});

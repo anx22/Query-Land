@@ -1,0 +1,401 @@
+import type {
+  AuditIssueRecord,
+  AuditIssueSeverity,
+  CrawlHealthScore,
+  DiscoveredUrl,
+  IndexabilityRecord,
+  Opportunity,
+  OpportunityStatus,
+  Site,
+  UrlFetchRecord
+} from "@seo-tool/domain-model";
+import type { SQLiteStore as BackendStore } from "@seo-tool/api";
+
+/**
+ * JSON-Schema subset used for MCP tool input declarations. Kept intentionally
+ * small (object schemas only) so it stays dependency-free and serialisable.
+ */
+export interface JsonSchema {
+  type: "object";
+  properties: Record<string, JsonSchemaProperty>;
+  required?: string[];
+  additionalProperties?: boolean;
+}
+
+export interface JsonSchemaProperty {
+  type: "string" | "number" | "integer" | "boolean";
+  description?: string;
+  enum?: readonly string[];
+}
+
+export interface McpTool {
+  name: string;
+  description: string;
+  inputSchema: JsonSchema;
+  handler(args: Record<string, unknown>): unknown;
+}
+
+/**
+ * Error carrying a stable machine code; mirrors RequestError semantics from the
+ * API store layer without depending on its internals.
+ */
+export class ToolError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message);
+    this.name = "ToolError";
+  }
+}
+
+const OPPORTUNITY_STATUSES: readonly OpportunityStatus[] = [
+  "open",
+  "planned",
+  "in_progress",
+  "implemented",
+  "validated",
+  "reopened",
+  "dismissed",
+  "expired"
+];
+
+const OPPORTUNITY_TYPES: readonly Opportunity["type"][] = [
+  "technical_fix",
+  "low_hanging_keyword",
+  "cannibalization",
+  "money_page",
+  "internal_link_gap",
+  "aeo"
+];
+
+const AUDIT_ISSUE_STATUSES = ["open", "resolved", "all"] as const;
+const AUDIT_ISSUE_SEVERITIES: readonly AuditIssueSeverity[] = ["critical", "high", "medium", "low"];
+const AUDIT_ISSUE_RULES = [
+  "http_error",
+  "redirect_chain",
+  "missing_title",
+  "duplicate_title",
+  "canonical_mismatch",
+  "broken_link"
+] as const;
+
+const MAX_PAGE = 200;
+
+function requireString(args: Record<string, unknown>, field: string): string {
+  const value = args[field];
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new ToolError("missing_field", `${field} is required and must be a non-empty string`);
+  }
+  return value;
+}
+
+function optionalString(args: Record<string, unknown>, field: string): string | undefined {
+  const value = args[field];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") {
+    throw new ToolError("invalid_field", `${field} must be a string`);
+  }
+  return value;
+}
+
+function optionalEnum<T extends string>(args: Record<string, unknown>, field: string, allowed: readonly T[]): T | undefined {
+  const value = optionalString(args, field);
+  if (value === undefined) return undefined;
+  if (!allowed.includes(value as T)) {
+    throw new ToolError("invalid_field", `${field} must be one of ${allowed.join(", ")}`);
+  }
+  return value as T;
+}
+
+function optionalCount(args: Record<string, unknown>, field: string): number | undefined {
+  const value = args[field];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new ToolError("invalid_field", `${field} must be a number`);
+  }
+  return Math.max(0, Math.trunc(value));
+}
+
+function findSite(store: BackendStore, projectId: string, siteId: string): Site {
+  const site = store.listSites(projectId).find((candidate) => candidate.id === siteId);
+  if (!site) {
+    throw new ToolError("unknown_site", `Site ${siteId} was not found in project ${projectId}`);
+  }
+  return site;
+}
+
+function requireProjectId(store: BackendStore, args: Record<string, unknown>): string {
+  const projectId = requireString(args, "projectId");
+  if (!store.listProjects().some((candidate) => candidate.id === projectId)) {
+    throw new ToolError("unknown_project", `Project ${projectId} was not found`);
+  }
+  return projectId;
+}
+
+interface SiteHealth {
+  site: Site;
+  latestHealthScore: CrawlHealthScore | null;
+  openIssueCount: number;
+}
+
+function buildProjectSummary(store: BackendStore, projectId: string) {
+  const project = store.listProjects().find((candidate) => candidate.id === projectId);
+  if (!project) {
+    throw new ToolError("unknown_project", `Project ${projectId} was not found`);
+  }
+  const sites = store.listSites(projectId);
+
+  const siteHealth: SiteHealth[] = sites.map((site) => {
+    const healthScores = store.listHealthScores(projectId, site.id);
+    // listHealthScores is ordered generated_at DESC, so the first entry is latest.
+    const latestHealthScore = healthScores[0] ?? null;
+    const openIssues = store.listAuditIssuesPage(projectId, site.id, { limit: 1, offset: 0 }, { status: "open" });
+    return { site, latestHealthScore, openIssueCount: openIssues.total };
+  });
+
+  const openOpportunities = store.listOpportunitiesPage(projectId, { limit: 1, offset: 0 }, { status: "open" });
+
+  // Top open audit issues across every site, severity-ranked (critical first).
+  const topIssues: AuditIssueRecord[] = [];
+  for (const site of sites) {
+    const page = store.listAuditIssuesPage(projectId, site.id, { limit: MAX_PAGE, offset: 0 }, { status: "open" });
+    topIssues.push(...page.data);
+  }
+  topIssues.sort((left, right) => severityRank(left.severity) - severityRank(right.severity));
+
+  return {
+    project,
+    sites: siteHealth,
+    openOpportunityCount: openOpportunities.total,
+    topOpenAuditIssues: topIssues.slice(0, 10)
+  };
+}
+
+function severityRank(severity: AuditIssueSeverity): number {
+  switch (severity) {
+    case "critical":
+      return 0;
+    case "high":
+      return 1;
+    case "medium":
+      return 2;
+    case "low":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+interface ResolvedUrlRow {
+  site: Site;
+  discoveredUrl: DiscoveredUrl;
+}
+
+/**
+ * Locate the discovered-URL row for a (project[, site], url) tuple. When siteId
+ * is omitted we scan all sites in the project. Matches url OR normalizedUrl.
+ */
+function resolveDiscoveredUrl(store: BackendStore, projectId: string, siteId: string | undefined, url: string): ResolvedUrlRow {
+  const sites = siteId ? [findSite(store, projectId, siteId)] : store.listSites(projectId);
+  for (const site of sites) {
+    let offset = 0;
+    for (;;) {
+      const page = store.listUrlExplorerRows(projectId, site.id, { limit: MAX_PAGE, offset });
+      const match = page.data.find(
+        (row) => row.discoveredUrl.url === url || row.discoveredUrl.normalizedUrl === url
+      );
+      if (match) {
+        return { site, discoveredUrl: match.discoveredUrl };
+      }
+      if (page.nextCursor === null || page.data.length === 0) break;
+      offset += page.data.length;
+    }
+  }
+  throw new ToolError("unknown_url", `No discovered URL matching ${url} was found in project ${projectId}`);
+}
+
+function buildUrlDossier(store: BackendStore, projectId: string, siteId: string | undefined, url: string) {
+  const { site, discoveredUrl } = resolveDiscoveredUrl(store, projectId, siteId, url);
+
+  const fetchHistory: UrlFetchRecord[] = store.listFetchResults(projectId, site.id, discoveredUrl.id);
+  const indexabilityAssessments: IndexabilityRecord[] = store.listIndexabilityAssessments(projectId, site.id, discoveredUrl.id);
+
+  const inlinks = store.listInternalLinks(projectId, site.id, "in", discoveredUrl.normalizedUrl, { limit: MAX_PAGE });
+  const outlinks = store.listInternalLinks(projectId, site.id, "out", discoveredUrl.normalizedUrl, { limit: MAX_PAGE });
+
+  // Audit issues that reference this URL (matched by URL or normalized URL).
+  const auditIssues: AuditIssueRecord[] = [];
+  let issueOffset = 0;
+  for (;;) {
+    const page = store.listAuditIssuesPage(projectId, site.id, { limit: MAX_PAGE, offset: issueOffset });
+    for (const issue of page.data) {
+      if (issue.url === discoveredUrl.url || issue.url === discoveredUrl.normalizedUrl || issue.discoveredUrlId === discoveredUrl.id) {
+        auditIssues.push(issue);
+      }
+    }
+    if (page.nextCursor === null || page.data.length === 0) break;
+    issueOffset += page.data.length;
+  }
+
+  // Opportunities whose affectedUrls include this URL (any status).
+  const relatedOpportunities: Opportunity[] = [];
+  let oppOffset = 0;
+  for (;;) {
+    const page = store.listOpportunitiesPage(projectId, { limit: MAX_PAGE, offset: oppOffset });
+    for (const opportunity of page.data) {
+      if (opportunity.affectedUrls.includes(discoveredUrl.url) || opportunity.affectedUrls.includes(discoveredUrl.normalizedUrl)) {
+        relatedOpportunities.push(opportunity);
+      }
+    }
+    if (page.nextCursor === null || page.data.length === 0) break;
+    oppOffset += page.data.length;
+  }
+
+  const sourceAnchor = store.resolveSourceAnchor(discoveredUrl.url);
+
+  return {
+    site,
+    discoveredUrl,
+    fetchHistory,
+    indexabilityAssessments,
+    inlinks: inlinks.data,
+    outlinks: outlinks.data,
+    auditIssues,
+    relatedOpportunities,
+    sourceAnchor
+  };
+}
+
+/**
+ * Build the read-only MCP tool set bound to a BackendStore. Pure and unit
+ * testable: every handler returns plain JSON-serialisable data.
+ */
+export function createSeoMcpTools(store: BackendStore): McpTool[] {
+  return [
+    {
+      name: "get_project_summary",
+      description:
+        "Return project metadata, its sites with latest health scores, the count of open opportunities, and the top open audit issues across the project.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier (e.g. proj-acme)." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args) {
+        const projectId = requireString(args, "projectId");
+        return buildProjectSummary(store, projectId);
+      }
+    },
+    {
+      name: "get_url_dossier",
+      description:
+        "Resolve a discovered URL and return its fetch history, indexability assessments, internal inlinks/outlinks, audit issues, related opportunities, and resolved source anchor. siteId is optional; when omitted every site in the project is searched.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier." },
+          siteId: { type: "string", description: "Optional site identifier to scope the lookup." },
+          url: { type: "string", description: "The URL (or normalized URL) to build the dossier for." }
+        },
+        required: ["projectId", "url"],
+        additionalProperties: false
+      },
+      handler(args) {
+        const projectId = requireProjectId(store, args);
+        const siteId = optionalString(args, "siteId");
+        const url = requireString(args, "url");
+        return buildUrlDossier(store, projectId, siteId, url);
+      }
+    },
+    {
+      name: "list_opportunities",
+      description:
+        "Return a priority-sorted page of opportunities for a project, each including its evidence, priority score, and validation metric. Optional filters: status, type. Supports limit/offset paging.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier." },
+          status: { type: "string", description: "Filter by opportunity status.", enum: OPPORTUNITY_STATUSES },
+          type: { type: "string", description: "Filter by opportunity type.", enum: OPPORTUNITY_TYPES },
+          limit: { type: "integer", description: "Max items per page (1-200, default 50)." },
+          offset: { type: "integer", description: "Number of items to skip." }
+        },
+        required: ["projectId"],
+        additionalProperties: false
+      },
+      handler(args) {
+        const projectId = requireString(args, "projectId");
+        const status = optionalEnum(args, "status", OPPORTUNITY_STATUSES);
+        const type = optionalEnum(args, "type", OPPORTUNITY_TYPES);
+        const limit = optionalCount(args, "limit");
+        const offset = optionalCount(args, "offset");
+        return store.listOpportunitiesPage(projectId, { limit, offset }, { status, type });
+      }
+    },
+    {
+      name: "get_crawl_issues",
+      description:
+        "Return a page of audit (crawl) issues for a project + site. Optional filters: status (open/resolved/all), severity, rule. Supports limit/offset paging.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          projectId: { type: "string", description: "Project identifier." },
+          siteId: { type: "string", description: "Site identifier." },
+          status: { type: "string", description: "Filter by issue status.", enum: AUDIT_ISSUE_STATUSES },
+          severity: { type: "string", description: "Filter by severity.", enum: AUDIT_ISSUE_SEVERITIES },
+          rule: { type: "string", description: "Filter by audit rule.", enum: AUDIT_ISSUE_RULES },
+          limit: { type: "integer", description: "Max items per page (1-200, default 50)." },
+          offset: { type: "integer", description: "Number of items to skip." }
+        },
+        required: ["projectId", "siteId"],
+        additionalProperties: false
+      },
+      handler(args) {
+        const projectId = requireString(args, "projectId");
+        const siteId = requireString(args, "siteId");
+        // Validate scope up front so callers get a clear not-found rather than an empty page.
+        findSite(store, projectId, siteId);
+        const status = optionalEnum(args, "status", AUDIT_ISSUE_STATUSES);
+        const severity = optionalEnum(args, "severity", AUDIT_ISSUE_SEVERITIES);
+        const rule = optionalEnum(args, "rule", AUDIT_ISSUE_RULES);
+        const limit = optionalCount(args, "limit");
+        const offset = optionalCount(args, "offset");
+        return store.listAuditIssuesPage(projectId, siteId, { limit, offset }, { status, severity, rule });
+      }
+    },
+    {
+      name: "explain_opportunity",
+      description:
+        "Return the full opportunity record (evidence, currentState, recommendedAction, priority, validationMetric, sourceAnchor) for an opportunity id.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          opportunityId: { type: "string", description: "Opportunity identifier (e.g. opp-...)." }
+        },
+        required: ["opportunityId"],
+        additionalProperties: false
+      },
+      handler(args) {
+        const opportunityId = requireString(args, "opportunityId");
+        let opportunity: Opportunity;
+        try {
+          opportunity = store.getOpportunity(opportunityId);
+        } catch {
+          throw new ToolError("unknown_opportunity", `Opportunity ${opportunityId} was not found`);
+        }
+        const sourceAnchor =
+          opportunity.affectedUrls.length > 0 ? store.resolveSourceAnchor(opportunity.affectedUrls[0]) : null;
+        return {
+          opportunity,
+          evidence: opportunity.evidence,
+          currentState: opportunity.currentState,
+          recommendedAction: opportunity.recommendedAction,
+          priority: opportunity.priority,
+          validationMetric: opportunity.validationMetric,
+          sourceAnchor: opportunity.sourceAnchor ?? sourceAnchor
+        };
+      }
+    }
+  ];
+}

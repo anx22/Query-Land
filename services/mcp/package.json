@@ -1,0 +1,16 @@
+{
+  "name": "@seo-tool/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/src/server.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/src/server.js"
+  },
+  "dependencies": {
+    "@seo-tool/domain-model": "0.1.0",
+    "@seo-tool/api": "0.1.0"
+  }
+}
