@@ -1,220 +1,185 @@
-import type { BacklinkChange, BacklinkSnapshot } from "@seo-tool/domain-model";
+import "../../features/backlinks/backlinks.css";
+
 import { AppShell } from "../../components/app-shell";
-import { MetricCard } from "../../components/metric-card";
-import { loadBacklinkAuthority } from "../../features/backlinks";
+import { ConfidenceBadge } from "../../components/confidence-badge";
+import { DeltaChip } from "../../components/delta-chip";
+import { TermTooltip } from "../../components/term-tooltip";
+import { WhyItMatters } from "../../components/why-it-matters";
+import { ScoreGauge } from "../../components/charts/score-gauge";
+import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
+import { loadBacklinksScreenData } from "../../lib/backlinks-api";
+import {
+  backlinkTrend,
+  diffToFlowBars,
+  formatCount,
+  formatRatioPct,
+  referringDomainTrend,
+  snapshotDeltas,
+} from "../../features/backlinks/backlinks-logic";
+import { BacklinkTrendCard } from "../../features/backlinks/backlink-trend-card";
+import { ReferringDomainsTable } from "../../features/backlinks/referring-domains-table";
+import { AnchorDistribution, FollowDistribution } from "../../features/backlinks/distribution-bars";
 import { importBacklinksAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const data = await loadBacklinkAuthority();
+  const data = await loadBacklinksScreenData();
   const feedback = feedbackMessage(params);
 
-  const followRatioPct = data.authority ? `${(data.authority.followRatio * 100).toFixed(1)} %` : "—";
-  const netBacklinks = data.diff ? (data.diff.netBacklinkChange >= 0 ? `+${data.diff.netBacklinkChange}` : String(data.diff.netBacklinkChange)) : "—";
-  const netDomains = data.diff ? (data.diff.netReferringDomainChange >= 0 ? `+${data.diff.netReferringDomainChange}` : String(data.diff.netReferringDomainChange)) : "—";
+  // Server-derived, serialisable props for client islands.
+  const backlinksTrend = backlinkTrend(data.snapshots);
+  const domainsTrend = referringDomainTrend(data.snapshots);
+  const flowBars = diffToFlowBars(data.diff);
+  const deltas = snapshotDeltas(data.snapshots);
+
+  const followRatio = data.authority?.followRatio ?? null;
+  // ScoreGauge expects a 0–100 value; follow-ratio is a 0–1 fraction.
+  const followRatioGauge = followRatio !== null ? Math.round(followRatio * 100) : null;
+
   const hasData = data.authority !== null || data.snapshots.length > 0;
 
   return (
     <AppShell activePath="/backlinks">
-      <section className="card hero-card">
-        <p className="kicker">Authority &amp; Backlinks</p>
-        <h1>Backlink-Profil</h1>
-        <p>
-          Backlink-Profil und Authority-Messung. Importieren Sie den GSC-Links-Report, um Backlinks, verweisende Domains, Follow-Ratio, Zu- und Abgänge sowie die Anchor-Verteilung auszuwerten.
-        </p>
-        <div className="badge-row">
-          <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
-          <span className="badge">{data.snapshots.length} Snapshot{data.snapshots.length !== 1 ? "s" : ""}</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
-        </div>
-        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
-        {data.connected && !hasData ? (
-          <p className="notice">Noch keine Backlink-Daten vorhanden. Klicke „Backlinks importieren", um den ersten Snapshot zu erstellen.</p>
-        ) : null}
-        <div className="action-row">
-          <form action={importBacklinksAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Backlinks importieren</button>
-          </form>
-        </div>
-      </section>
-
-      <section className="metric-grid">
-        <MetricCard
-          label="Backlinks gesamt"
-          value={data.authority ? String(data.authority.totalBacklinks) : "—"}
-          note={hasData ? undefined : "noch kein Import"}
-        />
-        <MetricCard
-          label="Verweisende Domains"
-          value={data.authority ? String(data.authority.referringDomains) : "—"}
-          note={data.referringDomains.length > 0 ? `${data.referringDomains.length} geladen` : undefined}
-        />
-        <MetricCard
-          label="Follow-Ratio"
-          value={followRatioPct}
-          note="Anteil Follow-Links"
-        />
-        <MetricCard
-          label="Netto-Veränderung"
-          value={data.diff ? `${netBacklinks} Links / ${netDomains} Domains` : "—"}
-          note={data.diff ? `${data.diff.newBacklinks.length} neu · ${data.diff.lostBacklinks.length} verloren` : "kein Diff (< 2 Snapshots)"}
-        />
-      </section>
-
-      <section className="content-grid">
-        <div className="card">
-          <p className="kicker">Top verweisende Domains</p>
-          {data.authority && data.authority.topReferringDomains.length > 0 ? (
-            <div className="table-list">
-              {data.authority.topReferringDomains.map((rd) => (
-                <article key={rd.domain}>
-                  <strong>{rd.domain}</strong>
-                  <span>{rd.backlinks} Backlinks · {rd.targetUrls} Ziel-URLs</span>
-                  <span className="muted">Follow-Anteil {(rd.followShare * 100).toFixed(1)} %</span>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">Noch keine Daten. Importiere Backlinks.</p>
-          )}
-        </div>
-
-        <div className="card">
-          <p className="kicker">Top Anchors</p>
-          {data.authority && data.authority.topAnchors.length > 0 ? (
-            <div className="table-list">
-              {data.authority.topAnchors.map((anchor) => (
-                <article key={anchor.anchorText || "(leer)"}>
-                  <strong>{anchor.anchorText || "(kein Ankertext)"}</strong>
-                  <span>{anchor.count}× · {(anchor.share * 100).toFixed(1)} %</span>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">Noch keine Anchor-Daten.</p>
-          )}
-        </div>
-
-        <div className="card">
-          <p className="kicker">Top Ziel-URLs</p>
-          {data.authority && data.authority.topTargetUrls.length > 0 ? (
-            <div className="table-list">
-              {data.authority.topTargetUrls.map((tu) => (
-                <article key={tu.targetUrl}>
-                  <strong className="muted">{tu.targetUrl}</strong>
-                  <span>{tu.backlinks} Backlinks · {tu.referringDomains} Domains</span>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">Noch keine Ziel-URL-Daten.</p>
-          )}
-        </div>
-      </section>
-
-      {data.diff ? (
-        <section className="content-grid">
-          <div className="card">
-            <p className="kicker">Neue Backlinks ({data.diff.newBacklinks.length})</p>
-            {data.diff.newBacklinks.length > 0 ? (
-              <div className="table-list">
-                {data.diff.newBacklinks.slice(0, 20).map((bl) => (
-                  <BacklinkChangeRow key={`new-${bl.sourceUrl}-${bl.targetUrl}`} change={bl} />
-                ))}
-                {data.diff.newBacklinks.length > 20 ? <p className="muted">… und {data.diff.newBacklinks.length - 20} weitere</p> : null}
-              </div>
-            ) : (
-              <p className="muted">Keine neuen Backlinks seit dem letzten Snapshot.</p>
-            )}
+      <div className="backlinks-root">
+        {/* ----------------------------------------------------------------- */}
+        {/* Intro + import action                                             */}
+        {/* ----------------------------------------------------------------- */}
+        <section className="card hero-card">
+          <p className="kicker">Authority &amp; Backlinks</p>
+          <h1>Backlink-Profil</h1>
+          <p>
+            So entwickelt sich Ihr Linkprofil: <TermTooltip term="Backlink">Backlinks</TermTooltip> und{" "}
+            <TermTooltip term="Verweisende Domain">verweisende Domains</TermTooltip> über die Zeit,{" "}
+            <TermTooltip term="Follow / Nofollow">Follow / Nofollow</TermTooltip>-Mix, Zu- und Abgänge sowie die{" "}
+            <TermTooltip term="Follow-Ratio">Follow-Ratio</TermTooltip>. Quelle ist der GSC-Links-Report (Beleg-Klasse B).
+          </p>
+          <div className="badge-row">
+            <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
+            <span className="badge">{data.snapshots.length} Snapshot{data.snapshots.length !== 1 ? "s" : ""}</span>
+            <ConfidenceBadge level="B" />
+            <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
           </div>
-
-          <div className="card">
-            <p className="kicker">Verlorene Backlinks ({data.diff.lostBacklinks.length})</p>
-            {data.diff.lostBacklinks.length > 0 ? (
-              <div className="table-list">
-                {data.diff.lostBacklinks.slice(0, 20).map((bl) => (
-                  <BacklinkChangeRow key={`lost-${bl.sourceUrl}-${bl.targetUrl}`} change={bl} />
-                ))}
-                {data.diff.lostBacklinks.length > 20 ? <p className="muted">… und {data.diff.lostBacklinks.length - 20} weitere</p> : null}
-              </div>
-            ) : (
-              <p className="muted">Keine verlorenen Backlinks seit dem letzten Snapshot.</p>
-            )}
-          </div>
-
-          <div className="card">
-            <p className="kicker">Neue verweisende Domains ({data.diff.newReferringDomains.length})</p>
-            {data.diff.newReferringDomains.length > 0 ? (
-              <ul>
-                {data.diff.newReferringDomains.slice(0, 20).map((domain) => (
-                  <li key={`newdom-${domain}`}>{domain}</li>
-                ))}
-                {data.diff.newReferringDomains.length > 20 ? <li className="muted">… und {data.diff.newReferringDomains.length - 20} weitere</li> : null}
-              </ul>
-            ) : (
-              <p className="muted">Keine neuen Domains.</p>
-            )}
-            <p className="kicker" style={{ marginTop: "1rem" }}>Verlorene Domains ({data.diff.lostReferringDomains.length})</p>
-            {data.diff.lostReferringDomains.length > 0 ? (
-              <ul>
-                {data.diff.lostReferringDomains.slice(0, 20).map((domain) => (
-                  <li key={`lostdom-${domain}`}>{domain}</li>
-                ))}
-                {data.diff.lostReferringDomains.length > 20 ? <li className="muted">… und {data.diff.lostReferringDomains.length - 20} weitere</li> : null}
-              </ul>
-            ) : (
-              <p className="muted">Keine verlorenen Domains.</p>
-            )}
+          {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+          {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+          {data.connected && !hasData ? (
+            <p className="notice">Noch keine Backlink-Daten. Mit „Backlinks importieren“ legen Sie den ersten Snapshot an.</p>
+          ) : null}
+          <div className="action-row">
+            <form action={importBacklinksAction}>
+              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+              <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Backlinks importieren</button>
+            </form>
           </div>
         </section>
-      ) : null}
 
-      <section className="card">
-        <p className="kicker">Snapshot-Verlauf ({data.snapshots.length})</p>
-        {data.snapshots.length > 0 ? (
-          <div className="table-list">
-            {data.snapshots.map((snap) => (
-              <SnapshotRow key={snap.id} snapshot={snap} />
-            ))}
+        {/* ----------------------------------------------------------------- */}
+        {/* Hero: TrendChart (toggle Backlinks/Domains) + Follow-Ratio gauge  */}
+        {/* ----------------------------------------------------------------- */}
+        <section className="backlinks-hero" aria-label="Verlauf und Follow-Ratio">
+          <div className="card">
+            <div className="backlinks-hero__header">
+              <div>
+                <p className="kicker">Verlauf</p>
+                <h2>Backlinks &amp; verweisende Domains</h2>
+                <WhyItMatters>
+                  Ein stetig wachsendes Linkprofil ist ein starkes Vertrauenssignal — fallende Kurven verdienen eine Ursachenanalyse.
+                </WhyItMatters>
+              </div>
+              {deltas.latest ? (
+                <div className="backlinks-gauge-foot">
+                  <span className="metric-value">{formatCount(deltas.latest.totalBacklinks)}</span>
+                  {deltas.backlinkDelta !== null ? <DeltaChip value={deltas.backlinkDelta} /> : null}
+                  <span className="backlinks-gauge-note">Backlinks gesamt</span>
+                </div>
+              ) : null}
+            </div>
+            <BacklinkTrendCard backlinks={backlinksTrend} domains={domainsTrend} />
           </div>
-        ) : (
-          <p>Noch keine Snapshots. Klicke „Backlinks importieren", um den ersten Snapshot zu erstellen.</p>
-        )}
-      </section>
+
+          <div className="card backlinks-gauge-card">
+            <p className="kicker">
+              <TermTooltip term="Follow-Ratio">Follow-Ratio</TermTooltip>
+            </p>
+            <WhyItMatters>
+              Der Anteil linkkraft-weitergebender Links zeigt, wie viel SEO-Wert Ihr Profil tatsächlich überträgt.
+            </WhyItMatters>
+            <div className="backlinks-chart">
+              <ScoreGauge value={followRatioGauge} max={100} label="Follow %" size={160} />
+            </div>
+            <div className="backlinks-gauge-foot">
+              <span className="backlinks-gauge-note">Follow-Anteil: {formatRatioPct(followRatio)}</span>
+              <ConfidenceBadge level="B" />
+              <span className="backlinks-gauge-note">
+                <TermTooltip term="Authority">Authority</TermTooltip>/Domain-Rating: Drittanbieter-Daten noch nicht angebunden.
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* ----------------------------------------------------------------- */}
+        {/* New vs. Lost (diverging) + KPI deltas                              */}
+        {/* ----------------------------------------------------------------- */}
+        <section className="content-grid" aria-label="Zu- und Abgänge">
+          <div className="card">
+            <p className="kicker">Zu- und Abgänge</p>
+            <h2>Neu vs. verloren</h2>
+            <WhyItMatters text="Verlorene Links rechtzeitig erkennen, bevor sie Rankings kosten." />
+            <div className="backlinks-chart">
+              <BacklinkFlowChart data={flowBars} title="Neue vs. verlorene Links und Domains" />
+            </div>
+            {data.diff ? (
+              <p className="muted">
+                Netto {data.diff.netBacklinkChange >= 0 ? `+${data.diff.netBacklinkChange}` : data.diff.netBacklinkChange} Links ·{" "}
+                {data.diff.netReferringDomainChange >= 0 ? `+${data.diff.netReferringDomainChange}` : data.diff.netReferringDomainChange} Domains
+                {" "}seit dem letzten Snapshot.
+              </p>
+            ) : (
+              <p className="muted">Vergleich erscheint ab dem zweiten Snapshot.</p>
+            )}
+          </div>
+
+          <div className="card">
+            <p className="kicker">
+              <TermTooltip term="Follow / Nofollow">Follow / Nofollow</TermTooltip>-Verteilung
+            </p>
+            <h2>Link-Typ-Mix</h2>
+            <WhyItMatters text="Ein gesunder Follow-Anteil maximiert die übertragene Linkkraft." />
+            <FollowDistribution authority={data.authority} />
+          </div>
+        </section>
+
+        {/* ----------------------------------------------------------------- */}
+        {/* Anchor distribution                                               */}
+        {/* ----------------------------------------------------------------- */}
+        <section className="card" aria-label="Anchor-Verteilung">
+          <p className="kicker">Anchor-Verteilung</p>
+          <h2>Häufigste Ankertexte</h2>
+          <WhyItMatters text="Ein natürlicher Anchor-Mix (Brand, URL, generisch) schützt vor Over-Optimization-Risiken." />
+          <AnchorDistribution authority={data.authority} />
+        </section>
+
+        {/* ----------------------------------------------------------------- */}
+        {/* Referring-domains table                                           */}
+        {/* ----------------------------------------------------------------- */}
+        <section className="card" aria-label="Verweisende Domains">
+          <p className="kicker">
+            <TermTooltip term="Verweisende Domain">Verweisende Domains</TermTooltip>
+          </p>
+          <h2>Domains, die auf Sie verlinken</h2>
+          <WhyItMatters text="Viele unterschiedliche verweisende Domains wiegen schwerer als viele Links von wenigen Domains." />
+          <ReferringDomainsTable domains={data.referringDomains} />
+        </section>
+      </div>
     </AppShell>
-  );
-}
-
-function BacklinkChangeRow({ change }: { change: BacklinkChange }) {
-  return (
-    <article>
-      <strong className="muted">{change.sourceDomain}</strong>
-      <span>{change.sourceUrl}</span>
-      <span>→ {change.targetUrl}</span>
-      <span className="muted">{change.anchorText || "(kein Ankertext)"} · {change.linkType}</span>
-    </article>
-  );
-}
-
-function SnapshotRow({ snapshot }: { snapshot: BacklinkSnapshot }) {
-  const date = new Date(snapshot.capturedAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
-  return (
-    <article>
-      <strong>{date}</strong>
-      <span>{snapshot.totalBacklinks} Backlinks · {snapshot.referringDomains} Domains</span>
-      <span className="muted">Quelle {snapshot.sourceConfidence}</span>
-    </article>
   );
 }
 
 function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
-  if (singleParam(params?.imported)) return { kind: "success", message: "Backlink-Import gestartet. Der neue Snapshot wird in Kürze verfügbar sein." };
+  if (singleParam(params?.imported)) return { kind: "success", message: "Backlink-Import gestartet. Der neue Snapshot ist in Kürze verfügbar." };
   return null;
 }
 
