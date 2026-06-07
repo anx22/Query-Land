@@ -8,6 +8,9 @@ import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
+import { InfoTip } from "../../components/info-tip";
+import { HelpPanel } from "../../components/help-panel";
+import { GlossarLink } from "../../components/glossar-link";
 import { IssueGroups } from "../../features/technical-audit/issue-groups";
 import { loadTechnicalAuditOverview } from "../../lib/audit-api";
 
@@ -55,11 +58,26 @@ export default async function Page() {
         ) : null}
       </section>
 
+      {/* Help zone — layout-separated from the productive panels below */}
+      <HelpPanel title="So liest du das Technical Audit">
+        <p>
+          Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt,
+          wo URLs auf dem Weg in den Google-Index verloren gehen. Der{" "}
+          <GlossarLink term="health score">Health Score</GlossarLink> bündelt alle offenen
+          Issues zu einer Zahl. Die Treemap verrät, welche Website-Bereiche die meisten
+          Probleme tragen — dort lohnt sich die Arbeit zuerst.
+        </p>
+      </HelpPanel>
+
       {/* Health gauge + indexability funnel */}
       <section className="audit-overview-grid">
         <div className="card">
           <p className="kicker">
             <TermTooltip term="indexierbarkeit">Indexierbarkeit</TermTooltip>-Funnel
+            <InfoTip>
+              Jede Stufe filtert URLs: entdeckt → abrufbar → renderbar → nicht blockiert →
+              indexierbar. Ein großer Abfall zwischen zwei Stufen ist ein konkreter Hebel.
+            </InfoTip>
           </p>
           <p className="muted">
             Entdeckt → Gecrawlt → Indexierbar (aus dem letzten Crawl-Lauf). <ConfidenceBadge level="A" />

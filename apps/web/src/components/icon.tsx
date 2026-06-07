@@ -20,7 +20,9 @@ export type IconName =
   | "auto_awesome"
   | "settings"
   | "lock"
-  | "check";
+  | "check"
+  | "info"
+  | "chevron";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard: (
@@ -86,6 +88,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5" />
+      <path d="M12 7.75v.5" />
+    </>
+  ),
+  chevron: <path d="M6 9l6 6 6-6" />,
 };
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

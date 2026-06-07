@@ -14,6 +14,10 @@ import { ConfidenceBadge, type ConfidenceLevel } from "../../components/confiden
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
+import { InfoTip } from "../../components/info-tip";
+import { HelpDisclosure } from "../../components/help-disclosure";
+import { HelpPanel } from "../../components/help-panel";
+import { GlossarLink } from "../../components/glossar-link";
 import { Sparkline } from "../../components/charts/sparkline";
 import { TrendChart } from "../../components/charts/trend-chart";
 import { ScoreGauge } from "../../components/charts/score-gauge";
@@ -187,6 +191,62 @@ export default function KitPage() {
             <WhyItMatters showIcon={false}>
               Kompakte Variante für Kontexte, die kein Icon vertragen.
             </WhyItMatters>
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================
+          Hilfe-Primitive — InfoTip / HelpDisclosure / HelpPanel / GlossarLink
+          ============================================================ */}
+      <section className="kit-section" aria-labelledby="help-heading">
+        <h2 id="help-heading">
+          Hilfe-Primitive
+          <InfoTip>
+            Diese Bausteine trennen Erklärung von produktivem Inhalt: kurze Tipps am
+            Ort (InfoTip), ausklappbare Hilfe (HelpDisclosure), abgesetzte Hilfspanels
+            (HelpPanel) und Inline-Verweise ins <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
+          </InfoTip>
+        </h2>
+
+        <div className="kit-row">
+          <span className="kit-label">InfoTip (i-Kreis):</span>
+          <span>
+            Visibility-Index
+            <InfoTip>
+              Positionsgewichtete Sichtbarkeit auf dem eigenen Keyword-Set. Mehr im{" "}
+              <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
+            </InfoTip>
+          </span>
+        </div>
+
+        <div className="kit-row">
+          <span className="kit-label">GlossarLink (inline):</span>
+          <span>
+            Siehe <GlossarLink term="Health Score">Health Score</GlossarLink> und{" "}
+            <GlossarLink term="Crawl">Crawl</GlossarLink>.
+          </span>
+        </div>
+
+        <div className="kit-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "1rem" }}>
+          <div style={{ width: "100%", maxWidth: "34rem" }}>
+            <span className="kit-label">HelpDisclosure (Ausklapper):</span>
+            <HelpDisclosure summary="Wie wird der Health Score berechnet?">
+              <p>
+                Der <GlossarLink term="Health Score">Health Score</GlossarLink> gewichtet
+                offene Issues nach Schweregrad und Anzahl. Kritische Blocker (z. B.
+                Noindex auf Money-Pages) drücken ihn am stärksten.
+              </p>
+            </HelpDisclosure>
+          </div>
+
+          <div style={{ width: "100%", maxWidth: "34rem" }}>
+            <span className="kit-label">HelpPanel (abgesetzt):</span>
+            <HelpPanel title="So liest du das Opportunity-Board">
+              <p>
+                Jede Karte ist eine umsetzbare Chance mit Evidenz, Aufwand und erwartetem
+                Impact. Die Sortierung folgt der Priorität (Impact × Konfidenz × Business-Wert ÷ Aufwand).
+              </p>
+            </HelpPanel>
           </div>
         </div>
       </section>
