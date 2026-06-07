@@ -71,8 +71,10 @@ Wo es um **harte Kennzahlen und Wahrheitsaussagen über die Website** geht, ist 
 | A | Gesichert | 🟢 grün | Eigene Daten (Crawl, Logs, CMS, GA4, Lighthouse) |
 | B | Beobachtet | 🟢 teal | Google/eigene API (GSC, PageSpeed) |
 | C | Gemessen (SERP) | 🟡 gelb | Beobachtete Suchergebnisse |
-| D | Geschätzt | 🟠 orange | Drittanbieter-Schätzung |
+| D | Geschätzt | ◆ slate | Drittanbieter-Schätzung |
 | E | KI-Hinweis (kein Beleg) | ⚪ grau | LLM-Interpretation — nie als Evidenz |
+
+> Exakte Farbwerte/Tokens (inkl. `--conf-*`) und alle Visualisierungen: **`seo-ui-kit.md`**. Brand-Orange ist bewusst **kein** Konfidenz-Wert (bleibt „wir/CTA").
 
 ## 6. Wortverbote in nutzersichtbarer Copy
 
