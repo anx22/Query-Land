@@ -614,3 +614,14 @@ Oben **PriorityMatrix (4.4)** als visuelle Triage; darunter umschaltbar **Status
 **Zukunft (🔭, neues Backend/Credentials/Daten):** Crawl-Diff · Competitor-/Link-Intersect-Daten · echtes Keyword-Volumen/Difficulty · Authority/DR aus Drittquelle · Content-Fit · Content Workspace · Google-Update-Marker · AuthZ-UI · Google-Update-Feed.
 
 > Konsequenz für die Reihenfolge: Der **gesamte sichtbare Qualitätssprung** (Overview, Chancen, Backlinks, Keywords, Audit-Überblick, AI) ist **ohne neues Backend** machbar — er hängt nur an UX-9 (Primitive) + Chart-Lib. Die 🔭-Punkte bleiben im Hintergrund-Backlog (Credentials/Worker/Wettbewerber).
+
+### N.1 Backend-Backlog — bei Umsetzung von Block 2 bestätigt (UX-4/UX-6a)
+Die Screens sind gebaut und liefern echte Daten; folgende Endpunkt-Lücken werden derzeit clientseitig/ehrlich-leer überbrückt und würden Genauigkeit/Performance verbessern:
+- **🟡 `?pageUrl=`-Filter (search-performance):** Route ignoriert den Param server-seitig → Dossier filtert bis zu ~500 Zeilen im Client. Server-Filter spart Last.
+- **🟡 `?targetUrl=`-Filter (backlinks):** kein Server-Filter → Dossier filtert externe Links clientseitig.
+- **🟡 per-URL Web Vitals:** aktuell nur site-scoped; Dossier zeigt Hinweis statt URL-Werten.
+- **🟡 Rankings je URL:** kein „alle Rank-Snapshots"-Endpunkt → Dossier mappt Keyword→`targetUrl` und holt pro Keyword (gedeckelt 25). Keywords ohne Mapping bleiben unauflösbar.
+- **🟡 Indexierbarkeits-Funnel:** `indexed`-Stufe braucht GSC-Index-Coverage (fehlt → ehrlich leer); `indexable` exakt statt „durchgeführte Assessments" braucht ein Aggregat (indexable vs. blockiert).
+- **🟡 Section-Aggregat (Audit):** Treemap/Issue-Gruppierung sampelt bis 200 URLs/Issues clientseitig; ein server-seitiges per-Sektion-Aggregat skaliert für große Sites.
+- **🔭 Content-Fit (Dossier)** und **Crawl-Diff (UX-6b)**: bewusst ausgelassen — neues Backend nötig.
+- **UI-Rest (kein Backend):** Bulk-Bar im Board (§G) noch nicht gebaut; Status-Übergänge laufen über den Drawer/Server-Actions.
