@@ -21,6 +21,7 @@ import { PositionDistribution } from "../../components/charts/position-distribut
 import { PriorityMatrix, type PriorityBubble } from "../../components/charts/priority-matrix";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
 import { SectionTreemap } from "../../components/charts/section-treemap";
+import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
 
 const KIT_BUBBLES: PriorityBubble[] = [
   { id: "o1", title: "H1 fehlt auf Money-Pages", effort: 2, expectedImpact: 4, businessValue: 5, priority: 480, confidenceLevel: "A", colorKey: "technical", typeLabel: "Technischer Fix" },
@@ -392,6 +393,20 @@ export default function KitPage() {
           />
           <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>SectionTreemap · leer</span>
           <SectionTreemap sections={[]} />
+        </div>
+
+        <div className="card" style={{ marginTop: "1rem" }}>
+          <span className="kit-label">BacklinkFlowChart (Neu vs. Verloren)</span>
+          <BacklinkFlowChart
+            data={[
+              { label: "KW 18", gained: 24, lost: 8 },
+              { label: "KW 19", gained: 12, lost: 15 },
+              { label: "KW 20", gained: 31, lost: 6 },
+            ]}
+            title="Neu vs. Verloren (Beispiel)"
+          />
+          <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>BacklinkFlowChart · leer</span>
+          <BacklinkFlowChart data={[]} />
         </div>
       </section>
     </div>
