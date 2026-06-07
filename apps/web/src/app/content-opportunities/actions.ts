@@ -6,8 +6,9 @@ import type { OpportunityStatus } from "@seo-tool/domain-model";
 import { generateAllOpportunities, revalidateOpportunity, syncSearchPerformance, transitionOpportunity } from "../../features/content-opportunities";
 
 export async function transitionOpportunityAction(formData: FormData) {
-  const status = requiredString(formData, "status") as OpportunityStatus;
+  let status: OpportunityStatus;
   try {
+    status = requiredString(formData, "status") as OpportunityStatus;
     await transitionOpportunity(requiredString(formData, "opportunityId"), status);
   } catch (error) {
     redirect(`/content-opportunities?error=${encodeURIComponent(messageFor(error))}`);

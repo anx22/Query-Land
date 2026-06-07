@@ -66,7 +66,7 @@ function metricConnector(options: {
     validate(payload) {
       const rows = rowsPayload(payload);
       for (const row of rows) {
-        if (typeof row.metric !== "string" || typeof row.value !== "number" || Number.isNaN(row.value)) {
+        if (typeof row.metric !== "string" || typeof row.value !== "number" || !Number.isFinite(row.value)) {
           throw new Error(`invalid metric row for ${options.provider}`);
         }
       }
