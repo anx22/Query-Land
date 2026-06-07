@@ -1,17 +1,17 @@
 # Roadmap — Phase 2: Produktreife & UX-Reconciliation
 
-> Stand: 2026-06-07 · Aktive Roadmap. Wahrheitsebene bleibt `docs/PRODUCT_MASTER_SPEC.md`; UX-Soll ist `docs/UX_FLOWS.md`.
+> Stand: 2026-06-07 · Aktive Roadmap. Wahrheitsebene bleibt `docs/PRODUCT_MASTER_SPEC.md`; UX-Soll ist `docs/PRODUCT_MASTER_SPEC.md` §A.5 (UX-Navigation & Screens).
 >
-> 📦 **Vorgänger (abgeschlossen):** Phase 1 (M0–M6) → gestrafft in `_archive/roadmap-m0-m6.md`; detaillierter Ausführungsverlauf + Codex-Prompts in `codex-execution-plan.md`. Das alte `roadmap-tracking.md` ist nur noch ein Verweis-Stub.
+> 📦 **Vorgänger (abgeschlossen):** Phase 1 (M0–M6) → gestrafft in `_archive/roadmap-m0-m6.md`; Phase-1-Abschluss + Codex-Prompts in `_archive/phase1-summary.md`.
 
 ## Ausgangslage
 
-Phase 1 lieferte alle sieben Funktions-Milestones (M0–M6, alle Gates ✅). Ein UI-Review am 2026-06-07 gegen `UX_FLOWS.md` zeigte: Bausteine, Navigation und Interaktions-Prinzip stimmen, aber die **inhaltliche** Deckung ist uneben — die Overview ist auf M0-Stand (inkl. Demo-Fixtures + Selbstwiderspruch), Texte/Metadaten sind veraltet, ein Schlüssel-Screen fehlt, mehrere Screens erfüllen ihre Feature-Liste nur teilweise.
+Phase 1 lieferte alle sieben Funktions-Milestones (M0–M6, alle Gates ✅). Ein UI-Review am 2026-06-07 gegen die UX-Navigation/Screens (`docs/PRODUCT_MASTER_SPEC.md` §A.5) zeigte: Bausteine, Navigation und Interaktions-Prinzip stimmen, aber die **inhaltliche** Deckung ist uneben — die Overview ist auf M0-Stand (inkl. Demo-Fixtures + Selbstwiderspruch), Texte/Metadaten sind veraltet, ein Schlüssel-Screen fehlt, mehrere Screens erfüllen ihre Feature-Liste nur teilweise.
 
 **Phasenziel:** Das fertige Produkt im UI **sichtbar, markengerecht und konsistent** machen, dann härten — und die strukturell geblockten GAPs schließen, sobald Credentials bzw. der async Worker-Pfad verfügbar sind.
 
 ## Leitprinzipien
-- Konsistenz zu `UX_FLOWS.md`: Screen an Spec anpassen **oder** Spec bewusst nachziehen (keine stille Drift).
+- Konsistenz zur UX-Spec (`docs/PRODUCT_MASTER_SPEC.md` §A.5): Screen an Spec anpassen **oder** Spec bewusst nachziehen (keine stille Drift).
 - Nur echte Daten im UI; keine Demo-Fixtures in produktiven Screens.
 - Jede Aufgabe mit klarem Done-Gate; `npm run check` + `build:web` bleiben grün.
 
@@ -21,7 +21,7 @@ Phase 1 lieferte alle sieben Funktions-Milestones (M0–M6, alle Gates ✅). Ein
 
 Der **gesamte** UX/UI-Sprint — Aufgabenliste **plus** die Specs (Voice & Microcopy · UI-Kit/Charts/Tokens · Component-Placement) — liegt **konsolidiert in diesem einen Dokument**. Hier nur die Kurzfassung:
 
-- **Block 1 (P0, kein Backend):** UX-9 Erklär-Infrastruktur + Chart-Lib (Recharts/visx) · UX-3 Voice/Microcopy-Reframe · UX-2 Nav-Metadaten · UX-1 Overview-Neubau · UX-8 `UX_FLOWS.md` nachziehen. Reihenfolge **UX-9 → 3 → 2 → 1 → 8**.
+- **Block 1 (P0, kein Backend):** UX-9 Erklär-Infrastruktur + Chart-Lib (Recharts/visx) · UX-3 Voice/Microcopy-Reframe · UX-2 Nav-Metadaten · UX-1 Overview-Neubau · UX-8 UX-Spec nachziehen (jetzt `docs/PRODUCT_MASTER_SPEC.md` §A.5). Reihenfolge **UX-9 → 3 → 2 → 1 → 8**.
 - **Block 2 (P1):** UX-4 URL-Dossier-360° · UX-5 Opportunity-Board (PriorityMatrix/Kanban/Evidence-Drawer) · UX-6a Issue-Groups + Funnel + Treemap · **UX-6b Crawl-Diff (neues Backend)**.
 - **Block 3:** UX-7 Content Workspace (net-new, Scope-Entscheidung).
 

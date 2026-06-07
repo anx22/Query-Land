@@ -1,8 +1,8 @@
 # Großer UX/UI-Sprint — Query-Land
 
 > **Ein** Dokument für den gesamten UX/UI-Sprint: Aufgaben + die drei Spec-Teile (Voice & Microcopy · UI-Kit · Component-Placement). Ersetzt die früheren Einzeldateien.
-> Übergeordnete Roadmap/Phasen: `../tasks/roadmap.md`. Wahrheitsebenen: `../docs/PRODUCT_MASTER_SPEC.md`, UX-Soll `../docs/UX_FLOWS.md`.
-> Status: Spezifikation + Aufgabenplan (Umsetzung folgt). Stand: 2026-06-07.
+> Übergeordnete Roadmap/Phasen: `../tasks/roadmap.md`. Wahrheitsebenen: `../docs/PRODUCT_MASTER_SPEC.md`, UX-Soll `../docs/PRODUCT_MASTER_SPEC.md` §A.5 (UX-Navigation & Screens).
+> Status: Umgesetzt — Block 1+2+3 geliefert; danach Wasserfall-Gating, Projekt-Klammer, Onboarding und Hilfe-Primitive ergänzt (siehe Abschnitt „Post-Sprint-Ergänzungen" am Ende). Stand: 2026-06-07.
 
 ## Ziel
 Das fertige Produkt (M0–M6) im UI **sichtbar, konsistent und markengerecht** machen: Marke „Query-Land", professioneller Berater-Ton mit dosierter Land-Metapher, SEO-Praktiker-Sprache, Progressive Disclosure für Nicht-SEO-Nutzer und SEO-spezifische Visualisierungen (Recharts + visx) statt generischer Tabellen. **Der gesamte sichtbare Qualitätssprung braucht kein neues Backend** — nur die Erklär-Primitive + Chart-Lib.
@@ -19,7 +19,7 @@ Reihenfolge: **UX-9 → UX-3 → UX-2 → UX-1 → UX-8**.
 | **UX-3** | Voice & Microcopy-Reframe strikt nach **Teil 1**: Dev-/Wellen-/§-/SQLite-Sprache raus, SEO-Nutzen rein; `app-shell` hartkodiertes „Welle 1"-Badge + Datum entfernen; Begriffe (Chance/Quell-Verknüpfung/Indexierbarkeit), Claim, Anrede. | S–M |
 | **UX-2** | Nav-Metadaten: gebaute Module `planned`→`active`; `icon`-Feld rendern (Material Symbols) oder entfernen; toten `createPlannedModulePage` löschen. | S |
 | **UX-1** | Overview-Neubau nach **Teil 3 §B**: TrendChart(Visibility)+Marker, ScoreGauge(Health), PositionDistribution, Top-Chancen-Matrix, Risiken, letzte Crawls/Reports; Demo-Fixtures raus. | M |
-| **UX-8** | `UX_FLOWS.md` nachziehen: URL-Dossier in Nav-Zeile, Content-Workspace als ausstehend, Begriffe/Marke spiegeln. | S (Doku) |
+| **UX-8** | UX-Spec nachziehen (jetzt `../docs/PRODUCT_MASTER_SPEC.md` §A.5): URL-Dossier in Nav-Zeile, Content-Workspace als ausstehend, Begriffe/Marke spiegeln. | S (Doku) |
 
 ### Block 2 — Screen-Tiefe (P1)
 | ID | Aufgabe | Aufwand | Backend? |
@@ -32,7 +32,7 @@ Reihenfolge: **UX-9 → UX-3 → UX-2 → UX-1 → UX-8**.
 ### Block 3 — Scope-Entscheidung
 | ID | Aufgabe | Aufwand |
 |---|---|---|
-| **UX-7** | Content Workspace (fehlt komplett, net-new): bauen (Briefings/Refresh/Snippet-/Linkvorschläge, eigener Screen + Backend) **oder** bewusst verschieben + in `UX_FLOWS.md` markieren. Entscheidung in `../tasks/decisions-backlog.md`. | XL |
+| **UX-7** | Content Workspace (fehlt komplett, net-new): bauen (Briefings/Refresh/Snippet-/Linkvorschläge, eigener Screen + Backend) **oder** bewusst verschieben + in der UX-Spec (§A.5) markieren. Entscheidung in `../tasks/decisions-backlog.md`. | XL |
 
 **Sprint-Gate:** Marke/Voice, Navigation, Erklär-Hilfen, Overview/Board/Dossier/Audit spiegeln den realen Stand und die Specs unten; `npm run check` + `build:web` grün.
 
@@ -114,7 +114,7 @@ Kurzdefinitionen im Berater-Ton (sachlich, ein Satz). Werden zur einzigen Quelle
 
 
 > Verbindliche Spec für den Microcopy/Voice-Reframe (Roadmap Phase 2, UX-3). Quelle: Quiz-Audit 2026-06-07 (3 Runden).
-> Wahrheitsebene Produkt: `docs/PRODUCT_MASTER_SPEC.md`; UX-Soll: `docs/UX_FLOWS.md`.
+> Wahrheitsebene Produkt: `docs/PRODUCT_MASTER_SPEC.md`; UX-Soll: `docs/PRODUCT_MASTER_SPEC.md` §A.5.
 
 ### 1. Marke & Charakter
 
@@ -214,7 +214,7 @@ Diese Bau-/Roadmap-Sprache erscheint **nie** in der UI (nur in Code/Docs):
 
 > **Status: Spezifikation** (noch nicht implementiert). Hier werden *alle* SEO-spezifischen UI-Patterns/Components präzise festgehalten, adaptiert auf unsere orange CI. Umsetzung erfolgt später schrittweise „aus dem Kit ins UI" (Roadmap Phase 2, v. a. UX-1/4/5/6/9).
 >
-> Verbindlich gekoppelt an: **Teil 1** (Ton, Serious-Zonen, Begriffe, Konfidenz) und **`../docs/UX_FLOWS.md`** (Schlüssel-Screens).
+> Verbindlich gekoppelt an: **Teil 1** (Ton, Serious-Zonen, Begriffe, Konfidenz) und **`../docs/PRODUCT_MASTER_SPEC.md` §A.5** (Schlüssel-Screens).
 > Grundprinzip: SEO-Daten sind **Verlauf · Verteilung · Struktur/Beziehung · Triage · 360°-Objekt** — generische Tabellen/Cards bilden das schlecht ab; die folgenden Patterns sind der Qualitätshebel.
 
 ---
@@ -625,3 +625,25 @@ Die Screens sind gebaut und liefern echte Daten; folgende Endpunkt-Lücken werde
 - **🟡 Section-Aggregat (Audit):** Treemap/Issue-Gruppierung sampelt bis 200 URLs/Issues clientseitig; ein server-seitiges per-Sektion-Aggregat skaliert für große Sites.
 - **🔭 Content-Fit (Dossier)** und **Crawl-Diff (UX-6b)**: bewusst ausgelassen — neues Backend nötig.
 - **UI-Rest (kein Backend):** Bulk-Bar im Board (§G) noch nicht gebaut; Status-Übergänge laufen über den Drawer/Server-Actions.
+
+---
+
+## Post-Sprint-Ergänzungen (2026-06-07)
+
+Nach Abschluss von Block 1–3 ergänzt, um Nutzerführung und Erklärbarkeit zu schärfen. Alle Komponenten sind im `/kit` als lebende Doku sichtbar.
+
+### Abhängigkeits-Wasserfall & Gating
+- **Readiness-Modell** (`lib/readiness.ts`, rein + getestet): leitet aus den Foundation-Daten (Projekt → Site → Datenquelle → Crawl) ab, welche Bereiche freigeschaltet sind. Pro Route Vorbedingungen (`ROUTE_PREREQUISITES`), erste-unerfüllte-Auflösung, Onboarding-Schritte und `actionLock()` für gesperrte Aktionen.
+- **Gating-Stil = weich, aber deutlich** (Nutzer-Entscheidung): Bereiche bleiben erreichbar, gesperrte Nav-Punkte bekommen Inactive-Farbcode + Schloss; finale Aktions-Buttons ohne Datengrundlage sind **disabled mit Begründung** (`.locked-action__reason`); gegatete Seiten zeigen oben einen `ReadinessBanner` mit nächstem Schritt.
+- **Projekt-Klammer:** globaler `ProjectSwitcher` (Sidebar-Kopf), aktiver Projektkontext persistent per Cookie; Loader nutzen das aktive Projekt statt `projects[0]`.
+- **Onboarding:** `OnboardingChecklist` auf der Übersicht — der 4-Schritte-Wasserfall, hakt sich selbst ab.
+- **Konsolidierte Inactive-Tokens** in `globals.css` (`--inactive-*`): ein Look für alle gesperrten Flächen + `:disabled`-Buttons.
+
+### Hilfe-Primitive (Trennung Erklärung ↔ Produktiv)
+- **`InfoTip`** — „i"-Kreis mit Popover-Tooltip (Hover+Fokus, Escape) für Kontext-Hilfe an Überschriften/Labels/KPIs.
+- **`HelpDisclosure`** — natives `<details>`-Ausklapper für längere Hilfe.
+- **`HelpPanel`** — abgesetztes Hilfspanel (getönt, Primary-Akzent) — bewusst andere Optik als produktive `.card`; layouttechnisch von Daten/Aktionen getrennt.
+- **`GlossarLink`** — leiser Inline-Link nach `/glossar#<term>`.
+- **Icon-Fix:** Material-Symbols-Webfont (lud per Google-CDN, zeigte offline rohen Text) → self-hosted Inline-SVG-Set (`components/icon.tsx`).
+- **Headings** global verkleinert (`h1` clamp 1.75–2.85rem statt 2.3–5.2rem).
+- **KPI-Labels:** `MetricCard` hat ein `info`-Prop; InfoTip/GlossarLink über Overview, Keywords, Backlinks, Reports ausgerollt.

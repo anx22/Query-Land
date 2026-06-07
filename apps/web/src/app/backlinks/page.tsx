@@ -7,6 +7,8 @@ import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
 import { GlossarLink } from "../../components/glossar-link";
+import { Icon } from "../../components/icon";
+import { PREREQUISITE_META } from "../../lib/readiness";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
 import { loadBacklinksScreenData } from "../../lib/backlinks-api";
@@ -69,10 +71,18 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <p className="notice">Noch keine Backlink-Daten. Mit „Backlinks importieren“ legen Sie den ersten Snapshot an.</p>
           ) : null}
           <div className="action-row">
-            <form action={importBacklinksAction}>
-              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-              <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Backlinks importieren</button>
-            </form>
+            <div className="locked-action">
+              <form action={importBacklinksAction}>
+                <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+                <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Backlinks importieren</button>
+              </form>
+              {!data.connected || !data.selectedProject ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+                </span>
+              ) : null}
+            </div>
           </div>
         </section>
 

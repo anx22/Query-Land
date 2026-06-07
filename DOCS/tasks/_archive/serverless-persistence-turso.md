@@ -2,8 +2,8 @@
 
 > **Status: GEPLANT — ganz späteres Vorhaben (nicht im aktuellen Sprint).**
 > Zweck: Skizze (Architektur + Umbauschritte), damit die Entscheidung dokumentiert ist.
-> Es wird hier **nichts umgesetzt**. Verknüpft mit `tasks/roadmap-tracking.md` (GAP-PERSIST-001)
-> und `deployment/vercel-single-deployment.md` (Abschnitt Limitations).
+> Es wird hier **nichts umgesetzt**. Verknüpft mit `../roadmap.md` (GAP-PERSIST-001, Hintergrund-Backlog)
+> und `../../deployment/vercel-single-deployment.md` (Abschnitt Limitations).
 >
 > Stand: 2026-06-06
 

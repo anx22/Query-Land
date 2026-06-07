@@ -29,7 +29,7 @@ Offen (später): DEC-002 (Provider), DEC-003 (Märkte DACH), DEC-005 (Open-Sourc
 - GAP-AI-002/003: Crawler-Content für AEO, externes Ticket-/PR-Backend
 - GAP-REPORT-002/003: echte Email/Slack-Delivery, worker-getriebener Cron
 - GAP-AUTH-001: echter GSC-OAuth-Provider
-- GAP-PERSIST-001: Persistenz-Dienst (Turso/Neon) — Skizze in `_archive/serverless-persistence-turso.md`
+- GAP-PERSIST-001: Persistenz-Dienst (Turso/Neon) — Skizze in `serverless-persistence-turso.md`
 
 Strukturelle Blocker für GAPs: (a) keine Credentials in der Umgebung, (b) synchrone `node:sqlite` Store-Schicht.
 

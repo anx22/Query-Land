@@ -1,7 +1,7 @@
 # [ARCHIV] Roadmap Phase 1 — M0–M6 (Foundation → AI-Layer)
 
 > ⚠️ **Veraltet / abgeschlossen.** Diese Roadmap deckte Phase 1 (M0–M6) ab und ist **abgeschlossen**.
-> Aktuelle Roadmap: **`../roadmap.md`** (Phase 2). Detaillierter Ausführungsverlauf + Codex-Prompts: **`../codex-execution-plan.md`**.
+> Aktuelle Roadmap: **`../roadmap.md`** (Phase 2). Gestraffter Phase-1-Abschluss + WP-Z.1-Prompt: **`phase1-summary.md`**.
 > Gestraffte Fassung — nur Ergebnisse, Gates und das GAP-Register (für spätere Suchen). Stand bei Archivierung: 2026-06-07.
 
 ## Ergebnis Phase 1
@@ -44,4 +44,4 @@ Sieben Milestones (Wellen 1–7) als vertikale Schnitte geliefert; `npm run chec
 ### Strukturelle Sperre (warum vieles „offen" bleibt)
 Die echten netzgebundenen Provider/Delivery/Persistenz sind durch zwei Faktoren blockiert: (a) **keine Credentials** in der Umgebung, (b) **synchrone Store-Schicht** (`node:sqlite DatabaseSync`) — blockendes `fetch` geht nicht in Store-Methoden. Diese GAPs gehören in den **async Crawler/Worker-Pfad (Codex)** bzw. erfordern eine Sync→Async-Refaktorierung. Der Provider-Seam (DEC-002) ist vorbereitet.
 
-> Volldetails (Sprint-Beschreibungen, Prozent-Einschätzungen, Wave-Slice-Tabellen) siehe Git-Historie dieser Datei vor 2026-06-07 bzw. `../codex-execution-plan.md`.
+> Volldetails (Sprint-Beschreibungen, Prozent-Einschätzungen, Wave-Slice-Tabellen) siehe Git-Historie dieser Datei vor 2026-06-07 bzw. `phase1-summary.md`.

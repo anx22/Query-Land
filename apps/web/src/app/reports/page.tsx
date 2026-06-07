@@ -12,6 +12,8 @@ import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
 import { TermTooltip } from "../../components/term-tooltip";
 import { GlossarLink } from "../../components/glossar-link";
+import { Icon } from "../../components/icon";
+import { PREREQUISITE_META } from "../../lib/readiness";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { AlertMetricChart } from "../../features/reports/alert-metric-chart";
 import {
@@ -102,6 +104,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <input type="hidden" name="projectId" value={projectId} />
             <button className="button secondary" type="submit" disabled={disabled}>Fällige Schedules ausführen</button>
           </form>
+          {disabled ? (
+            <span className="locked-action__reason">
+              <Icon name="lock" />
+              {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+            </span>
+          ) : null}
         </div>
       </section>
 

@@ -263,7 +263,7 @@ Wellen statt Monsterprompt (spart Tokens, erzwingt harte Gates). Querschichten �
 /packages/ui · /packages/domain-model · /packages/shared-config
 /docs/PRODUCT_MASTER_SPEC.md  (inkl. KPIs §8, Referenz-Anker §A.4, UX-Navigation §A.5)
 /specs/*.md  (Index → §11.2)
-/prompts/codex-*.md  (eine Datei pro Welle)
+/prompts/codex-prompts.md  (Basis-Muster + Wellen-Übersicht 1–7)
 /openapi/internal-api.yaml
 /infra/docker-compose.yml · /infra/terraform/
 ```

@@ -1,6 +1,6 @@
 # Welle-1 Reststories — Gate schließen
 
-> Status nach Bestandsaufnahme 2026-06-03: Backend-Fundamente sind weitgehend vorhanden, aber das Welle-1-Gate ist erst geschlossen, wenn die UI echte SQLite/API-Daten nutzt. Details und Prozent-Einschätzung: `roadmap-tracking.md`.
+> Status nach Bestandsaufnahme 2026-06-03: Backend-Fundamente sind weitgehend vorhanden, aber das Welle-1-Gate ist erst geschlossen, wenn die UI echte SQLite/API-Daten nutzt. Details: `next-session-handoff.md`.
 
 ## W1-REST-001 — Projekt und Domain persistent anzeigen
 
@@ -41,5 +41,5 @@
 ## Welle-1 Gate-Entscheidung
 
 - Backend allein reicht nicht für Gate-Schließung.
-- Nächster Sprint-Fokus: `roadmap-tracking.md` Sprint A — Foundation UI echt machen.
+- Nächster Sprint-Fokus: `next-session-handoff.md` Sprint A — Foundation UI echt machen.
 - Gate gilt als bestanden, wenn der Flow `Projekt anlegen → Site anlegen → Connector Stub → Job sichtbar → Reload hält Daten` ohne manuelle API-Aufrufe läuft.

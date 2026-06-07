@@ -1,6 +1,21 @@
 # Übergabe für die nächste Sprint-Session
 
-Stand: 2026-06-06
+Stand: 2026-06-07 (Backend-Abschnitte 1–5 weiterhin Stand 2026-06-06)
+
+## 0. Update 2026-06-07 — UX/UI-Phase 2 + Nutzerführung
+
+Seit dem 2026-06-06-Stand wurde **rein frontend** (kein Backend/Credentials) gearbeitet; alle Backend-Hinweise unten gelten unverändert.
+
+- **UX/UI-Sprint Block 1–3 abgeschlossen:** alle datenführenden Screens auf echten Daten (Overview, URL-Dossier, Opportunity-Board, Technical Audit, Keywords, Backlinks, KI-Sichtbarkeit, Reports) + `/glossar` und `/kit`. Details + offene Endpunkt-Lücken: `../design/ux-ui-sprint.md`.
+- **Abhängigkeits-Wasserfall/Gating:** `apps/web/src/lib/readiness.ts` (rein, getestet) steuert Nav-Sperren, `ReadinessBanner`, Onboarding und gesperrte Buttons. Weiches, aber deutliches Gating (gesperrte Aktionen disabled + Begründung).
+- **Projekt-Klammer:** globaler `ProjectSwitcher` (Cookie `ql_active_project`); `loadFoundationDashboardData()` wählt das aktive Projekt statt `projects[0]`.
+- **Onboarding-Checkliste** auf der Übersicht (4-Schritte-Wasserfall, self-checking).
+- **Hilfe-Primitive:** `InfoTip`, `HelpDisclosure`, `HelpPanel`, `GlossarLink`; `MetricCard.info`-Prop; Icon-Webfont → Inline-SVG (`components/icon.tsx`); Headings verkleinert.
+- **DOCS konsolidiert:** `UX_FLOWS`/`KPI_DEFINITIONS`/`REFERENCE_ANCHORS` → `PRODUCT_MASTER_SPEC` (§8/§A.4/§A.5); 7 Codex-Prompts → `prompts/codex-prompts.md`; `codex-execution-plan` → `_archive/phase1-summary.md`.
+- **Verifikation:** `tsc`, `build:web`, 196 Web-Vitest-Tests grün.
+- **Do-not-break:** Client-Islands importieren nur reine `*-logic.ts`/`readiness.ts`, nie Loader/`next/headers` (sonst Node-Schema im Browser-Bundle). `active-project-cookie.ts` (Konstante) ist client-safe, `active-project.ts` (cookies()) server-only.
+
+> Die folgenden Abschnitte 1–5 beschreiben den **Backend-Stand (2026-06-06)** und die empfohlene Backend-Sprint-Reihenfolge — weiterhin gültig.
 
 ## 1. Aktueller Projektstand
 

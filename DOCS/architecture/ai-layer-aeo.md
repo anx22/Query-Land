@@ -3,7 +3,7 @@
 > **Status: IMPLEMENTIERT — M6 abgeschlossen.**
 > Zweck: Architektur-Dokumentation des AI-Visibility-Moduls (Prompt/Citation/Mention/Referral-Tracking,
 > AI-Visibility-Score, AEO-Checks) und der review-gepflichteten MCP-Schreibtools (Proposals-Lifecycle).
-> Verknüpft mit `tasks/roadmap-tracking.md` (M6 Welle 7) und `tasks/codex-execution-plan.md`.
+> Verknüpft mit `tasks/_archive/phase1-summary.md` (Phase-1-Abschluss, M6 Welle 7).
 >
 > Stand: 2026-06-06 · Confidence-Klassen gemäß `docs/PRODUCT_MASTER_SPEC.md` §2.7 · DEC-002 aktiv.
 

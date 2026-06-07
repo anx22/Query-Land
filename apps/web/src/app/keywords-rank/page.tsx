@@ -5,6 +5,8 @@ import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { TermTooltip } from "../../components/term-tooltip";
 import { GlossarLink } from "../../components/glossar-link";
+import { Icon } from "../../components/icon";
+import { PREREQUISITE_META } from "../../lib/readiness";
 import { PositionDistribution } from "../../components/charts/position-distribution";
 import { TrendChart } from "../../components/charts/trend-chart";
 import { KeywordTableClient } from "../../features/keyword-rank";
@@ -56,12 +58,20 @@ export default async function Page({
           </p>
         ) : null}
         <div className="action-row">
-          <form action={computeVisibilityAction}>
-            <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
-              Visibility neu berechnen
-            </button>
-          </form>
+          <div className="locked-action">
+            <form action={computeVisibilityAction}>
+              <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
+              <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+                Visibility neu berechnen
+              </button>
+            </form>
+            {!data.connected || !data.project ? (
+              <span className="locked-action__reason">
+                <Icon name="lock" />
+                {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+              </span>
+            ) : null}
+          </div>
         </div>
       </section>
 

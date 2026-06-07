@@ -1,6 +1,6 @@
 # Welle-2 Audit-Core Story Seeds
 
-> Status nach Bestandsaufnahme 2026-06-03: Domain/API/SQLite/OpenAPI/Test-Contracts sind für die Minimum-Slices weitgehend vorhanden. Das Welle-2-Gate ist aber erst erreicht, wenn ein Worker die Pipeline end-to-end ausführt und die Technical-Audit-UI die Ergebnisse sichtbar macht. Details: `roadmap-tracking.md`.
+> Status nach Bestandsaufnahme 2026-06-03: Domain/API/SQLite/OpenAPI/Test-Contracts sind für die Minimum-Slices weitgehend vorhanden. Das Welle-2-Gate ist aber erst erreicht, wenn ein Worker die Pipeline end-to-end ausführt und die Technical-Audit-UI die Ergebnisse sichtbar macht. Details: `next-session-handoff.md`.
 
 ## W2-AUDIT-001 — URL Discovery v0
 
@@ -72,5 +72,5 @@
 ## Welle-2 Gate-Entscheidung
 
 - Contract-/Persistenzkern ist weit genug, um auf Worker+UI umzuschalten.
-- Nächste Sprint-Fokusse: `roadmap-tracking.md` Sprint B und Sprint C.
+- Nächste Sprint-Fokusse: `next-session-handoff.md` Sprint B und Sprint C.
 - Gate gilt erst als bestanden, wenn ein stabiler Crawl auf Fixture und mindestens einer eigenen Site wiederholbar läuft.

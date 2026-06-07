@@ -3,7 +3,7 @@
 > **Status: IMPLEMENTIERT — M5 abgeschlossen.**
 > Zweck: Architektur-Dokumentation des Reporting- und Alert-Moduls (generisches Report-Abschnittsmodell,
 > Export-Pipeline CSV/HTML, Delivery-Stub-Abstraktion, Schedule/Automatisierungsmodell und Alert-Regel→Ereignis-Flow).
-> Verknüpft mit `tasks/roadmap-tracking.md` (M5 Welle 6) und `tasks/codex-execution-plan.md`.
+> Verknüpft mit `tasks/_archive/phase1-summary.md` (Phase-1-Abschluss, M5 Welle 6).
 >
 > Stand: 2026-06-06 · Confidence-Klassen gemäß `docs/PRODUCT_MASTER_SPEC.md` §2.7 · DEC-002 aktiv.
 

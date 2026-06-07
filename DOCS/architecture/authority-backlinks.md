@@ -3,7 +3,7 @@
 > **Status: IMPLEMENTIERT — M4 abgeschlossen.**
 > Zweck: Architektur-Dokumentation des Authority-Moduls (GSC-Link-Import, Referring-Domain-Modell,
 > New/Lost-Diff zwischen Snapshots, Authority-Intelligence, UI und read-only MCP-Tools).
-> Verknüpft mit `tasks/roadmap-tracking.md` (M4 Welle 5) und `tasks/codex-execution-plan.md`.
+> Verknüpft mit `tasks/_archive/phase1-summary.md` (Phase-1-Abschluss, M4 Welle 5).
 >
 > Stand: 2026-06-06 · Confidence-Klassen gemäß `docs/PRODUCT_MASTER_SPEC.md` §2.7 · DEC-002 aktiv.
 
