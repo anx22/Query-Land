@@ -1,0 +1,232 @@
+/* AI Visibility / AEO screen styles (spec §4.12 / Teil 3 §J).
+   Every class is prefixed `ai-`; global classes (.card, .badge, .button,
+   .status, .kicker, .muted, .badge-row, .notice, .metric-grid, .table-list,
+   .form-row, .inline-actions, .sr-only) are reused. All colours via var(--…). */
+
+.ai-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* --- Class-E mandatory notice (serious-zone) --- */
+.ai-classE-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--conf-e, var(--line));
+  border-left: 4px solid var(--conf-e, var(--warning));
+  border-radius: 0.85rem;
+  background: var(--conf-e-soft, var(--surface-muted));
+  padding: 0.9rem 1.05rem;
+}
+
+.ai-classE-notice__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ai-classE-notice__title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ai-classE-notice__text {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+/* --- Score / gauge header --- */
+.ai-scores {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) 1fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .ai-scores { grid-template-columns: 1fr; }
+}
+
+.ai-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ai-gauge__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ai-scores__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.ai-fact {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ai-fact__value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-fact__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* --- Citation matrix --- */
+.ai-matrix {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+
+.ai-matrix__head,
+.ai-matrix__row {
+  display: grid;
+  grid-template-columns: 2.4fr 0.7fr 1fr 1.4fr 0.9fr;
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 40rem;
+}
+
+.ai-matrix__head {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.ai-matrix__row {
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.ai-matrix__prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.ai-matrix__prompt-text {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ai-matrix__market {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Citation glyph — paired with text label, never colour-only. */
+.ai-glyph {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-glyph__mark {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.ai-glyph--cited .ai-glyph__mark { color: var(--success); }
+.ai-glyph--mentioned .ai-glyph__mark { color: var(--warning); }
+.ai-glyph--absent .ai-glyph__mark { color: var(--danger); }
+.ai-glyph--none .ai-glyph__mark { color: var(--muted); }
+
+.ai-matrix__domains {
+  font-size: 0.82rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.ai-matrix__spark {
+  min-width: 0;
+}
+
+/* --- Proposals list --- */
+.ai-proposals {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.ai-proposal {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ai-proposal__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ai-proposal__title {
+  font-weight: 700;
+  color: var(--ink);
+  margin-right: auto;
+}
+
+.ai-proposal__body {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.ai-proposal__meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* --- Shared empty-state --- */
+.ai-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+  text-align: center;
+  padding: 2.25rem 1rem;
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  background: var(--surface-muted);
+  margin-top: 0.75rem;
+}
+
+.ai-empty__title { color: var(--ink); font-weight: 600; }
+.ai-empty__hint { color: var(--muted); max-width: 34rem; }
