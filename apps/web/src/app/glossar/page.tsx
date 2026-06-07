@@ -9,6 +9,7 @@
  */
 
 import type { Metadata } from "next";
+import { AppShell } from "../../components/app-shell";
 import { glossaryEntries } from "../../lib/glossary";
 import { confidenceMeta, type ConfidenceLevel } from "../../components/confidence-badge";
 import { ConfidenceBadge } from "../../components/confidence-badge";
@@ -27,7 +28,8 @@ function slugify(str: string): string {
 
 export default function GlossarPage() {
   return (
-    <div className="glossar-page">
+    <AppShell activePath="/glossar">
+      <div className="glossar-page">
       <h1>Glossar</h1>
       <p className="glossar-page__lead">
         SEO-Fachbegriffe, kurz und sachlich erklärt. Tooltips in der Anwendung
@@ -69,6 +71,7 @@ export default function GlossarPage() {
           })}
         </dl>
       </section>
-    </div>
+      </div>
+    </AppShell>
   );
 }
