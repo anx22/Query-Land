@@ -37,6 +37,8 @@ Reihenfolge: **UX-9 → UX-3 → UX-2 → UX-1 → UX-8**.
 **Sprint-Gate:** Marke/Voice, Navigation, Erklär-Hilfen, Overview/Board/Dossier/Audit spiegeln den realen Stand und die Specs unten; `npm run check` + `build:web` grün.
 
 > **AuthZ (WP-Z.1)** und die strukturell geblockten Backend-GAPs liegen in `../tasks/roadmap.md` (nicht Teil dieses UX-Sprints).
+>
+> **Phase 3 (zurückgestellt):** First-Run/Onboarding (geführter Aktivierungs-Pfad Projekt→Site→GSC/Crawl→erste Daten→erste Chance + „nächster sinnvoller Schritt"-Logik auf Overview). Baut auf den hier entstehenden Empty-States/Primitiven auf — bewusst **nicht** Teil dieses Sprints.
 
 ## UX-0 — Chart-Lib-Spike (zuerst, vor allen Charts)
 **Ziel:** den Chart-Stack in *diesem* Repo (Next 15 App Router, React 19) verifizieren, bevor Chart-Komponenten gebaut werden.
