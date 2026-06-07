@@ -4,6 +4,7 @@ import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { TermTooltip } from "../../components/term-tooltip";
+import { GlossarLink } from "../../components/glossar-link";
 import { PositionDistribution } from "../../components/charts/position-distribution";
 import { TrendChart } from "../../components/charts/trend-chart";
 import { KeywordTableClient } from "../../features/keyword-rank";
@@ -68,6 +69,12 @@ export default async function Page({
         <MetricCard
           label="Visibility-Index"
           value={visScore != null ? String(visScore) : "—"}
+          info={
+            <>
+              Positionsgewichtete Sichtbarkeit (0–100) auf dem eigenen Keyword-Set. Mehr im{" "}
+              <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
+            </>
+          }
           note={
             data.latestVisibility
               ? `${data.latestVisibility.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility.averagePosition ?? "—"}${
@@ -76,9 +83,24 @@ export default async function Page({
               : "noch nicht berechnet"
           }
         />
-        <MetricCard label="Keywords" value={String(data.totalKeywords)} note={`${data.rows.length} geladen`} />
-        <MetricCard label="Cluster" value={String(data.groups.length)} note="Themen-/Keyword-Gruppen" />
-        <MetricCard label="Brand" value={String(brandCount)} note="von den geladenen Keywords" />
+        <MetricCard
+          label="Keywords"
+          value={String(data.totalKeywords)}
+          info="Alle im Projekt kuratierten Begriffe — die Grundlage für Rankings und Sichtbarkeit."
+          note={`${data.rows.length} geladen`}
+        />
+        <MetricCard
+          label="Cluster"
+          value={String(data.groups.length)}
+          info="Thematisch gebündelte Keyword-Gruppen für Reporting und Analyse."
+          note="Themen-/Keyword-Gruppen"
+        />
+        <MetricCard
+          label="Brand"
+          value={String(brandCount)}
+          info="Keywords mit der eigenen Marke (Brand). Sie ranken meist leicht und sagen wenig über Wachstumspotenzial."
+          note="von den geladenen Keywords"
+        />
       </section>
 
       {/* Charts: PositionDistribution + Visibility TrendChart */}

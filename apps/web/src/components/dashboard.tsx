@@ -21,6 +21,8 @@ import { ConfidenceBadge } from "./confidence-badge";
 import { DeltaChip } from "./delta-chip";
 import { WhyItMatters } from "./why-it-matters";
 import { TermTooltip } from "./term-tooltip";
+import { InfoTip } from "./info-tip";
+import { GlossarLink } from "./glossar-link";
 
 // Client chart islands — imported for use in this server component.
 // Next.js will tree-shake them correctly; only the client bundle includes recharts.
@@ -157,6 +159,10 @@ export function Dashboard({ data }: { data: OverviewData }) {
                 <div className="overview-kpi-chip">
                   <span className="overview-kpi-chip__label">
                     <TermTooltip term="Visibility-Index">Visibility-Index</TermTooltip>
+                    <InfoTip label="Visibility-Index erklären">
+                      Positionsgewichtete Sichtbarkeit (0–100) auf dem eigenen Keyword-Set. Mehr im{" "}
+                      <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
+                    </InfoTip>
                   </span>
                   <span className="metric-value overview-kpi-chip__value">
                     {latestVisibility.score.toLocaleString("de-DE")}
@@ -194,6 +200,10 @@ export function Dashboard({ data }: { data: OverviewData }) {
         <div className="card overview-hero__gauge">
           <p className="kicker">
             <TermTooltip term="Health Score">Health Score</TermTooltip>
+            <InfoTip label="Health Score erklären">
+              Gewichteter technischer Gesundheitswert (0–100) aus offenen Issues nach Schweregrad. Siehe{" "}
+              <GlossarLink term="Health Score">Glossar</GlossarLink>.
+            </InfoTip>
           </p>
           <WhyItMatters>
             Aggregierter technischer Gesundheitswert — kritische Issues drücken den Score.

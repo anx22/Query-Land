@@ -11,6 +11,7 @@ import { AppShell } from "../../components/app-shell";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
 import { TermTooltip } from "../../components/term-tooltip";
+import { GlossarLink } from "../../components/glossar-link";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { AlertMetricChart } from "../../features/reports/alert-metric-chart";
 import {
@@ -106,10 +107,30 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       {/* Metric grid */}
       <section className="metric-grid">
-        <MetricCard label="Reports" value={String(data.reports.length)} note="generierte Snapshots" />
-        <MetricCard label="Schedules" value={String(data.schedules.length)} note="geplante Lieferungen" />
-        <MetricCard label="Alert-Regeln" value={String(data.alertRules.length)} note="definierte Schwellwerte" />
-        <MetricCard label="Ausgelöste Alarme" value={String(triggeredCount)} note={`von ${data.alertEvents.length} ausgewerteten Events`} />
+        <MetricCard
+          label="Reports"
+          value={String(data.reports.length)}
+          info={<>Feste Snapshots aus Health, Chancen, Sichtbarkeit und Authority. Siehe <GlossarLink term="Report / Alert">Report</GlossarLink>.</>}
+          note="generierte Snapshots"
+        />
+        <MetricCard
+          label="Schedules"
+          value={String(data.schedules.length)}
+          info="Automatische Lieferungen in fester Kadenz (z. B. wöchentlich) an einen Kanal."
+          note="geplante Lieferungen"
+        />
+        <MetricCard
+          label="Alert-Regeln"
+          value={String(data.alertRules.length)}
+          info={<>Schwellwerte auf Kennzahlen, die einen <GlossarLink term="Report / Alert">Alarm</GlossarLink> auslösen, wenn sie über-/unterschritten werden.</>}
+          note="definierte Schwellwerte"
+        />
+        <MetricCard
+          label="Ausgelöste Alarme"
+          value={String(triggeredCount)}
+          info="Events, bei denen eine Kennzahl die definierte Schwelle verletzt hat."
+          note={`von ${data.alertEvents.length} ausgewerteten Events`}
+        />
       </section>
 
       {/* Reports inventory */}

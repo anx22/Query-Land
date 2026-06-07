@@ -5,6 +5,8 @@ import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
+import { InfoTip } from "../../components/info-tip";
+import { GlossarLink } from "../../components/glossar-link";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
 import { loadBacklinksScreenData } from "../../lib/backlinks-api";
@@ -91,7 +93,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 <div className="backlinks-gauge-foot">
                   <span className="metric-value">{formatCount(deltas.latest.totalBacklinks)}</span>
                   {deltas.backlinkDelta !== null ? <DeltaChip value={deltas.backlinkDelta} /> : null}
-                  <span className="backlinks-gauge-note">Backlinks gesamt</span>
+                  <span className="backlinks-gauge-note">
+                    Backlinks gesamt
+                    <InfoTip label="Backlinks gesamt erklären">
+                      Alle eingehenden Links aus dem GSC-Links-Report (Beleg-Klasse B). Siehe{" "}
+                      <GlossarLink term="Backlink">Backlink</GlossarLink>.
+                    </InfoTip>
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -101,6 +109,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <div className="card backlinks-gauge-card">
             <p className="kicker">
               <TermTooltip term="Follow-Ratio">Follow-Ratio</TermTooltip>
+              <InfoTip label="Follow-Ratio erklären">
+                Anteil der Follow-Links am Gesamtprofil — der Teil, der tatsächlich{" "}
+                <GlossarLink term="Authority">Authority</GlossarLink> überträgt.
+              </InfoTip>
             </p>
             <WhyItMatters>
               Der Anteil linkkraft-weitergebender Links zeigt, wie viel SEO-Wert Ihr Profil tatsächlich überträgt.
