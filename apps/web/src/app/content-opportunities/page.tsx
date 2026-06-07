@@ -20,7 +20,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">Content &amp; Opportunities</p>
         <h1>Opportunity Board</h1>
         <p>
-          Die zentrale Einheit (§6): Beobachtung → Evidenz → Ursache → Priorität → Maßnahme → Validierung. v0 liest priorisierte Opportunities aus der API, erlaubt Statuswechsel und die binäre Re-Validierung von Indexierbarkeits-Fixes.
+          Priorisierte Optimierungschancen mit Evidenz, Maßnahmen und Validierung. Jede Chance folgt dem Muster: Beobachtung → Ursache → Maßnahme → messbares Ergebnis.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>

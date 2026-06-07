@@ -28,7 +28,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <span className="badge warning">Klasse E · Signal, kein Evidenz-Beleg</span>
         </div>
         <p className="notice warning">
-          <strong>Klasse E · kein Evidenz-Beleg:</strong> LLM-Interpretation ist Confidence-Klasse E gemäß §2.3/§2.7 und darf NICHT als Opportunity-Evidenz verwendet werden. Diese Daten sind ein Signal, kein deterministischer Beweis.
+          <strong>KI-Hinweis (kein Beleg):</strong> LLM-Interpretation ist Konfidenzklasse E und darf nicht als Evidenzbeleg verwendet werden. Diese Daten sind ein Signal, kein deterministischer Nachweis.
         </p>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
@@ -115,7 +115,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">MCP-Schreibtools · reviewpflichtig</p>
         <h2>Proposals</h2>
         <p>
-          MCP-Schreibtools erzeugen ausschließlich prüfbare Artefakte (Dev-Tickets, Fix-PR-Vorschläge) im Status „proposed" — niemals direkte Produktiv-Mutationen. Ein Mensch akzeptiert oder verwirft; jeder Agenten-Schreibvorgang bleibt reviewpflichtig (§4.4).
+          Vorschläge entstehen im Status „proposed" und werden erst nach manueller Prüfung aktiviert — keine automatischen Produktiv-Änderungen.
         </p>
 
         <form action={createProposalAction}>

@@ -6,11 +6,9 @@ export function AppShell({ activePath, children }: { activePath: string; childre
       <Navigation activePath={activePath} />
       <main className="main">
         <header className="topbar">
-          <input className="search" aria-label="Suche" placeholder="Domains, URLs, Opportunities suchen…" />
+          <input className="search" aria-label="Suche" placeholder="Domains, URLs, Chancen suchen…" />
           <div className="badge-row">
-            <span className="badge primary">Welle 1 · Foundation</span>
-            <span className="badge">UTC 2026-06-02</span>
-            <a className="badge" href="/login">Dev Login</a>
+            <a className="badge" href="/login">Anmelden</a>
           </div>
         </header>
         {children}

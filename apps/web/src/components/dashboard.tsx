@@ -44,15 +44,13 @@ export function Dashboard({ data }: { data: FoundationDashboardData }) {
     <>
       <section className="hero-grid">
         <div className="card hero-card">
-          <p className="kicker">Internal SEO OS</p>
-          <h1>Foundation Console für echte SEO-Operations</h1>
+          <p className="kicker">Query-Land</p>
+          <h1>Sichtbarkeit, die sich belegen lässt.</h1>
           <p>
-            Diese Übersicht liest den Foundation-State aus der lokalen API/SQLite-Schicht. Demo-Fixtures sind hier nicht mehr die Datenquelle für Projekte, Sites, Connectoren, Jobs und Source-Map.
+            Projekte, Sites, Connectoren und Datenquellen auf einen Blick — die Basis für alle SEO-Analysen und Optimierungschancen.
           </p>
           <div className="badge-row">
-            <span className="badge primary">Wave 1</span>
             <span className="badge">Evidence-first</span>
-            <span className="badge">SQLite API</span>
             <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
           </div>
           <div className="action-row">
@@ -65,7 +63,7 @@ export function Dashboard({ data }: { data: FoundationDashboardData }) {
           ) : null}
         </div>
         <div className="card">
-          <p className="kicker">Foundation Gate</p>
+          <p className="kicker">Projekt-Status</p>
           <h2>{selectedProject?.name ?? "Noch kein Projekt"}</h2>
           <StatusList items={foundationGateItems} />
         </div>
@@ -79,7 +77,7 @@ export function Dashboard({ data }: { data: FoundationDashboardData }) {
 
       <section className="content-grid">
         <div className="card">
-          <p className="kicker">Sites aus SQLite/API</p>
+          <p className="kicker">Sites</p>
           {data.sites.length > 0 ? (
             <div className="table-list">
               {data.sites.map((site) => (
@@ -128,7 +126,7 @@ export function Dashboard({ data }: { data: FoundationDashboardData }) {
           <div className="module-grid">
             {moduleRoutes.map((route) => (
               <article key={route.path} className="card">
-                <span className="badge primary">W{route.plannedWave}</span>
+                <span className="badge primary">{route.label}</span>
                 <h3>{route.label}</h3>
                 <p>{route.description}</p>
               </article>

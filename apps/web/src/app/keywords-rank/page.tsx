@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">Keywords &amp; Rank</p>
         <h1>Keyword-Bibliothek</h1>
         <p>
-          Welle 3: kuratiertes Keyword-Universum statt Datenmasse (§2.5). Keywords werden automatisch nach Intent, Brand und Funnel-Stage klassifiziert und Themen-Clustern zugeordnet (DACH, DEC-003).
+          Kuratiertes Keyword-Universum mit Rankings und Sichtbarkeit. Keywords werden nach Intent, Brand und Funnel-Stage klassifiziert und Themen-Clustern zugeordnet.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
@@ -54,7 +54,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 {data.groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}
               </select>
             </label>
-            <label>Brand-Begriffe (kommagetrennt, optional)<input name="brandTerms" placeholder="AuraSEO, acme" /></label>
+            <label>Brand-Begriffe (kommagetrennt, optional)<input name="brandTerms" placeholder="query-land, acme" /></label>
             <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Klassifizieren &amp; speichern</button>
           </form>
         </div>

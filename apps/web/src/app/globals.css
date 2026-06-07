@@ -67,6 +67,13 @@ select {
   letter-spacing: -0.04em;
 }
 
+.brand-claim {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .nav-list {
   display: grid;
   gap: 0.35rem;
@@ -96,8 +103,19 @@ select {
   border-radius: 0.65rem;
   background: var(--surface-muted);
   color: var(--primary);
-  font-size: 0.75rem;
-  font-weight: 800;
+  /* Material Symbols Outlined glyph rendering */
+  font-family: 'Material Symbols Outlined', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
 }
 
 .main {

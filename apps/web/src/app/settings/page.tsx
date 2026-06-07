@@ -11,7 +11,7 @@ const connectorProviders = [
 ] as const;
 
 const sovereigntyItems = [
-  { id: "self-hostable-core", label: "Self-hostable Foundation Core", status: "ready", statusClassName: "status succeeded" },
+  { id: "self-hostable-core", label: "Selbst hostbar — kein Zwang zu externer Infrastruktur", status: "ready", statusClassName: "status succeeded" },
   { id: "provider-abstraction", label: "Provider-Abstraktion statt Lock-in", status: "ready", statusClassName: "status succeeded" },
   { id: "data-portability", label: "Raw/Normalized Data getrennt", status: "guardrail", statusClassName: "status queued" },
   { id: "license-review", label: "Dependency-/License-Review vor Produktion", status: "todo", statusClassName: "status blocked" }
@@ -46,7 +46,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">Settings · Connectors</p>
         <h1>GSC/GA4 Connector-Stubs & Sync Jobs</h1>
         <p>
-          Sprint-Fortschritt für Welle 1: Connector-Stubs können aus der UI für ein echtes SQLite-Projekt angelegt werden. Danach plant die UI idempotente `connector_sync` Jobs in der bestehenden Queue.
+          Connector-Stubs anlegen und Sync-Jobs planen — verbinden Sie Google Search Console und Google Analytics 4 mit Ihrem Projekt.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.integrations.length} Connectoren</span>
@@ -117,9 +117,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       <section className="content-grid">
         <div className="card">
-          <p className="kicker">Source Map (§4.3)</p>
+          <p className="kicker">Quell-Verknüpfung</p>
           <h2>URL → Template → Repo</h2>
-          <p className="muted">Der Differenzierer: ordne URLs ihrem Quellcode zu, damit Opportunities einen Source-Anker tragen (ein Fix am Template korrigiert alle betroffenen URLs).</p>
+          <p className="muted">URLs ihrem Quellcode zuordnen — ein Fix am Template korrigiert alle betroffenen Seiten gleichzeitig.</p>
           <form className="form-card" action={createSourceMapEntryAction}>
             <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
             <label>URL-Pattern<input name="urlPattern" placeholder="https://example.com/pricing" required /></label>
@@ -147,9 +147,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           )}
         </div>
         <div className="card">
-          <p className="kicker">Pre-Merge-Gate (§4.3)</p>
+          <p className="kicker">Pre-Merge-Gate</p>
           <h2>Geänderte Repo-Pfade prüfen</h2>
-          <p className="muted">Löst geänderte Dateien über die Source Map auf betroffene Templates/URLs auf und verknüpft offene Opportunities (passed · review_required · unmapped). Für CI als PR-Check gedacht.</p>
+          <p className="muted">Löst geänderte Dateien über die Quell-Verknüpfung auf betroffene Templates und URLs auf und verknüpft offene Optimierungschancen. Als CI-Check vor dem Deployment einsetzbar.</p>
           <form className="form-card" action={evaluatePrCheckAction}>
             <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
             <label>Geänderte Pfade (einer pro Zeile)<textarea name="changedPaths" rows={4} placeholder={"src/templates/pricing.tsx\napps/web/app/pricing/page.tsx"} required /></label>
@@ -163,7 +163,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <p className="kicker">Open Source &amp; Souveränität</p>
           <h2>Open-source-first Guardrails</h2>
           <p>
-            Der Foundation Core bleibt selbst hostbar, speichert operative Daten lokal portabel und kapselt externe Dienste hinter austauschbaren Provider-Adaptern. Damit wird Souveränität zum Sprint-Kriterium statt zum späteren Einkaufsrisiko.
+            Query-Land bleibt selbst hostbar, speichert operative Daten lokal portabel und kapselt externe Dienste hinter austauschbaren Provider-Adaptern — kein Vendor-Lock-in.
           </p>
           <div className="badge-row">
             <span className="badge primary">DEC-005</span>

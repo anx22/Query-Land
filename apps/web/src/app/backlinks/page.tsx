@@ -22,7 +22,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">Authority &amp; Backlinks</p>
         <h1>Backlink-Profil</h1>
         <p>
-          Welle 4: Backlink-Profil und Authority-Messung (§5 Modul 4). Importiere den GSC-Links-Report, um Backlinks, verweisende Domains, Follow-Ratio, New/Lost-Diff und Anchor-Verteilung auszuwerten.
+          Backlink-Profil und Authority-Messung. Importieren Sie den GSC-Links-Report, um Backlinks, verweisende Domains, Follow-Ratio, Zu- und Abgänge sowie die Anchor-Verteilung auszuwerten.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>

@@ -34,7 +34,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">Technical Audit</p>
         <h1>Crawl Runs, Health & URL Explorer</h1>
         <p>
-          Welle-2 UI-Slice: Die Seite liest Crawl Runs, Health Scores, Audit Issues und Discovered URLs aus SQLite/API. Der Worker folgt als nächster Ausführungsslice; hier wird die Bedienoberfläche an die bestehenden Contracts gebunden.
+          Technische SEO-Analyse — finden und priorisieren Sie Crawl-, Index- und Performance-Probleme, die organischen Traffic kosten.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>

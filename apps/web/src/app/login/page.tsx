@@ -15,14 +15,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   return (
     <AppShell activePath="/login">
       <section className="card hero-card">
-        <p className="kicker">Dev-only Auth</p>
-        <h1>Lokaler Backend-Login sichtbar nutzen</h1>
+        <p className="kicker">Konto &amp; Zugang</p>
+        <h1>Anmelden</h1>
         <p>
-          Dieser Flow macht die vorhandene E-Mail/Passwort-Auth für die Sprint-UI sichtbar. Die Session wird als HttpOnly-Cookie im Web gehalten und gegen `/auth/session` aufgelöst; Business-Endpunkte bleiben bis zum AuthZ-Sprint bewusst noch nicht geschützt.
+          E-Mail und Passwort eingeben, um Ihre Session zu starten.
         </p>
         <div className="badge-row">
-          <span className="badge primary">Welle 1</span>
-          <span className="badge">dev-only</span>
           <span className={currentUser ? "badge success" : "badge danger"}>{currentUser ? "Session aktiv" : "Nicht eingeloggt"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}

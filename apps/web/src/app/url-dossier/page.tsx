@@ -15,7 +15,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">URL Dossier</p>
         <h1>Eine URL als vollständiges SEO-Objekt</h1>
         <p>
-          Aggregiert Crawl-Status, Indexierbarkeit, interne Verlinkung, Issues, Opportunities und den Source-Anker (§4.3) für eine einzelne URL aus den bestehenden Contracts.
+          Crawl-Status, Indexierbarkeit, interne Verlinkung, Issues und Optimierungschancen für eine einzelne URL — inklusive Quell-Verknüpfung zur verantwortlichen Code-Stelle.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
@@ -51,14 +51,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
           <section className="content-grid">
             <div className="card">
-              <p className="kicker">Identität &amp; Source-Anker</p>
+              <p className="kicker">Identität &amp; Quell-Verknüpfung</p>
               <div className="table-list">
                 <article>
                   <strong>{data.selectedUrl}</strong>
                   <span>{data.discoveredUrl ? `${data.discoveredUrl.source} · depth ${data.discoveredUrl.depth}` : "keine Discovery-Daten"}</span>
                 </article>
                 <article>
-                  <strong>Source Map (§4.3)</strong>
+                  <strong>Quell-Verknüpfung</strong>
                   {data.sourceAnchor ? (
                     <>
                       <span>{data.sourceAnchor.template} · {data.sourceAnchor.component}</span>
