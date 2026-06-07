@@ -14,7 +14,8 @@ Reihenfolge: **UX-9 → UX-3 → UX-2 → UX-1 → UX-8**.
 
 | ID | Aufgabe | Aufwand |
 |---|---|---|
-| **UX-9** | Erklär-Infrastruktur: Tooltip/Info-Icon, `ConfidenceBadge` (Klartext+Farbe, A–E, Teil 1 §5 / Teil 2 §2.3), `DeltaChip`, „Warum das zählt"-Zeile, Glossar-Seite `/glossar`. + **Chart-Lib einziehen** (Recharts + visx, Teil 2 §1). | M |
+| **UX-0** | **Chart-Lib-Spike** (zuerst, de-risk) — Recharts in diesem Repo verifizieren (Spec unten). | S–M |
+| **UX-9** | Erklär-Infrastruktur: Tooltip/Info-Icon, `ConfidenceBadge` (Klartext+Farbe, A–E, Teil 1 §5 / Teil 2 §2.3), `DeltaChip`, „Warum das zählt"-Zeile, Glossar-Seite `/glossar` (Inhalt: **Glossar-Seed** unten). Chart-Lib kommt aus **UX-0**. | M |
 | **UX-3** | Voice & Microcopy-Reframe strikt nach **Teil 1**: Dev-/Wellen-/§-/SQLite-Sprache raus, SEO-Nutzen rein; `app-shell` hartkodiertes „Welle 1"-Badge + Datum entfernen; Begriffe (Chance/Quell-Verknüpfung/Indexierbarkeit), Claim, Anrede. | S–M |
 | **UX-2** | Nav-Metadaten: gebaute Module `planned`→`active`; `icon`-Feld rendern (Material Symbols) oder entfernen; toten `createPlannedModulePage` löschen. | S |
 | **UX-1** | Overview-Neubau nach **Teil 3 §B**: TrendChart(Visibility)+Marker, ScoreGauge(Health), PositionDistribution, Top-Chancen-Matrix, Risiken, letzte Crawls/Reports; Demo-Fixtures raus. | M |
@@ -36,6 +37,51 @@ Reihenfolge: **UX-9 → UX-3 → UX-2 → UX-1 → UX-8**.
 **Sprint-Gate:** Marke/Voice, Navigation, Erklär-Hilfen, Overview/Board/Dossier/Audit spiegeln den realen Stand und die Specs unten; `npm run check` + `build:web` grün.
 
 > **AuthZ (WP-Z.1)** und die strukturell geblockten Backend-GAPs liegen in `../tasks/roadmap.md` (nicht Teil dieses UX-Sprints).
+
+## UX-0 — Chart-Lib-Spike (zuerst, vor allen Charts)
+**Ziel:** den Chart-Stack in *diesem* Repo (Next 15 App Router, React 19) verifizieren, bevor Chart-Komponenten gebaut werden.
+- **Installieren:** `recharts` (Default). `@visx/hierarchy` + `d3-force`/`react-force-graph` erst bei Bedarf in Block 2 (Treemap/Graph) — im Spike nur prüfen, ob installierbar; nicht produktiv einbinden.
+- **Proof:** **eine** Client-Island (`"use client"`) bauen — z. B. Visibility-`AreaChart` oder `Sparkline` — mit **serverseitig geladenen** Daten (`/projects/{id}/visibility`) als Props (keine Fetches im Client-Chart).
+- **Verifizieren:** keine SSR-/Hydration-Fehler; `ResponsiveContainer` funktioniert; Farben über `var(--primary)`/`chartTheme.ts`; `prefers-reduced-motion`; akzeptables Bundle-Delta; `build:web` grün.
+- **Liefern:** `chartTheme.ts` (Token-Map), dokumentiertes Import-/Island-Muster, **Go/No-Go zu Recharts** (+ Notiz, ob visx für Block 2 nötig).
+- **Gate:** Proof-Chart rendert mit echten Daten auf einem realen Screen; `npm run check` + `build:web` grün. **Aufwand: S–M.**
+
+## Claim (Platzhalter) & Brand-Hinweis
+- **Platzhalter-Claim (Phase 2):** „Sichtbarkeit, die sich belegen lässt." — bewusst vorläufig.
+- **Sidebar-Markenname:** „Query-Land".
+- **Brand-Rescoping verschoben:** vollständiges Rebranding (Wortmarke/Logo, `<title>`/Metadaten, Favicon, README, Paketnamen, Domain, finale Schreibweise) erfolgt **nach Phase 2** — in Phase 2 nur Sidebar-Name + Platzhalter-Claim.
+
+## Glossar-Seed (Quelle für UX-9 Tooltips & `/glossar`)
+Kurzdefinitionen im Berater-Ton (sachlich, ein Satz). Werden zur einzigen Quelle für Tooltips und Glossar-Seite.
+
+| Begriff | Definition |
+|---|---|
+| Crawl | Automatisiertes Abrufen der Seiten einer Website, um Erreichbarkeit, Inhalte und Verlinkung zu erfassen. |
+| Indexierbarkeit | Ob eine URL in den Suchindex aufgenommen werden darf (nicht durch robots/noindex/Canonical blockiert). |
+| Health Score | Aggregierter technischer Gesundheitswert einer Site aus offenen Issues und deren Schwere. |
+| Visibility-Index | Positionsgewichteter Sichtbarkeitswert über die getrackten Keywords (0–100). |
+| Ranking / Position | Platz einer URL in den Suchergebnissen für ein Keyword (1 = oben). |
+| Keyword / Intent | Suchbegriff samt dahinterliegender Absicht (informational, kommerziell, transaktional …). |
+| SERP / SERP-Feature | Suchergebnisseite; Sonderelemente wie Featured Snippet, People-Also-Ask, Image Pack. |
+| Striking Distance | Keywords knapp außerhalb der Top-10 (Position 11–20) — die günstigsten Hebel. |
+| CTR-Gap | Abstand zwischen positionsüblicher und tatsächlicher Klickrate — Hinweis auf schwache Snippets. |
+| Kannibalisierung | Mehrere eigene URLs konkurrieren um dasselbe Keyword. |
+| Backlink | Link von einer fremden Website auf die eigene. |
+| Verweisende Domain | Eindeutige Domain, von der mindestens ein Backlink stammt. |
+| Follow / Nofollow | Ob ein Link Linkkraft weitergibt (follow) oder nicht (nofollow). |
+| Follow-Ratio | Anteil der follow-Backlinks an allen Backlinks. |
+| Authority | Grobe Stärke des Linkprofils als Vertrauensindikator. |
+| Chance (Opportunity) | Zentrale Einheit: belegte Beobachtung → empfohlene Maßnahme → messbare Validierung. |
+| Priorität | Rangwert einer Chance = Impact × Konfidenz × Business-Value ÷ Aufwand. |
+| Evidenz / Konfidenz (A–E) | Beleg hinter einer Aussage und dessen Verlässlichkeit (A gesichert … E KI-Hinweis, kein Beleg). |
+| Quell-Verknüpfung | Zuordnung einer URL zur verantwortlichen Code-/Template-Stelle. |
+| Orphan-URL | Seite ohne interne eingehende Links — für Nutzer und Crawler schwer auffindbar. |
+| Interne Verlinkung | Links zwischen eigenen Seiten; verteilen Relevanz und Auffindbarkeit. |
+| Crawl-Diff | Vergleich zweier Crawls: neue/entfernte URLs und Statuswechsel. |
+| Web Vitals (LCP/CLS/INP/TTFB) | Kern-Performance-Kennzahlen der Ladeerfahrung. |
+| AEO | Answer Engine Optimization — Inhalte für Antwort-Engines/KI aufbereiten. |
+| AI-Visibility / Citation | Ob die eigene Domain in LLM-Antworten genannt/zitiert wird (Konfidenz E — Signal, kein Beleg). |
+| Report / Alert | Zusammenfassung von Kennzahlen über Zeit; Alert = Schwellwert-Auslöser. |
 
 
 ---
