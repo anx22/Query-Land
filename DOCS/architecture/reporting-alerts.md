@@ -30,8 +30,7 @@ Kernlieferung:
 - **Read-only MCP-Tools** — `get_latest_report` und `list_alert_events` ermöglichen Agent-Zugriff
   ohne Schreibrechte.
 
-Bewusst außerhalb des Scopes: echter PDF-Renderer (GAP-REPORT-001), echte SMTP/Slack-Delivery
-(GAP-REPORT-002), worker-getriebener Cron-Scheduler in der Laufzeitumgebung (GAP-REPORT-003).
+~~Bewusst außerhalb des Scopes: echter PDF-Renderer (GAP-REPORT-001)~~ **RESOLVED 2026-06-06** — dependency-freier `reportToPdf` (gültiges PDF-1.4, Einzelseite, Helvetica, ASCII-Transliteration) ist implementiert und in `renderReportExport` eingebunden. Außerhalb des Scopes bleiben: echte SMTP/Slack-Delivery (GAP-REPORT-002), worker-getriebener Cron-Scheduler in der Laufzeitumgebung (GAP-REPORT-003).
 
 ---
 
@@ -45,7 +44,7 @@ Bewusst außerhalb des Scopes: echter PDF-Renderer (GAP-REPORT-001), echte SMTP/
 | `Report` | `id`, `projectId`, `generatedAt`, `sections: ReportSection[]` | Vollständiger aggregierter Report zu einem Zeitpunkt |
 | `ReportDelivery` | `id`, `reportId`, `channel` (`email`\|`slack`), `deliveredAt`, `status`, `payload` | Protokolleintrag eines Zustellversuchs |
 | `ReportSchedule` | `id`, `projectId`, `cadence` (`weekly`\|`monthly`), `nextRunAt`, `channel`, `enabled` | Automatisierungsregel für wiederkehrende Reports |
-| `ReportExport` | `reportId`, `format` (`csv`\|`html`), `content` | Serialisierter Report für den Download |
+| `ReportExport` | `reportId`, `format` (`csv`\|`html`\|`pdf`), `content` | Serialisierter Report für den Download |
 
 ### 2.2 Alert-Typen (`alerts.ts`)
 
@@ -60,7 +59,8 @@ Bewusst außerhalb des Scopes: echter PDF-Renderer (GAP-REPORT-001), echte SMTP/
 |---|---|
 | `reportToCsv(report)` | Serialisiert alle Sections als CSV-Zeilen (kein externer Parser) |
 | `reportToHtml(report)` | Erzeugt einfaches HTML-Dokument ohne externe Template-Bibliothek |
-| `renderReportExport(report, format)` | Delegiert an `reportToCsv` oder `reportToHtml`; erzeugt `ReportExport` |
+| `reportToPdf(report)` | Erzeugt gültiges PDF-1.4-Dokument (Einzelseite, Helvetica, ASCII-Transliteration); dependency-frei **[RESOLVED GAP-REPORT-001]** |
+| `renderReportExport(report, format)` | Delegiert an `reportToCsv`, `reportToHtml` oder `reportToPdf`; erzeugt `ReportExport` |
 | `compareAlert(rule, currentValue)` | Vergleicht Metrikwert gegen Schwellenwert gemäß Operator; gibt `boolean` zurück |
 
 Alle Exportfunktionen sind **dependency-frei** (keine npm-Abhängigkeiten, keine I/O) und damit isoliert
@@ -128,10 +128,7 @@ flowchart LR
     CSV & HTML --> DL["GET /reports/{id}/export\n→ Content-Disposition: attachment"]
 ```
 
-Das Format `pdf` ist bewusst **nicht** implementiert (GAP-REPORT-001). Der Download-Endpunkt setzt
-den Response-Header `Content-Disposition: attachment` und gibt den serialisierten String direkt zurück.
-Die Datenbankschicht speichert Reports als JSON in der `sections`-Spalte; der Export erfolgt on-the-fly
-ohne erneute Aggregation.
+Das Format `pdf` ist **jetzt implementiert (GAP-REPORT-001 RESOLVED 2026-06-06)** — `reportToPdf` erzeugt ein gültiges PDF-1.4-Dokument ohne externe Abhängigkeiten (Einzelseite, Helvetica-Schrift, ASCII-Transliteration für Sonderzeichen). Der Download-Endpunkt setzt den Response-Header `Content-Disposition: attachment` und gibt den serialisierten String direkt zurück. Die Datenbankschicht speichert Reports als JSON in der `sections`-Spalte; der Export erfolgt on-the-fly ohne erneute Aggregation.
 
 ---
 
@@ -296,8 +293,8 @@ nicht durch echte Provider-Anbindungen aufgelöst ist, gilt für das gesamte Rep
 
 ## 12. Follow-ups / GAP
 
-| ID | Bereich | Befund | Empfehlung |
+| ID | Bereich | Befund | Status / Empfehlung |
 |---|---|---|---|
-| GAP-REPORT-001 | Export / PDF | PDF-Export nicht implementiert; `renderReportExport` kennt nur CSV und HTML | Echten PDF-Renderer einbinden (z. B. Puppeteer/headless Chrome oder server-side PDF-Bibliothek); `ReportExport.format` um `pdf` erweitern; Achtung Paketgröße auf Serverless |
-| GAP-REPORT-002 | Delivery / Provider | Email- und Slack-Zustellung sind Stubs (DEC-002 offen) | Echten SMTP-Adapter (z. B. Resend, Postmark) und Slack-Webhook-Adapter hinter `deliverReport`-Abstraktion einbauen; Confidence-Stufe der Delivery dann von B auf A anheben |
-| GAP-REPORT-003 | Scheduling / Cron | `runDueSchedules` muss extern ausgelöst werden; kein In-Environment-Cron verfügbar | Worker-Job oder Vercel-Cron-Trigger einrichten, der `POST /report-schedules/run-due` periodisch aufruft (z. B. täglich, um wöchentliche und monatliche Schedules zu verarbeiten) |
+| GAP-REPORT-001 | Export / PDF | ~~PDF-Export nicht implementiert; `renderReportExport` kannte nur CSV und HTML~~ | **RESOLVED 2026-06-06** — dependency-freier `reportToPdf` (PDF-1.4, Einzelseite, Helvetica, ASCII-Transliteration) in `packages/domain-model/src/reports.ts`; `renderReportExport` und Report-Store-Export verdrahtet; OpenAPI (`format=pdf`) und `/reports`-UI ergänzt |
+| GAP-REPORT-002 | Delivery / Provider | Email- und Slack-Zustellung sind Stubs (DEC-002 offen). Zusätzlich geblockt: Store-Schicht ist synchron (`node:sqlite` `DatabaseSync`) — blockende Netzwerk-`fetch`-Aufrufe können nicht innerhalb von Store-Methoden ausgeführt werden. Echte Delivery gehört in den asynchronen Crawler/Worker-Pfad oder erfordert eine Async-Refaktorierung der Store-Schicht. | Echten SMTP-Adapter (z. B. Resend, Postmark) und Slack-Webhook-Adapter hinter `deliverReport`-Abstraktion einbauen; Umsetzung im async Worker oder nach Async-Refaktorierung der Store-Schicht; Confidence-Stufe der Delivery dann von B auf A anheben |
+| GAP-REPORT-003 | Scheduling / Cron | `runDueSchedules` muss extern ausgelöst werden; kein In-Environment-Cron verfügbar; Worker-Jobs sind ein Codex/Crawler-Koordinationspunkt, kein isolierter API-Change | Worker-Job oder Vercel-Cron-Trigger einrichten, der `POST /report-schedules/run-due` periodisch aufruft (z. B. täglich, um wöchentliche und monatliche Schedules zu verarbeiten) |

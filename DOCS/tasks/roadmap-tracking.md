@@ -114,7 +114,7 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | UI `/reports` | Report-Liste, letzter Report in Abschnittsansicht, Export-Schaltflächen (CSV, HTML), Zustellhistorie, Alert-Regeln und -Events | vorhanden | done |
 | Read-only MCP-Tools | `get_latest_report`, `list_alert_events` in `services/mcp` | — | done |
 
-**Offene Follow-ups (nicht gate-kritisch):** echter PDF-Renderer (GAP-REPORT-001); echte Email/Slack-Delivery statt Stub (GAP-REPORT-002, DEC-002); worker-getriebener Cron-Trigger für `runDueSchedules` (GAP-REPORT-003). Architektur-Dokumentation: `architecture/reporting-alerts.md`.
+**Offene Follow-ups (nicht gate-kritisch):** ~~echter PDF-Renderer (GAP-REPORT-001)~~ **ERLEDIGT 2026-06-06** — dependency-freier `reportToPdf` (PDF-1.4, Helvetica, ASCII-Transliteration) in `packages/domain-model/src/reports.ts`, verdrahtet durch `renderReportExport`, Report-Store-Export, OpenAPI (`format=pdf`) und `/reports`-UI; echte Email/Slack-Delivery statt Stub (GAP-REPORT-002, DEC-002); worker-getriebener Cron-Trigger für `runDueSchedules` (GAP-REPORT-003). Architektur-Dokumentation: `architecture/reporting-alerts.md`.
 
 ### 4.5 Welle 7 — AI Layer / AEO ✅ abgeschlossen (M6)
 
@@ -229,12 +229,29 @@ Die Dokumentation ist bewusst gestuft aufgebaut:
 | GAP-AUTH-002 | Authority / Provider | Drittanbieter-Backlink-APIs (Ahrefs, Moz, Majestic) nicht angebunden | Erst bei Lizenzvertrag; separater Provider-Adapter hinter Connector-Interface §4.2; Klasse D kommunizieren | P3 | später |
 | GAP-AUTH-003 | Authority / Analyse | Competitor-Backlink-Gap fehlt (kein fremdes Linkprofil) | Authority-Gap-Analyse als M6+-Erweiterung; setzt GAP-AUTH-002 voraus | P3 | Welle 6+ |
 | GAP-AUTH-004 | Authority / Historisch | Snapshots decken nur laufende Sessions ab | Mit echtem GSC-Provider historische Daten (bis 16 Monate) nachladen; Schema bereits kompatibel | P2 | Welle 5+ |
-| GAP-REPORT-001 | Reporting / Export | PDF-Export nicht implementiert; `renderReportExport` kennt nur CSV und HTML | Echten PDF-Renderer einbinden (z. B. Puppeteer/headless Chrome); `ReportExport.format` um `pdf` erweitern; Paketgröße auf Serverless beachten | P2 | Welle 6+ |
-| GAP-REPORT-002 | Reporting / Delivery | Email- und Slack-Zustellung sind deterministische Stubs (DEC-002 offen) | Echten SMTP-Adapter (z. B. Resend, Postmark) und Slack-Webhook-Adapter hinter `deliverReport`-Abstraktion einbauen; Confidence-Stufe dann von B auf A | P2 | Welle 6+ |
-| GAP-REPORT-003 | Reporting / Scheduling | `runDueSchedules` muss extern ausgelöst werden; kein In-Environment-Cron verfügbar | Worker-Job oder Vercel-Cron-Trigger einrichten, der `POST /report-schedules/run-due` täglich aufruft | P2 | Welle 6+ |
+| GAP-REPORT-001 | Reporting / Export | ~~PDF-Export nicht implementiert~~ **RESOLVED 2026-06-06** — dependency-freier `reportToPdf` (gültiges PDF-1.4, Einzelseite, Helvetica, ASCII-Transliteration) in `packages/domain-model/src/reports.ts` implementiert; `renderReportExport` und Report-Store-Export verdrahtet; OpenAPI (`format=pdf`) und `/reports`-UI ergänzt | — | — | CLOSED |
+| GAP-REPORT-002 | Reporting / Delivery | Email- und Slack-Zustellung sind deterministische Stubs (DEC-002 offen). Zusätzlich geblockt: Store-Schicht ist synchron (`node:sqlite` `DatabaseSync`) — blockende Netzwerk-`fetch`-Aufrufe können nicht innerhalb von Store-Methoden ausgeführt werden; echte Delivery gehört in den asynchronen Crawler/Worker-Pfad oder erfordert eine Async-Refaktorierung der Store-Schicht | Echten SMTP-Adapter (z. B. Resend, Postmark) und Slack-Webhook-Adapter hinter `deliverReport`-Abstraktion einbauen; Umsetzung im async Worker oder nach Async-Refaktorierung der Store-Schicht; Confidence-Stufe dann von B auf A | P2 | Welle 6+ / Codex-Worker |
+| GAP-REPORT-003 | Reporting / Scheduling | `runDueSchedules` muss extern ausgelöst werden; kein In-Environment-Cron verfügbar; Worker-Jobs (Re-Check, PR-Crawl-Diff, connector_sync/PSI, Report-Cron) sind explizit ein Codex/Crawler-Koordinationspunkt | Worker-Job oder Vercel-Cron-Trigger einrichten, der `POST /report-schedules/run-due` täglich aufruft | P2 | Welle 6+ / Codex-Worker |
 | GAP-AI-001 | AI-Visibility / Provider | LLM-Antwort-Snapshots nutzen einen deterministischen Stub (DEC-002 offen); kein echter LLM-API-Aufruf; Confidence bleibt Klasse E | Echten LLM-Provider (z. B. Anthropic Claude API) hinter `createAiAnswerSnapshot`-Abstraktion einbinden; Stub gegen echten Connector austauschen ohne Schemaänderung; Confidence-Klasse E bleibt, da LLM-Output prinzipiell nicht deterministisch | P2 | Welle 7+ |
 | GAP-AI-002 | AEO / Content-Quelle | `analyzeAeo` erhält aktuell vom API-Caller manuell eingereichten Seiteninhalt; Crawler liefert Inhalte noch nicht automatisch | Crawler-Artefakte (`fetch_results.body`) als primäre Content-Quelle für AEO-Scans nutzen; Scan als regulären Worker-Job nach jedem Crawl-Zyklus ausführen; manuelle Einreichung als Fallback behalten | P2 | Welle 7+ |
 | GAP-AI-003 | MCP-Schreibtools / Backend | `create_dev_ticket` und `propose_fix_pr` erzeugen nur Datenbankzeilen im Status `proposed`; kein echter Webhook an Ticketing- oder PR-System | Echten Integrations-Adapter (z. B. GitHub-Issues-API, Jira-REST, Linear) hinter `acceptProposal` einbinden; Webhook erst nach menschlicher Annahme auslösen; Proposal bleibt primäre Review-Instanz | P3 | später |
+| GAP-MCP-SDK | MCP / Transport | MCP-Server nutzte ursprünglich ein inoffizielles/manuelles stdio-JSON-RPC-Protokoll; offizielles `@modelcontextprotocol/sdk` fehlte | **RESOLVED 2026-06-06** — MCP-Server auf offizielles `@modelcontextprotocol/sdk`-Transport umgestellt; Tool-Registry und Handler unverändert | — | CLOSED |
+
+### GAP-Status 2026-06 — Warum die verbleibenden GAPs noch offen sind
+
+**Abgeschlossen:** GAP-REPORT-001 (PDF-Export, dependency-frei, jetzt real), GAP-MCP-SDK (offizielles `@modelcontextprotocol/sdk`-Transport).
+
+**Verbleibende GAPs — strukturelle Sperren, kein Implementierungsversäumnis:**
+
+1. **Echte Provider (GSC/SERP/PSI/LLM, betrifft DEC-002) und echte Report-Delivery (GAP-REPORT-002)** sind durch zwei Faktoren geblockt:
+   - (a) **Keine Credentials** in dieser Umgebung konfiguriert.
+   - (b) **Synchrone Store-Schicht:** die API nutzt `node:sqlite` `DatabaseSync`; blockende Netzwerk-`fetch`-Aufrufe können nicht innerhalb von Store-Methoden ausgeführt werden. Echte, netzwerkgebundene Provider und Delivery gehören daher in den **asynchronen Crawler/Worker-Pfad** (`services/crawler`, Codex-Koordination) oder erfordern eine Async-Refaktorierung der Store-Schicht. Die Provider-Abstraktion (Stub `fetch()` austauschbar gegen echten Adapter, DEC-002) ist bereits vorhanden.
+
+2. **GAP-PERSIST-001 (Turso/Neon)** erfordert zusätzlich einen async-fähigen DB-Client (libsql ist async), d. h. dieselbe Sync→Async-Refaktorierung plus einen verwalteten Datenbank-Dienst mit Credentials.
+
+3. **Worker-Jobs (Re-Check, PR-Crawl-Diff, connector_sync/PSI, Report-Cron, GAP-REPORT-003)** sind explizit ein Codex/Crawler-Koordinationspunkt — kein isolierter API-Change.
+
+Diese GAPs bleiben offen, sind aber klar begrenzt: Sobald entweder (a) Credentials vorliegen und (b) die Store-Schicht asynchron ist oder der Pfad durch den Worker läuft, können GAP-REPORT-002/003, GAP-AUTH-001, GAP-AI-001 und GAP-PERSIST-001 sequenziell geschlossen werden.
 
 ## 7. Abschlusskriterien bis App-MVP
 
