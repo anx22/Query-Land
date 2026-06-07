@@ -209,7 +209,17 @@ Raw und Normalized getrennt (§2.7, §3.2). Bei < 5k URLs liegt **alles in Postg
 
 Sieben Kern-KPIs, abgeleitet aus den Referenz-Mustern. Die letzten beiden sind **Welle-7-KPIs** (erst mit Modul 7 belastbar).
 
-`Health Score` (technische Qualität, Modul 2) · `Project Visibility` (Sichtbarkeit auf eigenem Keyword-Set, Modul 3) · `Opportunity Score` (offenes priorisiertes Potenzial, §6) · `Content Coverage` (Themen-/Intent-Abdeckung, Modul 4) · `Authority Delta` (Link-Autorität über Zeit, Modul 5) · `AI Visibility Share` *(W7)* · `AI Referral Impact` *(W7)*.
+| KPI | Quelle (Modul) | Definition (high-level) |
+|-----|----------------|--------------------------|
+| Health Score | M2 | Gewichteter technischer Gesundheitswert aus Issues/Severity. |
+| Project Visibility | M3 | Sichtbarkeit auf dem eigenen Keyword-Set (Visibility-Index, `specs/visibility-index.md`). |
+| Opportunity Score | §6 | Summe offenen, priorisierten Potenzials (Prioritätsformel §6.4). |
+| Content Coverage | M4 | Abdeckung der Ziel-Themen/Intents durch performenden Content. |
+| Authority Delta | M5 | Veränderung der Link-Autorität über Zeit. |
+| AI Visibility Share *(W7)* | M7 | Anteil eigener Marke/URLs in getrackten AI-Antworten. |
+| AI Referral Impact *(W7)* | M7 | Beitrag von AI-Referrals zu organischem/Business-Outcome. |
+
+Detailformeln je KPI: in der zuständigen Child-Spec.
 
 ---
 
@@ -251,7 +261,7 @@ Wellen statt Monsterprompt (spart Tokens, erzwingt harte Gates). Querschichten �
 /apps/web · /apps/api
 /services/crawler · /services/ranker · /services/recommendation-engine · /services/reporting-worker · /services/ai-visibility-worker
 /packages/ui · /packages/domain-model · /packages/shared-config
-/docs/PRODUCT_MASTER_SPEC.md · REFERENCE_ANCHORS.md · KPI_DEFINITIONS.md · UX_FLOWS.md
+/docs/PRODUCT_MASTER_SPEC.md  (inkl. KPIs §8, Referenz-Anker §A.4, UX-Navigation §A.5)
 /specs/*.md  (Index → §11.2)
 /prompts/codex-*.md  (eine Datei pro Welle)
 /openapi/internal-api.yaml
@@ -314,9 +324,38 @@ Vollständiger globaler Backlink-Index · globale Keyword-Datenbank · Traffic-S
 Web Vitals in Modul 2 (kein eigenes Modul). JS-Rendering als Projekt-Flag. Vollcrawl statt Sampling (< 5k URLs). UI schlank, MCP gleichrangig (§3.3). AI Visibility architektonisch ab W1, funktional ab W7.
 
 ### A.4 Referenz-Anker
-Semrush (breiteste Suite, AI-Visibility, API/MCP) · XOVI (DACH-Modell, Advisor, Monitoring-OVI, Reporting) · Ahrefs (Research-/Backlink-DNA, Opportunities, API/MCP/Connect) · Similarweb (Brücke SEO ↔ Traffic-Intelligence ↔ AI-Discovery). **DNA übernehmen, nicht 1:1 klonen.** Quellen-Detail → `docs/REFERENCE_ANCHORS.md`.
 
-### A.5 Offene Entscheidungen (vor/während Welle 1 zu klären)
+> DNA übernehmen, nicht 1:1 klonen.
+
+| Anker | Stärke / übernommenes Muster |
+|-------|------------------------------|
+| Semrush | Breiteste Suite; Site Audit (JS-Rendering, Scopes, Recrawl); Position Tracking inkl. AI-Modi; On Page SEO Checker; AI-Visibility-Toolkit; API/MCP (read-only Projektdaten). |
+| XOVI | DACH-Modell; Advisor (priorisierte Aufgaben mit Erklärung); Monitoring-OVI als individueller Sichtbarkeitsindex; Onpage→Aufgaben; Reporting-Templates; XOVI AI. |
+| Ahrefs | Tiefste Research-/Backlink-DNA; Site Audit (170+ Checks, Health Score); Opportunities (Content+Link+Technik priorisiert); API v3/MCP/Connect. |
+| Similarweb | Brücke SEO ↔ Traffic-Intelligence ↔ AI-Discovery; Site Audit (eigener Bot, Sitemaps/robots/GA4/GSC); Rank Tracker (Kannibalisierung, 5 Wettbewerber); Gen-AI/AEO-Module; MCP. |
+
+**Übernommenes Kernmuster (alle vier):** Projekt anlegen → Datenquellen verbinden → (externe Indizes optional) → KPIs verdichten → Maßnahmen priorisieren → reporten → automatisieren.
+
+**Bewusst NICHT übernommen:** Globale Massen-Indizes (Keyword/Backlink/Traffic über fremde Domains) als Kernfeature — nicht ohne lizenzierten Provider erreichbar und für eigene Properties unnötig (→ §A.2).
+
+### A.5 UX Navigation & Screens
+
+> UI schlank; MCP gleichrangig (§3.3). Marke: **Query-Land**.
+
+**Hauptnavigation:** Übersicht · Projekte · Technical Audit · URL-Dossier · Keywords & Rankings · Content & Chancen · Backlinks · Reports · KI-Sichtbarkeit · Einstellungen
+
+**Schlüssel-Screens:**
+- **Übersicht** — Visibility-Verlauf, Health Score, Positions-Verteilung, Top-Chancen, offene Risiken, letzte Crawls/Reports. (Echte Daten, keine Demo-Fixtures.)
+- **URL-Dossier** — eine URL als vollständiges SEO-Objekt: Crawlstatus, Indexierbarkeit, GSC-Leistung, Rankings, Queries, interne/externe Links, Content-Fit, Performance, Issues, Chancen, Quell-Verknüpfung, Historie.
+- **Content & Chancen (Opportunity Board)** — priorisierte Maßnahmen, Filter (Typ/Projekt/URL-Gruppe/Impact/Aufwand/Status), Evidenz-Drawer, Validierungs-Drawer.
+- **Technical Audit** — Crawl-Runs, Indexierbarkeits-Funnel, Issue-Gruppen, URL-Explorer, Crawl-Diff.
+- **Content Workspace** — ausstehend (Scope-Entscheidung): Chancen, Briefings, Refresh-Kandidaten, interne Linkvorschläge, Snippet-Vorschläge.
+
+**Erklär-Infrastruktur:**
+- **`/glossar`** — Begriffsliste + Konfidenz-Legende; einzige Quelle für alle Tooltips.
+- **`/kit`** — Showcase aller geteilten Komponenten in allen Zuständen (Abnahme + lebende Doku).
+
+### A.6 Offene Entscheidungen (vor/während Welle 1 zu klären)
 - Plattform-Typen im Scope: Content, Shop, SaaS, Local, Misch?
 - Competitor Intelligence: lizenzierter Provider ab V1 oder zunächst rein First-Party + eigener Crawl?
 - Märkte: DACH + ein Referenzmarkt zuerst, oder international ab Tag 1?

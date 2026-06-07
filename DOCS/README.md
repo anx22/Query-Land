@@ -2,29 +2,35 @@
 
 Source of Truth für die Nachbauprogrammierung. Einstieg: `docs/PRODUCT_MASTER_SPEC.md`.
 
+## Struktur
+
 ```
-docs/    PRODUCT_MASTER_SPEC.md (oberste Wahrheitsebene) + REFERENCE_ANCHORS, KPI_DEFINITIONS, UX_FLOWS
-specs/   14 Child-Specs (verfeinern Module/Querschichten; Master gewinnt bei Konflikt)
-prompts/ 7 Codex-Welle-Prompts (Muster Master §12.3)
-openapi/ internal-api.yaml (Gerüst; UI + Agent/MCP teilen den Kern)
-tasks/   Vorbereitungshärtung, Story-/Sprint-Backlog und offene Entscheidungen
+docs/    PRODUCT_MASTER_SPEC.md   ← oberste Wahrheitsebene (inkl. KPIs, Referenz-Anker, UX-Navigation)
+         MONOREPO_CONVENTIONS.md  ← Workspace-Regeln, Import/Export, Pre-Sprint-Checks
+         MIGRATION_STRATEGY.md    ← SQLite→Postgres-Policy
+specs/   14 Child-Specs           ← verfeinern Module/Querschichten; Master gewinnt bei Konflikt
+prompts/ codex-prompts.md         ← Basis-Prompt-Muster + Wellen-Übersicht (Wellen 1–7)
+openapi/ internal-api.yaml        ← API-Vertrag; UI + Agent/MCP teilen den Kern
+design/  DESIGN.md                ← Brand-System (Farben, Typo, Layout)
+         ux-ui-sprint.md          ← UX-Sprint-Spec (UX-0–UX-9, DoD, Komponenten)
+tasks/   roadmap.md               ← Phase-2-Roadmap (aktiv)
+         next-session-handoff.md  ← aktueller Sprint-Status + Empfehlungen
+         decisions-backlog.md     ← DEC-001–007 Produktentscheidungen
+         welle-1-rest-stories.md  ← Welle-1-Reststories (aktiv)
+         welle-2-audit-core-stories.md ← Welle-2-Story-Seeds (aktiv)
+         sprint-conventions.md    ← Story-Template + Testing-Matrix
+         preparation-hardening-backlog.md ← Härtungs-Checkliste (Phase 1, alle erledigt)
+         worker-smoke.md          ← WP-0.3 Smoke-Anleitung
+         _archive/                ← Phase-1-Abschluss, Persistenz-Skizze
+deployment/ vercel-single-deployment.md ← Vercel-Konfiguration
+_Konzepte/  einschetzung.txt      ← strategischer Nord-Stern
+            LLM_council_analyse.txt ← Entscheidungs-Druck-Test (16→7 Module)
 ```
 
-Reihenfolge: Master §1→§2→§6→§7→§10 → zuständige Child-Spec. Gebaut wird in Wellen (§10), vertikal geschnitten (§12.2), validiert gegen den Master.
+## Lesereihenfolge für Implementierung
 
+Master §1 → §2 → §6 → §7 → §10 → zuständige Child-Spec → Codex-Prompt für die Welle.
 
-Aktueller Preparation-Backlog: `tasks/preparation-hardening-backlog.md`.
+## Aktueller Stand
 
-
-Vor Sprintstart abgeschlossen:
-- Monorepo-Konventionen: `docs/MONOREPO_CONVENTIONS.md`
-- SQLite/Postgres-Migration: `docs/MIGRATION_STRATEGY.md`
-- Preparation-Backlog: `tasks/preparation-hardening-backlog.md`
-- Story-Template: `tasks/story-template.md`
-- Testing-Matrix: `tasks/testing-matrix.md`
-- Decisions-Backlog: `tasks/decisions-backlog.md`
-- Welle-1 Reststories: `tasks/welle-1-rest-stories.md`
-- Welle-2 Audit-Core Story Seeds: `tasks/welle-2-audit-core-stories.md`
-- Roadmap-/Status-Tracking: `tasks/roadmap-tracking.md`
-- Übergabe nächste Sprint-Session: `tasks/next-session-handoff.md`
-- Worker-Smoke WP-0.3: `tasks/worker-smoke.md`
+Phase 2 aktiv. Sprint-Status: `tasks/next-session-handoff.md`. Roadmap: `tasks/roadmap.md`.
