@@ -15,7 +15,7 @@ Reihenfolge: **UX-9 → UX-3 → UX-2 → UX-1 → UX-8**.
 | ID | Aufgabe | Aufwand |
 |---|---|---|
 | **UX-0** | **Chart-Lib-Spike** (zuerst, de-risk) — Recharts in diesem Repo verifizieren (Spec unten). | S–M |
-| **UX-9** | Erklär-Infrastruktur: Tooltip/Info-Icon, `ConfidenceBadge` (Klartext+Farbe, A–E, Teil 1 §5 / Teil 2 §2.3), `DeltaChip`, „Warum das zählt"-Zeile, Glossar-Seite `/glossar` (Inhalt: **Glossar-Seed** unten). Chart-Lib kommt aus **UX-0**. | M |
+| **UX-9** | Erklär-Infrastruktur: Tooltip/Info-Icon, `ConfidenceBadge` (Klartext+Farbe, A–E, Teil 1 §5 / Teil 2 §2.3), `DeltaChip`, „Warum das zählt"-Zeile, Glossar-Seite `/glossar` (Inhalt: **Glossar-Seed** unten), **`/kit`-Showcase-Seite** und **Web-Test-Runner (Vitest+RTL)**. Chart-Lib aus **UX-0**. | M |
 | **UX-3** | Voice & Microcopy-Reframe strikt nach **Teil 1**: Dev-/Wellen-/§-/SQLite-Sprache raus, SEO-Nutzen rein; `app-shell` hartkodiertes „Welle 1"-Badge + Datum entfernen; Begriffe (Chance/Quell-Verknüpfung/Indexierbarkeit), Claim, Anrede. | S–M |
 | **UX-2** | Nav-Metadaten: gebaute Module `planned`→`active`; `icon`-Feld rendern (Material Symbols) oder entfernen; toten `createPlannedModulePage` löschen. | S |
 | **UX-1** | Overview-Neubau nach **Teil 3 §B**: TrendChart(Visibility)+Marker, ScoreGauge(Health), PositionDistribution, Top-Chancen-Matrix, Risiken, letzte Crawls/Reports; Demo-Fixtures raus. | M |
@@ -82,6 +82,28 @@ Kurzdefinitionen im Berater-Ton (sachlich, ein Satz). Werden zur einzigen Quelle
 | AEO | Answer Engine Optimization — Inhalte für Antwort-Engines/KI aufbereiten. |
 | AI-Visibility / Citation | Ob die eigene Domain in LLM-Antworten genannt/zitiert wird (Konfidenz E — Signal, kein Beleg). |
 | Report / Alert | Zusammenfassung von Kennzahlen über Zeit; Alert = Schwellwert-Auslöser. |
+
+## Component Definition-of-Done (DoD)
+
+### Projektweite Konventionen (gelten für jede Komponente — beschlossen 2026-06-07)
+- **Styling:** globales CSS erweitern (neue Klassen/Tokens in `globals.css`); kein CSS-Modules/Tailwind. Tokens nie hartkodieren (`var(--…)` / `chartTheme.ts`).
+- **State:** URL-`searchParams`-first für Filter/Tabs/Selektion (server-gerendert, teilbar, Deep-Link); nur Drawer & Command-Palette client-lokal (`"use client"`).
+- **Tests:** leichte Logik-Tests (**Vitest + React Testing Library**) für reine Logik (KonfidenzBadge-Mapping, DeltaChip-Richtung, Formatter, Daten-Adapter); Visuelles/Charts via `build:web`. Web-Test-Runner-Setup = Teil von UX-9.
+- **Abnahme:** **`/kit`-Preview-Seite** zeigt jede Komponente in allen Zuständen; dient als Abnahme + lebende Doku. Route = Teil von UX-9.
+- **A11y:** Tastaturbedienung, sichtbarer Fokus, Labels/`aria`, `prefers-reduced-motion`; Farbe nie allein (Label/Icon dazu).
+- **Ablage:** geteilte Primitive in `apps/web/src/components/`, modul-spezifisch in `features/<modul>/`. Props englisch + typisiert. Ein Breakpoint (980px).
+
+### DoD-Checkliste je Komponente (Ticket „fertig", wenn alle ✔)
+- [ ] **Props/API** typisiert + dokumentiert (Eingaben, Defaults).
+- [ ] **Zustände**: default · loading (Skeleton) · empty/no-data (mit nächster Aktion) · error.
+- [ ] **Varianten** implementiert (z. B. Badge A–E; DeltaChip up/down/flat).
+- [ ] **Interaktion**: Hover/Klick/Tastatur; Server-Daten als Props (kein Fetch in Client-Charts).
+- [ ] **CI**: Tokens via `var(--…)`; Brand-Orange nur „wir/CTA"; Serious-Zonen sachlich.
+- [ ] **A11y** erfüllt (siehe Konventionen).
+- [ ] **Responsive** ≤ 980px geprüft.
+- [ ] **Tests**: Logik-Tests grün (falls Logik); `npm run check` + `build:web` grün.
+- [ ] **Abnahme**: in `/kit` mit allen Zuständen sichtbar **und** in mind. einem echten Screen verwendet.
+
 
 
 ---
