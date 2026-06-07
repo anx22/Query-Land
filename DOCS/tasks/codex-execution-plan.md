@@ -1,5 +1,7 @@
 # Codex-Ausführungsplan — sequenzierte Arbeitspakete bis MVP
 
+> ✅ **Phase 1 (M0–M6) abgeschlossen.** Dieses Dokument ist der detaillierte Ausführungs-/Prompt-Verlauf von Phase 1 und bleibt als Historie erhalten. **Aktuelle Roadmap: [`roadmap.md`](./roadmap.md)** (Phase 2). Gestraffte Phase-1-Übersicht: [`_archive/roadmap-m0-m6.md`](./_archive/roadmap-m0-m6.md).
+
 > Zweck: Aus Bestandsaufnahme (Code) × Kernvision (`docs/PRODUCT_MASTER_SPEC.md`) × Roadmap (`tasks/roadmap-tracking.md`)
 > abgeleitete, nach Komplexität/Abhängigkeit/Modul geschnittene Arbeitspakete (WP) mit kopierbaren Codex-Prompts.
 > Jeder Prompt folgt dem Master-Prompt-Muster §12.3 (spec-first, vertikaler Schnitt, Tests zuerst, keine Vertragsänderung außerhalb des Scopes).
