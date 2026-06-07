@@ -1,18 +1,30 @@
-import type { Opportunity, OpportunityStatus } from "@seo-tool/domain-model";
+import "../../features/content-opportunities/board.css";
+
 import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
-import { loadOpportunityBoard, OPPORTUNITY_STATUSES } from "../../features/content-opportunities";
-import { generateOpportunitiesAction, revalidateOpportunityAction, syncSearchPerformanceAction, transitionOpportunityAction } from "./actions";
+import { WhyItMatters } from "../../components/why-it-matters";
+import { OpportunityBoardClient } from "../../features/content-opportunities";
+import { loadOpportunityBoard } from "../../lib/board-api";
+import { generateOpportunitiesAction, syncSearchPerformanceAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const params = await searchParams;
-  const statusFilter = singleParam(params?.status) ?? "all";
-  const data = await loadOpportunityBoard({ status: statusFilter });
+  const data = await loadOpportunityBoard();
   const feedback = feedbackMessage(params);
-  const openCount = data.opportunities.filter((o) => !["validated", "dismissed", "expired"].includes(o.status)).length;
-  const validatedCount = data.opportunities.filter((o) => o.status === "validated").length;
+
+  const opportunities = data.opportunities;
+  const openCount = opportunities.filter(
+    (o) => !["validated", "dismissed", "expired"].includes(o.status)
+  ).length;
+  const validatedCount = opportunities.filter((o) => o.status === "validated").length;
+  const quickWins = opportunities.filter((o) => o.expectedImpact >= 4 && o.effort <= 2).length;
+  const topPriority = [...opportunities].sort((a, b) => b.priority - a.priority)[0] ?? null;
 
   return (
     <AppShell activePath="/content-opportunities">
@@ -20,168 +32,81 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">Content &amp; Opportunities</p>
         <h1>Opportunity Board</h1>
         <p>
-          Priorisierte Optimierungschancen mit Evidenz, Maßnahmen und Validierung. Jede Chance folgt dem Muster: Beobachtung → Ursache → Maßnahme → messbares Ergebnis.
+          Priorisierte Optimierungschancen mit Evidenz, Maßnahmen und Validierung. Jede Chance folgt dem
+          Muster: Beobachtung → Ursache → Maßnahme → messbares Ergebnis.
         </p>
+        <WhyItMatters>
+          Die Impact×Effort-Matrix zeigt die günstigsten Hebel zuerst — Quick Wins vor Big Bets.
+        </WhyItMatters>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
           <span className="badge">{data.selectedSite?.baseUrl ?? "keine Site"}</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+          <span className={data.connected ? "badge success" : "badge danger"}>
+            {data.connected ? "API verbunden" : "API offline"}
+          </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+        {!data.connected ? (
+          <p className="notice danger">
+            {data.errorMessage ?? "API nicht erreichbar."} · Erwartete API: {data.apiBaseUrl}
+          </p>
+        ) : null}
         <div className="action-row">
           <form action={generateOpportunitiesAction}>
             <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
             <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject || !data.selectedSite}>Alle Opportunity-Klassen generieren</button>
+            <button
+              className="button"
+              type="submit"
+              disabled={!data.connected || !data.selectedProject || !data.selectedSite}
+            >
+              Alle Opportunity-Klassen generieren
+            </button>
           </form>
           <form action={syncSearchPerformanceAction}>
             <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
             <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.selectedProject || !data.selectedSite}>Search Performance synchronisieren</button>
+            <button
+              className="button secondary"
+              type="submit"
+              disabled={!data.connected || !data.selectedProject || !data.selectedSite}
+            >
+              Search Performance synchronisieren
+            </button>
           </form>
         </div>
       </section>
 
       <section className="metric-grid">
-        <MetricCard label="Opportunities" value={String(data.opportunitiesMeta.total)} note={`${data.opportunities.length} im Filter geladen`} />
+        <MetricCard label="Opportunities" value={String(data.meta.total)} note={`${opportunities.length} geladen`} />
         <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
-        <MetricCard label="Validiert" value={String(validatedCount)} note="Vorher/Nachher bestätigt" />
-        <MetricCard label="Top-Priorität" value={data.opportunities[0] ? String(data.opportunities[0].priority) : "—"} note={data.opportunities[0]?.type ?? "noch keine"} />
+        <MetricCard label="Quick Wins" value={String(quickWins)} note="hohe Wirkung, niedriger Aufwand" />
+        <MetricCard
+          label="Validiert"
+          value={String(validatedCount)}
+          note={topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt"}
+        />
       </section>
 
-      <section className="card">
-        <p className="kicker">Search-Performance-Intelligence · GSC (Klasse B)</p>
-        {data.searchPerformance && data.searchPerformance.summary.rows > 0 ? (
-          <>
-            <div className="badge-row">
-              <span className="badge">{data.searchPerformance.summary.rows} Query/Page-Zeilen</span>
-              <span className="badge primary">{data.searchPerformance.summary.strikingDistance} Striking Distance</span>
-              <span className="badge primary">{data.searchPerformance.summary.ctrGaps} CTR-Gaps</span>
-              <span className="badge primary">{data.searchPerformance.summary.cannibalization} Kannibalisierung</span>
-            </div>
-            <div className="content-grid">
-              <div>
-                <p className="muted">Striking Distance (Pos 11–20)</p>
-                <ul>
-                  {data.searchPerformance.strikingDistance.slice(0, 5).map((item) => (
-                    <li key={`sd-${item.query}-${item.pageUrl}`}>{item.query} · Pos {item.position} · {item.impressions} Imp.</li>
-                  ))}
-                  {data.searchPerformance.strikingDistance.length === 0 ? <li className="muted">—</li> : null}
-                </ul>
-              </div>
-              <div>
-                <p className="muted">CTR-Gaps (entgangene Klicks)</p>
-                <ul>
-                  {data.searchPerformance.ctrGaps.slice(0, 5).map((item) => (
-                    <li key={`cg-${item.query}-${item.pageUrl}`}>{item.query} · Pos {item.position} · {item.missedClicks} Klicks</li>
-                  ))}
-                  {data.searchPerformance.ctrGaps.length === 0 ? <li className="muted">—</li> : null}
-                </ul>
-              </div>
-              <div>
-                <p className="muted">Kannibalisierung</p>
-                <ul>
-                  {data.searchPerformance.cannibalization.slice(0, 5).map((item) => (
-                    <li key={`cn-${item.query}`}>{item.query} · {item.pages.length} Seiten</li>
-                  ))}
-                  {data.searchPerformance.cannibalization.length === 0 ? <li className="muted">—</li> : null}
-                </ul>
-              </div>
-            </div>
-          </>
-        ) : (
-          <p>Noch keine Search-Performance-Daten. Klicke „Search Performance synchronisieren", um die GSC-Matrix (deterministischer Stub) und daraus abgeleitete Signale zu erzeugen.</p>
-        )}
-      </section>
-
-      <section className="content-grid">
-        <div className="card">
-          <p className="kicker">Board</p>
-          <form className="filter-row" action="/content-opportunities">
-            <label>
-              Status
-              <select name="status" defaultValue={statusFilter}>
-                <option value="all">Alle</option>
-                {OPPORTUNITY_STATUSES.map((status) => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </label>
-            <button className="button secondary" type="submit">Filtern</button>
-          </form>
-          {data.opportunities.length > 0 ? (
-            <div className="table-list">
-              {data.opportunities.map((opportunity) => (
-                <article key={opportunity.id}>
-                  <strong>{opportunity.type} · Prio {opportunity.priority}</strong>
-                  <span className={`status ${opportunity.status}`}>{opportunity.status}</span>
-                  <span>{opportunity.currentState}</span>
-                  <span>Maßnahme: {opportunity.recommendedAction}</span>
-                  <span>Validierung: {opportunity.validationMetric} · {opportunity.affectedUrls.join(", ") || "keine URL"}</span>
-                  <span className="muted">
-                    Evidenz: {opportunity.evidence.map((evidence) => `${evidence.source} (${evidence.sourceConfidence}) ${evidence.metric}: ${String(evidence.beforeValue)}→${String(evidence.currentValue)}`).join(" · ") || "—"}
-                  </span>
-                  <div className="inline-actions">
-                    {opportunity.status === "implemented" ? (
-                      <OpportunityForm action={revalidateOpportunityAction} opportunityId={opportunity.id} disabled={!data.connected} label="Re-Validieren" />
-                    ) : null}
-                    {transitionsFor(opportunity.status).map((next) => (
-                      <TransitionForm key={next} opportunityId={opportunity.id} status={next} disabled={!data.connected} />
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p>Keine Opportunities im Filter. „Search Performance synchronisieren" und dann „Alle Opportunity-Klassen generieren" erzeugt low_hanging_keyword-, money_page-, cannibalization- (GSC) und internal_link_gap-Opportunities; technische Fixes brauchen zusätzlich einen Crawl mit Indexierbarkeits-Blockern.</p>
-          )}
-        </div>
-      </section>
+      <OpportunityBoardClient opportunities={opportunities} />
     </AppShell>
   );
 }
 
-// v0-Aktionssatz pro Status (Teilmenge des §6.5-Statusmodells; die API erzwingt die Regeln).
-function transitionsFor(status: OpportunityStatus): OpportunityStatus[] {
-  switch (status) {
-    case "open": return ["in_progress", "dismissed"];
-    case "planned": return ["in_progress", "dismissed"];
-    case "in_progress": return ["implemented", "dismissed"];
-    case "implemented": return ["dismissed"];
-    case "validated": return ["reopened"];
-    case "reopened": return ["in_progress", "dismissed"];
-    case "dismissed": return ["open"];
-    case "expired": return ["open"];
-    default: return [];
-  }
-}
-
-function TransitionForm({ opportunityId, status, disabled }: { opportunityId: string; status: OpportunityStatus; disabled: boolean }) {
-  return (
-    <form action={transitionOpportunityAction}>
-      <input type="hidden" name="opportunityId" value={opportunityId} />
-      <input type="hidden" name="status" value={status} />
-      <button className="button secondary compact" type="submit" disabled={disabled}>→ {status}</button>
-    </form>
-  );
-}
-
-function OpportunityForm({ action, opportunityId, disabled, label }: { action: (formData: FormData) => Promise<void>; opportunityId: string; disabled: boolean; label: string }) {
-  return (
-    <form action={action}>
-      <input type="hidden" name="opportunityId" value={opportunityId} />
-      <button className="button compact" type="submit" disabled={disabled}>{label}</button>
-    </form>
-  );
-}
-
-function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
+function feedbackMessage(
+  params: Record<string, string | string[] | undefined> | undefined
+): { kind: "success" | "danger"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
-  if (singleParam(params?.generated)) return { kind: "success", message: "Opportunities generiert (alle fünf Klassen, idempotent)." };
-  if (singleParam(params?.synced)) return { kind: "success", message: "Search-Performance synchronisiert (GSC-Stub, Klasse B)." };
-  if (singleParam(params?.revalidated)) return { kind: "success", message: "Opportunity re-validiert (validated oder reopened)." };
+  if (singleParam(params?.generated)) {
+    return { kind: "success", message: "Opportunities generiert (alle Klassen, idempotent)." };
+  }
+  if (singleParam(params?.synced)) {
+    return { kind: "success", message: "Search-Performance synchronisiert (GSC-Stub, Klasse B)." };
+  }
+  if (singleParam(params?.revalidated)) {
+    return { kind: "success", message: "Opportunity re-validiert (validated oder reopened)." };
+  }
   const transition = singleParam(params?.transition);
   if (transition) return { kind: "success", message: `Status gewechselt zu ${transition}.` };
   return null;
