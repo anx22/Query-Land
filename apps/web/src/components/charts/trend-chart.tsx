@@ -71,6 +71,13 @@ export interface TrendChartProps {
    * Chart wrapper height in rem (default 14).
    */
   height?: number;
+  /**
+   * Upper bound of the Y axis. Default 100 (suits a 0–100 index like Visibility).
+   * Pass "auto" for unbounded series (e.g. raw backlink counts) so values > 100
+   * are not clipped; the axis then scales to the data maximum.
+   * @default 100
+   */
+  yMax?: number | "auto";
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +143,7 @@ export function TrendChart({
   valueLabel = "Visibility",
   events = [],
   height = 14,
+  yMax = 100,
 }: TrendChartProps) {
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -181,7 +189,7 @@ export function TrendChart({
           />
 
           <YAxis
-            domain={[0, 100]}
+            domain={[0, yMax === "auto" ? "dataMax" : yMax]}
             tick={{ fill: chartTheme.chrome.axisText, fontSize: chartTheme.chrome.axisFontSize }}
             axisLine={false}
             tickLine={false}
