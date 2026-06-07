@@ -10,6 +10,22 @@
   --success: #16794d;
   --warning: #a05a00;
   --danger: #b42318;
+
+  /* UX-9 explain primitives — confidence/evidence scale A–E (Teil 2 §2.3)        */
+  /* These names MUST match exactly what chart-theme.ts references via var(--…).  */
+  --conf-a: #16794d; --conf-a-soft: #e7f6ee;   /* A Gesichert     (eigene Daten)       */
+  --conf-b: #0e7c86; --conf-b-soft: #e2f4f5;   /* B Beobachtet    (Google/eigene API)  */
+  --conf-c: #b7791f; --conf-c-soft: #fbf0db;   /* C Gemessen SERP (beobachtete Suche)  */
+  --conf-d: #5b6478; --conf-d-soft: #edeff3;   /* D Geschätzt     (Drittanbieter)      */
+  --conf-e: #9aa0a6; --conf-e-soft: #f1f1f2;   /* E KI-Hinweis    (kein Beleg)         */
+
+  /* UX-9 — categorical colors for opportunity types (avoids green/red/orange)    */
+  --cat-technical: #0e7c86;
+  --cat-keyword:   #6f7d2e;
+  --cat-cannibal:  #8a4f9e;
+  --cat-money:     #4f56b5;
+  --cat-link:      #9a6b4f;
+  --cat-aeo:       #5b6478;
 }
 
 * {
@@ -501,5 +517,323 @@ select:disabled {
 
 .button.compact {
   padding: 0.55rem 0.8rem;
+  font-size: 0.82rem;
+}
+
+/* ============================================================
+   UX-9 — Explain primitives
+   (ConfidenceBadge · DeltaChip · TermTooltip · WhyItMatters)
+   All tokens via var(--…) — no hardcoded hex values here.
+   ============================================================ */
+
+/* ConfidenceBadge ------------------------------------------ */
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  /* border set per level via modifier classes below */
+}
+
+.confidence-badge__dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.confidence-badge__label {
+  /* always visible — color is never the only signal */
+}
+
+.confidence-badge--A {
+  background: var(--conf-a-soft);
+  color: var(--conf-a);
+  border: 1px solid color-mix(in srgb, var(--conf-a) 24%, transparent);
+}
+.confidence-badge--A .confidence-badge__dot { background: var(--conf-a); }
+
+.confidence-badge--B {
+  background: var(--conf-b-soft);
+  color: var(--conf-b);
+  border: 1px solid color-mix(in srgb, var(--conf-b) 24%, transparent);
+}
+.confidence-badge--B .confidence-badge__dot { background: var(--conf-b); }
+
+.confidence-badge--C {
+  background: var(--conf-c-soft);
+  color: var(--conf-c);
+  border: 1px solid color-mix(in srgb, var(--conf-c) 24%, transparent);
+}
+.confidence-badge--C .confidence-badge__dot { background: var(--conf-c); }
+
+.confidence-badge--D {
+  background: var(--conf-d-soft);
+  color: var(--conf-d);
+  border: 1px solid color-mix(in srgb, var(--conf-d) 24%, transparent);
+}
+.confidence-badge--D .confidence-badge__dot { background: var(--conf-d); }
+
+.confidence-badge--E {
+  background: var(--conf-e-soft);
+  color: var(--conf-e);
+  border: 1px solid color-mix(in srgb, var(--conf-e) 24%, transparent);
+}
+.confidence-badge--E .confidence-badge__dot { background: var(--conf-e); }
+
+/* DeltaChip ------------------------------------------------ */
+.delta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.delta-chip__arrow {
+  font-style: normal;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.delta-chip__value {
+  /* always rendered — direction is not color-only */
+}
+
+.delta-chip--up {
+  background: #e7f6ee; /* --conf-a-soft — gain */
+  color: var(--success);
+}
+
+.delta-chip--down {
+  background: #ffe8e5; /* danger-soft */
+  color: var(--danger);
+}
+
+.delta-chip--flat {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+/* TermTooltip ---------------------------------------------- */
+.term {
+  display: inline;
+  cursor: help;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+  position: relative;
+}
+
+.term:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.term__popover {
+  position: absolute;
+  z-index: 100;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 240px;
+  min-width: 160px;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.5;
+  box-shadow: 0 24px 80px rgba(77, 47, 23, 0.08);
+  /* prevent dotted underline inside popover */
+  text-decoration: none;
+}
+
+.term__popover-title {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.term__popover-def {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+
+.term__popover-link {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.term__popover-link:hover {
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .term__popover {
+    animation: popover-in 120ms ease-out;
+  }
+}
+
+@keyframes popover-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* WhyItMatters --------------------------------------------- */
+.why-it-matters {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.why-it-matters__icon {
+  flex-shrink: 0;
+  color: var(--primary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Screen-reader-only utility (shared by DeltaChip sr text) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* /kit showcase page --------------------------------------- */
+.kit-page {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.kit-section {
+  margin-top: 2.5rem;
+}
+
+.kit-section h2 {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.kit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.kit-label {
+  min-width: 7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* /glossar page -------------------------------------------- */
+.glossar-page {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.glossar-page h1 {
+  font-size: clamp(1.6rem, 4vw, 2.8rem);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+}
+
+.glossar-page__lead {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+}
+
+.glossar-list {
+  display: grid;
+  gap: 0;
+}
+
+.glossar-term {
+  border-bottom: 1px solid var(--line);
+  padding: 1.1rem 0;
+}
+
+.glossar-term:last-child {
+  border-bottom: 0;
+}
+
+.glossar-term__word {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 0.3rem;
+}
+
+.glossar-term__def {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* confidence legend used in /glossar */
+.conf-legend {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.conf-legend__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.conf-legend__desc {
+  color: var(--muted);
   font-size: 0.82rem;
 }
