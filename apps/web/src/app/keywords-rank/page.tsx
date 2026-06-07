@@ -1,113 +1,167 @@
+import "../../features/keyword-rank/keywords.css";
+
 import { AppShell } from "../../components/app-shell";
 import { MetricCard } from "../../components/metric-card";
-import { KEYWORD_INTENT_OPTIONS, loadKeywordLibrary } from "../../features/keyword-rank";
-import { addKeywordsAction, computeVisibilityAction, createKeywordGroupAction, recordRankAction } from "./actions";
+import { WhyItMatters } from "../../components/why-it-matters";
+import { TermTooltip } from "../../components/term-tooltip";
+import { PositionDistribution } from "../../components/charts/position-distribution";
+import { TrendChart } from "../../components/charts/trend-chart";
+import { KeywordTableClient } from "../../features/keyword-rank";
+import { loadKeywordsRankData } from "../../lib/keywords-api";
+import { addKeywordsAction, computeVisibilityAction, createKeywordGroupAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const params = await searchParams;
-  const intentFilter = singleParam(params?.intent) ?? "all";
-  const data = await loadKeywordLibrary({ intent: intentFilter });
+  const data = await loadKeywordsRankData();
   const feedback = feedbackMessage(params);
-  const brandCount = data.keywords.filter((keyword) => keyword.brand).length;
+
+  const brandCount = data.rows.filter((r) => r.brand).length;
+  const visScore = data.latestVisibility?.score;
+  const visDelta =
+    data.latestVisibility && data.previousVisibility
+      ? data.latestVisibility.score - data.previousVisibility.score
+      : null;
 
   return (
     <AppShell activePath="/keywords-rank">
       <section className="card hero-card">
         <p className="kicker">Keywords &amp; Rank</p>
-        <h1>Keyword-Bibliothek</h1>
+        <h1>Keywords &amp; Rankings</h1>
         <p>
-          Kuratiertes Keyword-Universum mit Rankings und Sichtbarkeit. Keywords werden nach Intent, Brand und Funnel-Stage klassifiziert und Themen-Clustern zugeordnet.
+          Das eigene Keyword-Universum mit Positionen und Sichtbarkeit. Jede Zeile zeigt den
+          Positions-Trend, die Veränderung gegenüber dem letzten Snapshot und die Quell-Konfidenz.
         </p>
+        <WhyItMatters>
+          <TermTooltip term="Striking Distance">Striking-Distance</TermTooltip>-Keywords (Position 11–20)
+          sind die günstigsten Hebel — ein paar Plätze entscheiden über Sichtbarkeit.
+        </WhyItMatters>
         <div className="badge-row">
-          <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
+          <span className="badge primary">{data.project?.name ?? "kein Projekt"}</span>
           <span className="badge">{data.groups.length} Cluster</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+          <span className={data.connected ? "badge success" : "badge danger"}>
+            {data.connected ? "API verbunden" : "API offline"}
+          </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+        {!data.connected ? (
+          <p className="notice danger">
+            {data.errorMessage ?? "API nicht erreichbar."} · Erwartete API: {data.apiBaseUrl}
+          </p>
+        ) : null}
         <div className="action-row">
           <form action={computeVisibilityAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.selectedProject}>Visibility neu berechnen</button>
+            <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
+            <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+              Visibility neu berechnen
+            </button>
           </form>
         </div>
       </section>
 
       <section className="metric-grid">
-        <MetricCard label="Visibility-Index" value={data.visibility ? String(data.visibility.score) : "—"} note={data.visibility ? `${data.visibility.trackedKeywords} getrackt · Ø Pos ${data.visibility.averagePosition ?? "—"}` : "noch nicht berechnet"} />
-        <MetricCard label="Keywords" value={String(data.keywordsMeta.total)} note={`${data.keywords.length} im Filter`} />
+        <MetricCard
+          label="Visibility-Index"
+          value={visScore != null ? String(visScore) : "—"}
+          note={
+            data.latestVisibility
+              ? `${data.latestVisibility.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility.averagePosition ?? "—"}${
+                  visDelta != null ? ` · ${visDelta > 0 ? "+" : ""}${visDelta} Pkt` : ""
+                }`
+              : "noch nicht berechnet"
+          }
+        />
+        <MetricCard label="Keywords" value={String(data.totalKeywords)} note={`${data.rows.length} geladen`} />
         <MetricCard label="Cluster" value={String(data.groups.length)} note="Themen-/Keyword-Gruppen" />
-        <MetricCard label="Brand" value={String(brandCount)} note="im aktuellen Filter" />
+        <MetricCard label="Brand" value={String(brandCount)} note="von den geladenen Keywords" />
       </section>
 
+      {/* Charts: PositionDistribution + Visibility TrendChart */}
+      <section className="kw-charts">
+        <div className="card kw-chart-card">
+          <p className="kicker">Positions-Verteilung</p>
+          <WhyItMatters showIcon={false}>
+            Verteilung der getrackten Keywords über die fünf Ranking-Tiers.
+          </WhyItMatters>
+          <PositionDistribution buckets={data.buckets} />
+        </div>
+        <div className="card kw-chart-card">
+          <p className="kicker">
+            <TermTooltip term="Visibility-Index">Visibility-Index</TermTooltip> · Verlauf
+          </p>
+          <WhyItMatters showIcon={false}>
+            Positionsgewichtete Sichtbarkeit über die Zeit (0–100).
+          </WhyItMatters>
+          <TrendChart data={data.visibilityTrend} valueLabel="Visibility" />
+        </div>
+      </section>
+
+      {/* Interactive keyword table + FilterBar + Inspector */}
+      <KeywordTableClient rows={data.rows} inspectors={data.inspectors} />
+
+      {/* Curation forms (reframed in voice) */}
       <section className="content-grid">
         <div className="card">
           <p className="kicker">Keywords hinzufügen</p>
+          <WhyItMatters showIcon={false}>
+            Neue Begriffe werden automatisch nach Intent, Brand und Funnel-Stage klassifiziert.
+          </WhyItMatters>
           <form className="form-card" action={addKeywordsAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-            <label>Keywords (eines pro Zeile)<textarea name="phrases" rows={5} placeholder={"seo tool kaufen\nahrefs vs semrush\nwie funktioniert seo"} required /></label>
-            <label>Cluster (optional)
+            <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
+            <label>
+              Keywords (eines pro Zeile)
+              <textarea
+                name="phrases"
+                rows={5}
+                placeholder={"seo tool kaufen\nahrefs vs semrush\nwie funktioniert seo"}
+                required
+              />
+            </label>
+            <label>
+              Cluster (optional)
               <select name="groupId" defaultValue="">
                 <option value="">— kein Cluster —</option>
-                {data.groups.map((group) => (<option key={group.id} value={group.id}>{group.name}</option>))}
+                {data.groups.map((group) => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
+                ))}
               </select>
             </label>
-            <label>Brand-Begriffe (kommagetrennt, optional)<input name="brandTerms" placeholder="query-land, acme" /></label>
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Klassifizieren &amp; speichern</button>
+            <label>
+              Brand-Begriffe (kommagetrennt, optional)
+              <input name="brandTerms" placeholder="query-land, acme" />
+            </label>
+            <button className="button" type="submit" disabled={!data.connected || !data.project}>
+              Klassifizieren &amp; speichern
+            </button>
           </form>
         </div>
         <div className="card">
           <p className="kicker">Cluster anlegen</p>
+          <WhyItMatters showIcon={false}>
+            Cluster bündeln thematisch verwandte Keywords für Reporting und Analyse.
+          </WhyItMatters>
           <form className="form-card" action={createKeywordGroupAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+            <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
             <label>Name<input name="name" placeholder="Pricing" required /></label>
             <label>Thema (optional)<input name="topic" placeholder="Money pages" /></label>
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.selectedProject}>Cluster anlegen</button>
+            <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+              Cluster anlegen
+            </button>
           </form>
-        </div>
-      </section>
-
-      <section className="content-grid">
-        <div className="card">
-          <p className="kicker">Keyword-Set</p>
-          <form className="filter-row" action="/keywords-rank">
-            <label>Intent
-              <select name="intent" defaultValue={intentFilter}>
-                <option value="all">Alle</option>
-                {KEYWORD_INTENT_OPTIONS.map((intent) => (<option key={intent} value={intent}>{intent}</option>))}
-              </select>
-            </label>
-            <button className="button secondary" type="submit">Filtern</button>
-          </form>
-          {data.keywords.length > 0 ? (
-            <div className="table-list">
-              {data.keywords.map((keyword) => (
-                <article key={keyword.id}>
-                  <strong>{keyword.phrase}</strong>
-                  <span>{keyword.intent} · {keyword.funnelStage}{keyword.brand ? " · brand" : ""} · {keyword.market}</span>
-                  <span className="muted">{keyword.targetUrl ? `→ ${keyword.targetUrl}` : "keine Ziel-URL"} · Quelle {keyword.sourceConfidence}</span>
-                  <div className="inline-actions">
-                    <form action={recordRankAction}>
-                      <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-                      <input type="hidden" name="keywordId" value={keyword.id} />
-                      <button className="button secondary compact" type="submit" disabled={!data.connected}>Rang erfassen</button>
-                    </form>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p>Noch keine Keywords im Filter. Füge oben welche hinzu.</p>
-          )}
         </div>
       </section>
     </AppShell>
   );
 }
 
-function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
+function feedbackMessage(
+  params: Record<string, string | string[] | undefined> | undefined
+): { kind: "success" | "danger"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.added)) return { kind: "success", message: "Keywords klassifiziert und gespeichert." };
