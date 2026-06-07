@@ -1,0 +1,154 @@
+/**
+ * reports.css — Reports & Alerts screen (UX Modul I) styles.
+ *
+ * Conventions:
+ *   - Every class is prefixed with `reports-`.
+ *   - Colors via design tokens (var(--…)) only; no hardcoded hex.
+ *   - Reuses global classes (.card, .badge, .kicker, .muted, .table-list,
+ *     .content-grid, .metric-grid) wherever possible.
+ *   - prefers-reduced-motion respected (no custom transitions added).
+ *   - Single breakpoint at 980px.
+ */
+
+/* --- Inventory / schedule / event rows: align meta in a clean grid --- */
+.reports-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.reports-row__title {
+  font-weight: 600;
+  color: var(--ink);
+  margin-right: 0.25rem;
+}
+
+.reports-row__meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.reports-row__spacer {
+  flex: 1 1 auto;
+}
+
+.reports-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* --- Inventory table --- */
+.reports-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.reports-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.reports-table th,
+.reports-table td {
+  text-align: left;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.reports-table th {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.reports-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* --- Alerts grid: each metric card may carry a gauge/trend --- */
+.reports-alert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.reports-alert-card {
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: var(--surface);
+}
+
+.reports-alert-card__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+}
+
+.reports-alert-card__metric {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.reports-alert-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.reports-alert-chart__caption {
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.reports-alert-card__numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.reports-alert-card__numbers strong {
+  color: var(--ink);
+}
+
+/* --- Empty-state block (calm, with next action) --- */
+.reports-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 0;
+  color: var(--muted);
+}
+
+.reports-empty__glyph {
+  font-size: 1.5rem;
+}
+
+.reports-empty__title {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* --- Responsive --- */
+@media (max-width: 980px) {
+  .reports-alert-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-row {
+    align-items: flex-start;
+  }
+}

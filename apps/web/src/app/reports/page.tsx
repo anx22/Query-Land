@@ -1,8 +1,37 @@
-import type { AlertComparator, AlertEvent, AlertMetric, AlertRule, DeliveryChannel, Report, ReportCadence, ReportSchedule, ReportType } from "@seo-tool/domain-model";
-import { ALERT_COMPARATORS, ALERT_METRICS, DELIVERY_CHANNELS, REPORT_CADENCES, REPORT_TYPES } from "@seo-tool/domain-model";
+import "../../features/reports/reports.css";
+
+import {
+  ALERT_COMPARATORS,
+  ALERT_METRICS,
+  DELIVERY_CHANNELS,
+  REPORT_CADENCES,
+  REPORT_TYPES,
+} from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
+import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
-import { loadReports } from "../../features/reports";
+import { TermTooltip } from "../../components/term-tooltip";
+import { WhyItMatters } from "../../components/why-it-matters";
+import { AlertMetricChart } from "../../features/reports/alert-metric-chart";
+import {
+  buildAlertChartModel,
+  countTriggered,
+  eventSeverity,
+  formatMetricValue,
+  formatTimestamp,
+  labelForCadence,
+  labelForChannel,
+  labelForComparator,
+  labelForMetric,
+  labelForReportType,
+  metricsFromRules,
+  scheduleStatus,
+  scheduleStatusBadge,
+  scheduleStatusLabel,
+  severityBadge,
+  severityLabel,
+} from "../../features/reports/reports-logic";
+import { loadReportsData } from "../../lib/reports-api";
 import {
   createAlertRuleAction,
   createScheduleAction,
@@ -16,18 +45,35 @@ export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const data = await loadReports();
+  const data = await loadReportsData();
   const feedback = feedbackMessage(params);
-  const triggeredEvents = data.alertEvents.filter((e) => e.triggered);
+
+  const triggeredCount = countTriggered(data.alertEvents);
+  const projectId = data.selectedProject?.id ?? "";
+  const disabled = !data.connected || !data.selectedProject;
+
+  // Build a per-metric chart model from rules + events (metric vs. threshold).
+  const alertMetrics = metricsFromRules(data.alertRules);
+  const alertModels = alertMetrics.map((metric) => ({
+    metric,
+    rule: data.alertRules.find((r) => r.metric === metric) ?? null,
+    model: buildAlertChartModel(metric, data.alertEvents),
+  }));
+  const recentEvents = data.alertEvents
+    .slice()
+    .sort((a, b) => new Date(b.evaluatedAt).getTime() - new Date(a.evaluatedAt).getTime())
+    .slice(0, 12);
 
   return (
     <AppShell activePath="/reports">
-      {/* Hero card */}
+      {/* Hero — metaphor lives only in the framing copy (Serious-Zone elsewhere). */}
       <section className="card hero-card">
-        <p className="kicker">Reporting &amp; Alerts</p>
-        <h1>Reports &amp; Alarme</h1>
+        <p className="kicker">Reporting &amp; Alarme</p>
+        <h1>
+          <TermTooltip term="report">Reports</TermTooltip> &amp; <TermTooltip term="alert">Alarme</TermTooltip>
+        </h1>
         <p>
-          Generiere Snapshots der SEO-Daten (Health, Opportunities, Sichtbarkeit, Authority), plane automatische Lieferungen und setze Schwellwert-Alarme auf projektweite Kennzahlen.
+          Halten Sie den Stand Ihrer Sichtbarkeit fest: generierte Snapshots aus Health, Opportunities, Sichtbarkeit und Authority, geplante Lieferungen und Schwellwert-Alarme auf projektweite Kennzahlen.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
@@ -35,9 +81,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+        {data.connected && !data.selectedProject ? (
+          <p className="notice">Kein Projekt ausgewählt. Legen Sie zuerst ein Projekt an, um Reports zu erzeugen.</p>
+        ) : null}
         <div className="action-row">
           <form action={generateReportAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+            <input type="hidden" name="projectId" value={projectId} />
             <label>
               Report-Typ
               <select name="type" defaultValue="weekly_summary">
@@ -46,11 +95,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 ))}
               </select>
             </label>
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Wochenreport generieren</button>
+            <button className="button" type="submit" disabled={disabled}>Report generieren</button>
           </form>
           <form action={runDueAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.selectedProject}>Fällige Reports ausführen</button>
+            <input type="hidden" name="projectId" value={projectId} />
+            <button className="button secondary" type="submit" disabled={disabled}>Fällige Schedules ausführen</button>
           </form>
         </div>
       </section>
@@ -58,26 +107,72 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       {/* Metric grid */}
       <section className="metric-grid">
         <MetricCard label="Reports" value={String(data.reports.length)} note="generierte Snapshots" />
-        <MetricCard label="Zeitpläne" value={String(data.schedules.length)} note="aktive Schedules" />
+        <MetricCard label="Schedules" value={String(data.schedules.length)} note="geplante Lieferungen" />
         <MetricCard label="Alert-Regeln" value={String(data.alertRules.length)} note="definierte Schwellwerte" />
-        <MetricCard label="Ausgelöste Alerts" value={String(triggeredEvents.length)} note={`von ${data.alertEvents.length} ausgewerteten Events`} />
+        <MetricCard label="Ausgelöste Alarme" value={String(triggeredCount)} note={`von ${data.alertEvents.length} ausgewerteten Events`} />
       </section>
 
-      {/* Latest report */}
+      {/* Reports inventory */}
       <section className="card">
-        <p className="kicker">Letzter Report</p>
+        <p className="kicker">Reports-Bestand</p>
+        <h2>Generierte Reports</h2>
+        <WhyItMatters>Ein fester Snapshot je Lieferung macht Fortschritt belegbar — auch rückwirkend.</WhyItMatters>
+        {data.reports.length > 0 ? (
+          <div className="reports-table-scroll">
+            <table className="reports-table">
+              <thead>
+                <tr>
+                  <th scope="col">Titel</th>
+                  <th scope="col">Typ</th>
+                  <th scope="col">Generiert</th>
+                  <th scope="col">Sektionen</th>
+                  <th scope="col">Export</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.reports.map((report) => (
+                  <tr key={report.id}>
+                    <td>{report.title}</td>
+                    <td><span className="badge">{labelForReportType(report.type)}</span></td>
+                    <td className="reports-row__meta">{formatTimestamp(report.generatedAt)}</td>
+                    <td className="reports-row__meta">{report.sections.length}</td>
+                    <td>
+                      <div className="reports-actions">
+                        {(["csv", "html", "pdf"] as const).map((format) => (
+                          <a
+                            key={format}
+                            className="button secondary compact"
+                            href={`/api/export/reports/${report.id}/export?format=${format}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {format.toUpperCase()}
+                          </a>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="reports-empty">
+            <span className="reports-empty__glyph" aria-hidden="true">🗺️</span>
+            <strong className="reports-empty__title">Noch kein Report vorhanden</strong>
+            <span>Erzeugen Sie oben den ersten Snapshot, um den Stand Ihrer Sichtbarkeit festzuhalten.</span>
+          </div>
+        )}
+
+        {/* Latest report detail + delivery */}
         {data.latestReport ? (
-          <>
-            <h2>{data.latestReport.title}</h2>
-            <div className="badge-row">
-              <span className="badge">{labelForReportType(data.latestReport.type)}</span>
-              <span className="badge">Generiert: {data.latestReport.generatedAt}</span>
-            </div>
+          <div>
+            <h3>Letzter Report: {data.latestReport.title}</h3>
             {data.latestReport.sections.map((section) => (
               <div key={section.title}>
-                <h3>{section.title}</h3>
+                <p className="kicker">{section.title}</p>
                 {section.rows.length > 0 ? (
-                  <table className="data-table">
+                  <table className="reports-table">
                     <tbody>
                       {section.rows.map((row) => (
                         <tr key={row.label}>
@@ -92,66 +187,62 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 )}
               </div>
             ))}
-            <div className="action-row">
-              <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV exportieren</a>
-              <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML exportieren</a>
-              <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=pdf`} target="_blank" rel="noopener noreferrer">PDF exportieren</a>
-            </div>
-            <div>
-              <p className="kicker">Report versenden</p>
-              <form action={deliverReportAction} className="inline-form">
-                <input type="hidden" name="reportId" value={data.latestReport.id} />
-                <label>
-                  Kanal
-                  <select name="channel" defaultValue="email">
-                    {DELIVERY_CHANNELS.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Ziel (E-Mail / Webhook)
-                  <input type="text" name="target" placeholder="z. B. team@example.com" />
-                </label>
-                <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
-              </form>
-            </div>
-          </>
-        ) : (
-          <p>Noch kein Report vorhanden. Klicke „Wochenreport generieren", um den ersten Snapshot zu erstellen.</p>
-        )}
-      </section>
-
-      {/* Reports history */}
-      <section className="card">
-        <p className="kicker">Report-Verlauf</p>
-        {data.reports.length > 0 ? (
-          <div className="table-list">
-            {data.reports.map((report) => (
-              <article key={report.id}>
-                <strong>{report.title}</strong>
-                <span className="badge">{labelForReportType(report.type)}</span>
-                <span className="muted">{report.generatedAt}</span>
-                <div className="inline-actions">
-                  <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV</a>
-                  <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML</a>
-                  <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=pdf`} target="_blank" rel="noopener noreferrer">PDF</a>
-                </div>
-              </article>
-            ))}
+            <p className="kicker">Report versenden</p>
+            <form action={deliverReportAction} className="inline-form">
+              <input type="hidden" name="reportId" value={data.latestReport.id} />
+              <label>
+                Kanal
+                <select name="channel" defaultValue="email">
+                  {DELIVERY_CHANNELS.map((c) => (
+                    <option key={c} value={c}>{labelForChannel(c)}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Ziel (E-Mail / Webhook)
+                <input type="text" name="target" placeholder="z. B. team@example.com" />
+              </label>
+              <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
+            </form>
           </div>
-        ) : (
-          <p>Keine Reports vorhanden.</p>
-        )}
+        ) : null}
       </section>
 
       <section className="content-grid">
-        {/* Schedules card */}
+        {/* Schedules */}
         <div className="card">
-          <p className="kicker">Zeitpläne</p>
-          <h2>Schedule erstellen</h2>
+          <p className="kicker">Schedules</p>
+          <h2>Geplante Lieferungen</h2>
+          <WhyItMatters>Automatische Lieferungen halten Stakeholder ohne manuelles Nachfassen auf dem Laufenden.</WhyItMatters>
+
+          {data.schedules.length > 0 ? (
+            <div className="table-list">
+              {data.schedules.map((schedule) => {
+                const status = scheduleStatus(schedule);
+                const badge = scheduleStatusBadge(status);
+                return (
+                  <article key={schedule.id} className="reports-row">
+                    <strong className="reports-row__title">{labelForReportType(schedule.type)}</strong>
+                    <span className="badge">{labelForCadence(schedule.cadence)}</span>
+                    <span className="badge">{labelForChannel(schedule.channel)}</span>
+                    {schedule.target ? <span className="reports-row__meta">{schedule.target}</span> : null}
+                    <span className="reports-row__spacer" />
+                    <span className={badge ? `badge ${badge}` : "badge"}>{scheduleStatusLabel(status)}</span>
+                    <span className="reports-row__meta">Letzter Lauf: {formatTimestamp(schedule.lastRunAt)}</span>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="reports-empty">
+              <strong className="reports-empty__title">Noch keine Schedules angelegt</strong>
+              <span>Legen Sie unten eine Kadenz fest, damit Reports automatisch erzeugt werden.</span>
+            </div>
+          )}
+
+          <h3>Schedule anlegen</h3>
           <form action={createScheduleAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+            <input type="hidden" name="projectId" value={projectId} />
             <label>
               Report-Typ
               <select name="type" defaultValue="weekly_summary">
@@ -164,7 +255,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               Kadenz
               <select name="cadence" defaultValue="weekly">
                 {REPORT_CADENCES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{labelForCadence(c)}</option>
                 ))}
               </select>
             </label>
@@ -173,7 +264,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <select name="channel">
                 <option value="">— keiner —</option>
                 {DELIVERY_CHANNELS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{labelForChannel(c)}</option>
                 ))}
               </select>
             </label>
@@ -181,35 +272,64 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               Ziel (optional)
               <input type="text" name="target" placeholder="z. B. team@example.com" />
             </label>
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Schedule anlegen</button>
+            <button className="button" type="submit" disabled={disabled}>Schedule anlegen</button>
           </form>
-
-          {data.schedules.length > 0 ? (
-            <>
-              <h3>Bestehende Zeitpläne</h3>
-              <div className="table-list">
-                {data.schedules.map((schedule) => (
-                  <article key={schedule.id}>
-                    <strong>{labelForReportType(schedule.type)}</strong>
-                    <span className="badge">{schedule.cadence}</span>
-                    {schedule.channel ? <span className="badge">{schedule.channel}</span> : null}
-                    {schedule.target ? <span>{schedule.target}</span> : null}
-                    <span className="muted">Letzter Lauf: {schedule.lastRunAt ?? "noch nie"}</span>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="muted">Noch keine Zeitpläne angelegt.</p>
-          )}
         </div>
 
-        {/* Alerts card */}
+        {/* Alerts */}
         <div className="card">
-          <p className="kicker">Alert-Regeln</p>
-          <h2>Regel erstellen</h2>
+          <p className="kicker">Alarme</p>
+          <h2>
+            <TermTooltip term="alert">Alarm</TermTooltip>-Regeln &amp; Events
+          </h2>
+          <WhyItMatters>Schwellwert-Alarme melden Einbrüche, bevor sie unbemerkt Traffic kosten.</WhyItMatters>
+
+          {/* Metric vs. threshold — gauge / mini-trend where data allows */}
+          {alertModels.length > 0 ? (
+            <div className="reports-alert-grid">
+              {alertModels.map(({ metric, rule, model }) => (
+                <div key={metric} className="reports-alert-card">
+                  <div className="reports-alert-card__head">
+                    <span className="reports-alert-card__metric">{labelForMetric(metric)}</span>
+                    {rule ? (
+                      <span className={model.triggered ? "badge danger" : "badge"}>
+                        {labelForComparator(rule.comparator)} {rule.threshold}
+                      </span>
+                    ) : null}
+                    <ConfidenceBadge level="A" showLabel={false} />
+                  </div>
+
+                  {model.kind !== "none" ? (
+                    <AlertMetricChart model={model} />
+                  ) : (
+                    <p className="muted">
+                      {model.observedValue !== null
+                        ? `Zuletzt beobachtet: ${formatMetricValue(model.observedValue)}`
+                        : "Noch nicht ausgewertet — Schwelle definiert, aber keine Messung."}
+                    </p>
+                  )}
+
+                  <div className="reports-alert-card__numbers">
+                    {model.observedValue !== null ? (
+                      <span>Beobachtet: <strong>{formatMetricValue(model.observedValue)}</strong></span>
+                    ) : null}
+                    {model.threshold !== null && model.comparator !== null ? (
+                      <span>Schwelle: <strong>{labelForComparator(model.comparator)} {formatMetricValue(model.threshold)}</strong></span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="reports-empty">
+              <strong className="reports-empty__title">Noch keine Alarm-Regeln</strong>
+              <span>Definieren Sie unten einen Schwellwert auf eine Kennzahl, um Einbrüche automatisch zu erkennen.</span>
+            </div>
+          )}
+
+          <h3>Regel erstellen</h3>
           <form action={createAlertRuleAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+            <input type="hidden" name="projectId" value={projectId} />
             <label>
               Kennzahl
               <select name="metric" defaultValue="visibility_score">
@@ -230,47 +350,35 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               Schwellwert
               <input type="number" name="threshold" step="any" placeholder="z. B. 50" required />
             </label>
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Regel anlegen</button>
+            <button className="button" type="submit" disabled={disabled}>Regel anlegen</button>
           </form>
 
           <form action={evaluateAlertsAction} className="action-row">
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.selectedProject}>Alerts auswerten</button>
+            <input type="hidden" name="projectId" value={projectId} />
+            <button className="button secondary" type="submit" disabled={disabled}>Alarme auswerten</button>
           </form>
 
-          {data.alertRules.length > 0 ? (
-            <>
-              <h3>Definierte Regeln</h3>
-              <div className="table-list">
-                {data.alertRules.map((rule) => (
-                  <article key={rule.id}>
-                    <strong>{labelForMetric(rule.metric)}</strong>
-                    <span className="badge">{labelForComparator(rule.comparator)} {rule.threshold}</span>
-                    <span className="muted">angelegt: {rule.createdAt}</span>
+          {/* Recent alert events — factual list with severity */}
+          <h3>Letzte Alarm-Events</h3>
+          {recentEvents.length > 0 ? (
+            <div className="table-list">
+              {recentEvents.map((event) => {
+                const severity = eventSeverity(event);
+                return (
+                  <article key={event.id} className="reports-row">
+                    <strong className="reports-row__title">{labelForMetric(event.metric)}</strong>
+                    <span className={`badge ${severityBadge(severity)}`}>{severityLabel(severity)}</span>
+                    <span className="reports-row__meta">
+                      Beobachtet {formatMetricValue(event.observedValue)} · Schwelle {labelForComparator(event.comparator)} {formatMetricValue(event.threshold)}
+                    </span>
+                    <span className="reports-row__spacer" />
+                    <span className="reports-row__meta">{formatTimestamp(event.evaluatedAt)}</span>
                   </article>
-                ))}
-              </div>
-            </>
+                );
+              })}
+            </div>
           ) : (
-            <p className="muted">Noch keine Alert-Regeln angelegt.</p>
-          )}
-
-          {data.alertEvents.length > 0 ? (
-            <>
-              <h3>Letzte Alert-Events</h3>
-              <div className="table-list">
-                {data.alertEvents.slice(0, 20).map((event) => (
-                  <article key={event.id}>
-                    <strong>{labelForMetric(event.metric)}</strong>
-                    <span className={event.triggered ? "badge danger" : "badge"}>{event.triggered ? "ausgelöst" : "ok"}</span>
-                    <span>Beobachtet: {event.observedValue} · Schwellwert: {labelForComparator(event.comparator)} {event.threshold}</span>
-                    <span className="muted">{event.evaluatedAt}</span>
-                  </article>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="muted">Noch keine Alert-Events. Klicke „Alerts auswerten", um Regeln gegen aktuelle Kennzahlen zu prüfen.</p>
+            <p className="muted">Noch keine Events. Klicken Sie „Alarme auswerten", um Regeln gegen aktuelle Kennzahlen zu prüfen.</p>
           )}
         </div>
       </section>
@@ -278,45 +386,16 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   );
 }
 
-function labelForReportType(type: ReportType): string {
-  switch (type) {
-    case "weekly_summary": return "Wochenzusammenfassung";
-    case "opportunity_digest": return "Opportunity-Digest";
-    case "authority_report": return "Authority-Report";
-    default: return type;
-  }
-}
-
-function labelForMetric(metric: AlertMetric): string {
-  switch (metric) {
-    case "visibility_score": return "Sichtbarkeits-Score";
-    case "health_score": return "Health-Score";
-    case "open_opportunities": return "Offene Opportunities";
-    case "referring_domains": return "Referring Domains";
-    default: return metric;
-  }
-}
-
-function labelForComparator(comparator: AlertComparator): string {
-  switch (comparator) {
-    case "lt": return "<";
-    case "lte": return "≤";
-    case "gt": return ">";
-    case "gte": return "≥";
-    default: return comparator;
-  }
-}
-
 function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.generated)) return { kind: "success", message: "Report erfolgreich generiert." };
   if (singleParam(params?.delivered)) return { kind: "success", message: "Report erfolgreich versendet." };
-  if (singleParam(params?.schedule)) return { kind: "success", message: "Zeitplan angelegt." };
+  if (singleParam(params?.schedule)) return { kind: "success", message: "Schedule angelegt." };
   const due = singleParam(params?.due);
   if (due !== undefined) return { kind: "success", message: `Fällige Schedules ausgeführt — ${due} Report(s) generiert.` };
-  if (singleParam(params?.alertrule)) return { kind: "success", message: "Alert-Regel angelegt." };
-  if (singleParam(params?.evaluated)) return { kind: "success", message: "Alerts ausgewertet." };
+  if (singleParam(params?.alertrule)) return { kind: "success", message: "Alarm-Regel angelegt." };
+  if (singleParam(params?.evaluated)) return { kind: "success", message: "Alarme ausgewertet." };
   return null;
 }
 
