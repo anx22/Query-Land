@@ -249,7 +249,7 @@ Diese Punkte sind in der aktuellen Foundation vorhanden und werden **nicht** als
   - Commands je Kategorie dokumentieren.
   - Minimal-Gate für Welle 2 festlegen.
 - **Akzeptanzkriterien:**
-  - `DOCS/tasks/testing-matrix.md` oder Abschnitt in diesem Backlog existiert.
+  - Testing-Matrix in `DOCS/tasks/sprint-conventions.md` oder Abschnitt in diesem Backlog existiert.
   - Jede neue Welle kennt Pflichtchecks.
 
 ---
@@ -265,7 +265,7 @@ Diese Punkte sind in der aktuellen Foundation vorhanden und werden **nicht** als
   - Story-Template definieren: Rolle, Ziel, Nutzen, Scope, Non-Scope, Akzeptanzkriterien, Test-Gate, Spec-Refs, API-Refs.
   - Definition of Ready und Definition of Done für Stories festlegen.
 - **Akzeptanzkriterien:**
-  - Template ist in `DOCS/tasks/story-template.md` dokumentiert.
+  - Template ist in `DOCS/tasks/sprint-conventions.md` dokumentiert.
   - Jede zukünftige Story kann gegen Master §12 geprüft werden.
 
 ### PREP-STORY-002 — Welle-1 Reststories ableiten
