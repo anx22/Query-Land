@@ -20,13 +20,14 @@ Phase 1 lieferte alle sieben Funktions-Milestones (M0–M6, alle Gates ✅). Ein
 ## Sprint 1 — UX-Reconciliation P0 (billig, höchste Sichtbarkeit)
 
 > Behebt die gravierendsten Soll/Ist-Lücken aus dem UI-Review. Klein, hoher Hebel.
+> Alle Punkte am 2026-06-07 per Code-Verifikation bestätigt; Datenquellen unten sind real vorhandene Endpunkte. Empfohlene Reihenfolge: **UX-3 → UX-2 → UX-1 → UX-8**.
 
-| ID | Aufgabe | Done-Gate |
-|---|---|---|
-| **UX-1** | **Overview neu aufbauen** (`components/dashboard.tsx`): echte KPIs gemäß UX_FLOWS Project-Overview — Visibility-Index (M2), Health-Score (M0), Top-Opportunities (M1/M3, echt statt `demoOpportunities`), letzte Crawls/Reports (M5), Risiken (offene kritische Issues/Alerts). `demoOpportunities`/`seoMemory`-Importe entfernen; Selbstwiderspruch (Hero-Text vs. Demo-Daten) auflösen. | Overview zeigt ausschließlich echte API-Daten und deckt die UX_FLOWS-Liste; keine Demo-Fixtures mehr importiert. |
-| **UX-2** | **Navigations-Metadaten korrigieren** (`module-routes.ts`, `navigation.tsx`): gebaute Module (`content-opportunities`, `backlinks`, `reports`, `ai-visibility`) von `status:"planned"` → `"active"`; `icon`-Feld entweder in der Sidebar nutzen oder entfernen (aktuell tot, Initialen werden gerendert). | Nav-Metadaten == realer Stand; kein totes `icon`-Feld. |
-| **UX-3** | **Veraltete Texte entschärfen**: u. a. Technical-Audit-Hero „Welle-2 UI-Slice … Worker folgt", Opportunity-Board „v0", Overview „noch Demo-Modul"/„Wave 1". | Keine Texte mehr, die den fertigen Stand untertreiben/falsch beschreiben. |
-| **UX-8** | **`UX_FLOWS.md` nachziehen**, wo bewusst abgewichen: `URL Dossier` in die Nav-Zeile aufnehmen; Status von „Content Workspace" (siehe UX-7) markieren. | Spec == Intent; bewusste Abweichungen dokumentiert. |
+| ID | Aufgabe | Aufwand | Done-Gate |
+|---|---|---|---|
+| **UX-3** | **Voice & Microcopy (hochgestuft).** Durchgängiger Reframe von Entwickler-/Roadmap-Sprache zu SEO-Praktiker-Nutzen. Raus aus nutzersichtbarer Copy: `Welle/Wave`, `Slice`, `Stub`, `v0`, `§x.y`, `SQLite/API`, `Contracts`, `connector_sync`, `Foundation-State`, „Worker folgt", „noch Demo-Modul". Konkrete Stellen u. a.: `technical-audit/page.tsx:37`, `content-opportunities/page.tsx:23`, `backlinks/page.tsx:25`, `keywords-rank/page.tsx:21`, `settings/page.tsx:49`, `projects/page.tsx:18`, `dashboard.tsx:53-56,143`, **`app-shell.tsx:11-12` (hartkodiertes „Welle 1 · Foundation"-Badge + hartkodiertes Datum „UTC 2026-06-02")**. Hero-Texte = Nutzen statt Bauphase; interne Confidence-/Evidenz-Hinweise als dezente Badges/Tooltips statt §-Zitate. | S (reine Strings) | Keine Entwickler-/Wellen-/§-Sprache mehr in nutzersichtbarer Copy; Topbar ohne hartkodiertes Datum. |
+| **UX-2** | **Navigations-Metadaten korrigieren** (`module-routes.ts`, `navigation.tsx`): gebaute Module (`content-opportunities`, `backlinks`, `reports`, `ai-visibility`) `status:"planned"` → `"active"`; `icon`-Feld real rendern (Material Symbols — Font-Verfügbarkeit prüfen) **oder** entfernen (aktuell tot, Initialen). Toten Code `planned-module-page.tsx` (`createPlannedModulePage`, nirgendwo aufgerufen) entfernen. | S | Nav-Metadaten == realer Stand; kein totes `icon`-Feld/keine Dead-Code-Datei. |
+| **UX-1** | **Overview neu aufbauen** (`components/dashboard.tsx`, `lib/foundation-api.ts`, `page.tsx`): echte KPIs gemäß UX_FLOWS — Visibility (`GET /projects/{id}/visibility`), Health (`…/health-scores`), Top-5-Opportunities (`/opportunities?limit=5`, default priority-sortiert), Risiken (`…/audit-issues?status=open&severity=critical`), letzte Crawls (`…/crawl-runs`), letzte Reports (`/reports`). `demoOpportunities`/`seoMemory` entfernen; Selbstwiderspruch auflösen. **Gotcha:** aggregierte organische Klicks/Impressionen haben *keinen* Endpoint — entweder 1-Zeilen-Summe über `search-performance` (kleine Backend-Ergänzung) oder „n/a · GSC-Sync ausstehend"-Platzhalter. | M | Overview zeigt nur echte API-Daten + deckt UX_FLOWS-Liste; keine Demo-Fixtures importiert. |
+| **UX-8** | **`UX_FLOWS.md` nachziehen**: `URL Dossier` in die Nav-Zeile aufnehmen; „Content Workspace" als ausstehend markieren (siehe UX-7). | S (Doku) | Spec == Intent; bewusste Abweichungen dokumentiert. |
 
 **Sprint-Gate:** Overview + Navigation + Texte spiegeln den realen M0–M6-Stand; `npm run check` + `build:web` grün.
 
@@ -34,13 +35,14 @@ Phase 1 lieferte alle sieben Funktions-Milestones (M0–M6, alle Gates ✅). Ein
 
 ## Sprint 2 — Screen-Tiefe P1 (Feature-Listen vervollständigen)
 
-| ID | Aufgabe | Done-Gate |
-|---|---|---|
-| **UX-4** | **URL Dossier vervollständigen** (`features/url-dossier`, `url-dossier/page.tsx`): GSC-Leistung (Klicks/Impressionen je URL), Rankings/Queries (aus Rank/Search-Performance), externe Links (Backlinks auf die URL), Performance/Web-Vitals je URL ergänzen; Content-Fit als bewusst-später markieren. | Dossier deckt ≥ 10/12 UX_FLOWS-Facetten; fehlende explizit als später ausgewiesen. |
-| **UX-5** | **Opportunity Board ausbauen** (`content-opportunities/page.tsx`): Filter Typ / URL-Gruppe / Impact / Effort zusätzlich zu Status; echte Evidence- und Validation-Drawer (statt nur Inline-Text). | Filterset + Drawer gemäß UX_FLOWS Opportunity Board. |
-| **UX-6** | **Technical Audit vervollständigen**: Issues gruppiert darstellen („Issue Groups" nach Rule/Severity statt flacher Tabelle) + **Crawl-Diff** (zwei Runs vergleichen). | 4/4 UX_FLOWS-Facetten (Crawl Runs, Issue Groups, URL Explorer, Crawl-Diff). |
+| ID | Aufgabe | Aufwand | Backend nötig? |
+|---|---|---|---|
+| **UX-4** | **URL Dossier vervollständigen** (`features/url-dossier`, `url-dossier/page.tsx`): GSC-Leistung + Rankings/Queries (aus `…/search-performance`, nach `pageUrl` filtern), externe Links (aus `/projects/{id}/backlinks`, nach `targetUrl` filtern), Web-Vitals (site-skopiert, mit Hinweis). Content-Fit bewusst später (kein Endpoint). | M | Nein (optional `?pageUrl=`/`?targetUrl=`-Filter; sonst client-seitig). Content-Fit = später. |
+| **UX-5** | **Opportunity Board ausbauen** (`content-opportunities/page.tsx`, `features/.../api.ts`): **Typ-Filter** (Endpoint akzeptiert `type` bereits → 0 Backend), Impact/Effort/URL-Gruppe client-seitig (Felder sind am Objekt); echte Evidence-/Validation-Drawer (Daten `evidence[]`/`validationMetric` werden bereits geliefert → `"use client"`-Drawer). | S (Typ-Filter) + M (Drawer) | Nein |
+| **UX-6a** | **Issue Groups** (`technical-audit/page.tsx`): Issues nach `rule`/`severity` gruppieren statt flacher Tabelle. | S | Nein (rein client-seitig) |
+| **UX-6b** | **Crawl-Diff** (zwei Runs vergleichen: neue/entfernte URLs, Statuswechsel). Kein Endpoint vorhanden. | L | **Ja** — neue Store-Methode `crawlDiff` + Route + UI |
 
-**Sprint-Gate:** Die vier UX_FLOWS-Schlüssel-Screens (Overview, URL Dossier, Opportunity Board, Technical Audit) erfüllen ihre Spec-Feature-Liste; `npm run check` + `build:web` grün.
+**Sprint-Gate:** Overview, URL Dossier, Opportunity Board und Technical Audit erfüllen ihre UX_FLOWS-Feature-Liste (Crawl-Diff ggf. als eigener Schritt); `npm run check` + `build:web` grün.
 
 ---
 
@@ -48,7 +50,7 @@ Phase 1 lieferte alle sieben Funktions-Milestones (M0–M6, alle Gates ✅). Ein
 
 | ID | Aufgabe | Done-Gate |
 |---|---|---|
-| **UX-7** | **Content Workspace** (fehlt komplett): Scope-Entscheidung treffen — bauen (Briefings, Refresh-Kandidaten, interne Linkvorschläge, Snippet-Vorschläge) **oder** bewusst auf später verschieben und in `UX_FLOWS.md` markieren. Bei „bauen": eigener Screen `/content-workspace`. | Entscheidung dokumentiert (`decisions-backlog.md`); falls gebaut: Screen live + spec-konform. |
+| **UX-7** | **Content Workspace** (fehlt komplett — **net-new, XL**: weder Backend noch Frontend existiert). Scope-Entscheidung treffen — bauen (Briefings, Refresh-Kandidaten, interne Linkvorschläge, Snippet-Vorschläge; neue Endpunkte + Screen `/content-workspace`) **oder** bewusst verschieben und in `UX_FLOWS.md` markieren. | Entscheidung dokumentiert (`decisions-backlog.md`); falls gebaut: Screen live + spec-konform. |
 | **WP-Z.1** | **AuthZ-minimal** (Querschnitt, aus Phase 1 übernommen): Session-Gate für alle nicht-/auth-/nicht-/health-Routen, per `AUTH_GATE_ENABLED` schaltbar; Audit-Log für abgelehnte Zugriffe; `cleanupExpiredSessions` aktivieren. Tests zuerst. | Bei aktivem Gate: geschützte Endpunkte ohne Token → 401, mit Token → wie bisher; `npm run check` grün. |
 
 ---
