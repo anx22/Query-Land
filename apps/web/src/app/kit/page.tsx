@@ -14,6 +14,19 @@ import { ConfidenceBadge, type ConfidenceLevel } from "../../components/confiden
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
+import { Sparkline } from "../../components/charts/sparkline";
+import { TrendChart } from "../../components/charts/trend-chart";
+import { ScoreGauge } from "../../components/charts/score-gauge";
+import { PositionDistribution } from "../../components/charts/position-distribution";
+import { PriorityMatrix, type PriorityBubble } from "../../components/charts/priority-matrix";
+import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
+import { SectionTreemap } from "../../components/charts/section-treemap";
+
+const KIT_BUBBLES: PriorityBubble[] = [
+  { id: "o1", title: "H1 fehlt auf Money-Pages", effort: 2, expectedImpact: 4, businessValue: 5, priority: 480, confidenceLevel: "A", colorKey: "technical", typeLabel: "Technischer Fix" },
+  { id: "o2", title: "Striking-Distance-Keyword optimieren", effort: 3, expectedImpact: 5, businessValue: 4, priority: 420, confidenceLevel: "B", colorKey: "keyword", typeLabel: "Keyword-Chance" },
+  { id: "o3", title: "Interne Verlinkung zu /pricing", effort: 1, expectedImpact: 3, businessValue: 3, priority: 300, confidenceLevel: "C", colorKey: "link", typeLabel: "Interne Verlinkung" },
+];
 
 export const metadata: Metadata = {
   title: "/kit — Komponenten-Showcase — Query-Land",
@@ -285,6 +298,100 @@ export default function KitPage() {
               neu laden.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* ============================================================
+          Charts (UX-1 / Block 2) — populated + empty states
+          ============================================================ */}
+      <section className="kit-section" aria-labelledby="charts-heading">
+        <h2 id="charts-heading">Charts</h2>
+        <p>Jede Chart-Komponente mit Beispieldaten und Leerzustand. Alle Farben über <code>chartTheme</code>-Tokens, <code>prefers-reduced-motion</code> respektiert.</p>
+
+        <div className="content-grid">
+          <div className="card">
+            <span className="kit-label">Sparkline</span>
+            <div style={{ width: "12rem" }}><Sparkline data={[12, 18, 15, 22, 30, 28, 35]} ariaLabel="Beispiel-Trend" /></div>
+            <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>Sparkline · leer</span>
+            <div style={{ width: "12rem" }}><Sparkline data={[]} /></div>
+          </div>
+
+          <div className="card">
+            <span className="kit-label">ScoreGauge</span>
+            <ScoreGauge value={72} max={100} label="Health Score" size={150} />
+            <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>ScoreGauge · keine Daten</span>
+            <ScoreGauge value={null} max={100} label="Health Score" size={150} />
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: "1rem" }}>
+          <span className="kit-label">TrendChart (+ Event-Marker)</span>
+          <TrendChart
+            data={[
+              { label: "1.5.", value: 42 },
+              { label: "8.5.", value: 48 },
+              { label: "15.5.", value: 45 },
+              { label: "22.5.", value: 53 },
+              { label: "29.5.", value: 61 },
+            ]}
+            title="Visibility-Verlauf (Beispiel)"
+            valueLabel="Visibility-Index"
+            events={[{ label: "15.5.", description: "Deploy" }]}
+          />
+          <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>TrendChart · leer</span>
+          <TrendChart data={[]} title="Visibility-Verlauf (leer)" />
+        </div>
+
+        <div className="content-grid" style={{ marginTop: "1rem" }}>
+          <div className="card">
+            <span className="kit-label">PositionDistribution</span>
+            <PositionDistribution buckets={{ top3: 4, top10: 9, strikingDist: 12, mid: 20, weak: 7, total: 52 }} title="Positions-Verteilung (Beispiel)" />
+            <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>· leer</span>
+            <PositionDistribution buckets={{ top3: 0, top10: 0, strikingDist: 0, mid: 0, weak: 0, total: 0 }} />
+          </div>
+
+          <div className="card">
+            <span className="kit-label">IndexabilityFunnel</span>
+            <IndexabilityFunnel
+              stages={[
+                { key: "discovered", label: "Entdeckt", value: 1240, drop: null },
+                { key: "fetched", label: "Abgerufen", value: 1180, drop: -60 },
+                { key: "indexable", label: "Indexierbar", value: 910, drop: -270 },
+                { key: "indexed", label: "Indexiert", value: null, drop: null },
+              ]}
+              title="Indexierbarkeits-Funnel (Beispiel)"
+            />
+            <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>· leer</span>
+            <IndexabilityFunnel
+              stages={[
+                { key: "discovered", label: "Entdeckt", value: null, drop: null },
+                { key: "fetched", label: "Abgerufen", value: null, drop: null },
+                { key: "indexable", label: "Indexierbar", value: null, drop: null },
+                { key: "indexed", label: "Indexiert", value: null, drop: null },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: "1rem" }}>
+          <span className="kit-label">PriorityMatrix (Impact × Aufwand)</span>
+          <PriorityMatrix bubbles={KIT_BUBBLES} title="Chancen-Matrix (Beispiel)" />
+          <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>PriorityMatrix · leer</span>
+          <PriorityMatrix bubbles={[]} />
+        </div>
+
+        <div className="card" style={{ marginTop: "1rem" }}>
+          <span className="kit-label">SectionTreemap</span>
+          <SectionTreemap
+            sections={[
+              { path: "/blog", urlCount: 320, issueCount: 12, health: 78 },
+              { path: "/shop", urlCount: 540, issueCount: 40, health: 55 },
+              { path: "/", urlCount: 80, issueCount: 2, health: 94 },
+            ]}
+            title="Section-Health (Beispiel)"
+          />
+          <span className="kit-label" style={{ display: "block", marginTop: "0.75rem" }}>SectionTreemap · leer</span>
+          <SectionTreemap sections={[]} />
         </div>
       </section>
     </div>
