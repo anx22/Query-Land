@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@seo-tool/domain-model": "0.1.0",
-    "@seo-tool/api": "0.1.0"
+    "@seo-tool/api": "0.1.0",
+    "@modelcontextprotocol/sdk": "^1.0.0"
   }
 }
