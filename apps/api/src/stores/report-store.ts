@@ -166,8 +166,8 @@ class SQLiteReportStore implements ReportStore {
   }
 
   exportReport(reportId: string, format: ReportExportFormat): ReportExport {
-    if (format !== "csv" && format !== "html") {
-      throw new RequestError(400, "invalid_field", "format must be csv or html");
+    if (format !== "csv" && format !== "html" && format !== "pdf") {
+      throw new RequestError(400, "invalid_field", "format must be csv, html or pdf");
     }
     return renderReportExport(this.getReport(reportId), format);
   }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compareAlert, reportToCsv, reportToHtml, type Report } from "@seo-tool/domain-model";
+import { compareAlert, reportToCsv, reportToHtml, reportToPdf, type Report } from "@seo-tool/domain-model";
 import { createApp } from "../src/app.js";
 import { createSQLiteStore } from "../src/sqlite-store.js";
 
@@ -58,6 +58,15 @@ test("reportToCsv/reportToHtml serialize sections (pure, escaped)", () => {
   assert.ok(html.includes("<h2>Übersicht</h2>"));
 });
 
+test("reportToPdf emits a valid dependency-free PDF (pure)", () => {
+  const pdf = reportToPdf(SAMPLE_REPORT);
+  assert.ok(pdf.startsWith("%PDF-1.4"), "has a PDF header");
+  assert.ok(pdf.includes("/Type /Catalog"));
+  assert.ok(pdf.trimEnd().endsWith("%%EOF"), "has a PDF trailer");
+  // Non-ASCII (the section title "Übersicht") is transliterated so /Length stays byte-accurate.
+  assert.ok(pdf.includes("Uebersicht"));
+});
+
 test("compareAlert covers all comparators (pure)", () => {
   assert.equal(compareAlert(5, "lt", 10), true);
   assert.equal(compareAlert(10, "lt", 10), false);
@@ -85,6 +94,9 @@ test("weekly report aggregates four sections and exports/delivers", async () => 
     assert.ok(csv.content.startsWith("section,label,value"));
     const html = data<{ contentType: string }>(await app("GET", `/reports/${report.id}/export?format=html`));
     assert.equal(html.contentType, "text/html");
+    const pdf = data<{ contentType: string; content: string }>(await app("GET", `/reports/${report.id}/export?format=pdf`));
+    assert.equal(pdf.contentType, "application/pdf");
+    assert.ok(pdf.content.startsWith("%PDF-1.4"));
 
     const delivery = data<{ status: string; channel: string }>(await app("POST", `/reports/${report.id}/deliver`, { channel: "email", target: "team@acme.test" }));
     assert.equal(delivery.status, "sent");

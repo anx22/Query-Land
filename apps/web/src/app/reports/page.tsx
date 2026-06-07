@@ -95,6 +95,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <div className="action-row">
               <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV exportieren</a>
               <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML exportieren</a>
+              <a className="button secondary" href={`/api/export/reports/${data.latestReport.id}/export?format=pdf`} target="_blank" rel="noopener noreferrer">PDF exportieren</a>
             </div>
             <div>
               <p className="kicker">Report versenden</p>
@@ -134,6 +135,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 <div className="inline-actions">
                   <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=csv`} target="_blank" rel="noopener noreferrer">CSV</a>
                   <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=html`} target="_blank" rel="noopener noreferrer">HTML</a>
+                  <a className="button secondary compact" href={`/api/export/reports/${report.id}/export?format=pdf`} target="_blank" rel="noopener noreferrer">PDF</a>
                 </div>
               </article>
             ))}
