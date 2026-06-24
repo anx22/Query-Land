@@ -16,7 +16,7 @@
  * single source of truth so a view survives reload / can be shared.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Opportunity, OpportunityStatus } from "@seo-tool/domain-model";
 import { Sparkline } from "../../components/charts/sparkline";
@@ -45,7 +45,20 @@ const VIEWS: Array<{ key: BoardView; label: string }> = [
 
 export interface OpportunityBoardClientProps {
   opportunities: Opportunity[];
+  /** Server action: transition many opportunities to one status at once. */
+  onBulkTransition?: (
+    ids: string[],
+    status: OpportunityStatus
+  ) => Promise<{ ok: number; failed: number }>;
 }
+
+/** Status targets offered by the Bulk-Action-Bar (sensible forward moves + dismiss). */
+const BULK_TARGETS: Array<{ status: OpportunityStatus; label: string }> = [
+  { status: "in_progress", label: "In Arbeit" },
+  { status: "implemented", label: "Umgesetzt" },
+  { status: "validated", label: "Validiert" },
+  { status: "dismissed", label: "Verwerfen" },
+];
 
 function parseView(value: string | null): BoardView {
   return value === "kanban" || value === "table" ? value : "matrix";
@@ -75,12 +88,18 @@ function evidenceSparkline(op: Opportunity): number[] {
   return values;
 }
 
-export function OpportunityBoardClient({ opportunities }: OpportunityBoardClientProps) {
+export function OpportunityBoardClient({
+  opportunities,
+  onBulkTransition,
+}: OpportunityBoardClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(() => new Set());
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [isBulkPending, startBulk] = useTransition();
 
   const view = parseView(searchParams.get("view"));
 
@@ -119,6 +138,59 @@ export function OpportunityBoardClient({ opportunities }: OpportunityBoardClient
   // the filtered set for table / kanban (kanban ignores the impact/effort floor
   // only insofar as those filters still apply when set).
   const bubbles = useMemo(() => opportunities.map(toBubble), [opportunities]);
+
+  // --- Bulk selection (table view) ---
+  const filteredIds = useMemo(() => filtered.map((o) => o.id), [filtered]);
+  const checkedInView = useMemo(
+    () => filteredIds.filter((id) => checkedIds.has(id)),
+    [filteredIds, checkedIds]
+  );
+  const allChecked = filteredIds.length > 0 && checkedInView.length === filteredIds.length;
+
+  const toggleOne = useCallback((id: string) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setBulkMessage(null);
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      const everySelected = filteredIds.length > 0 && filteredIds.every((id) => next.has(id));
+      if (everySelected) {
+        filteredIds.forEach((id) => next.delete(id));
+      } else {
+        filteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+    setBulkMessage(null);
+  }, [filteredIds]);
+
+  const clearSelection = useCallback(() => {
+    setCheckedIds(new Set());
+    setBulkMessage(null);
+  }, []);
+
+  const runBulk = useCallback(
+    (status: OpportunityStatus) => {
+      if (!onBulkTransition || checkedInView.length === 0) return;
+      const ids = [...checkedInView];
+      setBulkMessage(null);
+      startBulk(async () => {
+        const result = await onBulkTransition(ids, status);
+        const failedSuffix = result.failed > 0 ? `, ${result.failed} übersprungen (Übergang nicht erlaubt)` : "";
+        setBulkMessage(`${result.ok} aktualisiert${failedSuffix}.`);
+        setCheckedIds(new Set());
+        router.refresh();
+      });
+    },
+    [onBulkTransition, checkedInView, router]
+  );
 
   const activeChips = useMemo(() => {
     const chips: Array<{ key: string; label: string }> = [];
@@ -166,6 +238,11 @@ export function OpportunityBoardClient({ opportunities }: OpportunityBoardClient
           activeChips={activeChips}
           onParam={setParam}
           onSelect={setSelectedId}
+          checkedIds={checkedIds}
+          allChecked={allChecked}
+          selectable={Boolean(onBulkTransition)}
+          onToggleOne={toggleOne}
+          onToggleAll={toggleAll}
         />
       ) : (
         <section className="card">
@@ -178,6 +255,59 @@ export function OpportunityBoardClient({ opportunities }: OpportunityBoardClient
       )}
 
       <EvidenceChainDrawer opportunity={selected} onClose={() => setSelectedId(null)} />
+
+      {onBulkTransition && (checkedInView.length > 0 || bulkMessage) ? (
+        <BulkBar
+          count={checkedInView.length}
+          message={bulkMessage}
+          pending={isBulkPending}
+          onAction={runBulk}
+          onClear={clearSelection}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bulk-Action-Bar (spec §3.9) — floating selection toolbar
+// ---------------------------------------------------------------------------
+
+function BulkBar({
+  count,
+  message,
+  pending,
+  onAction,
+  onClear,
+}: {
+  count: number;
+  message: string | null;
+  pending: boolean;
+  onAction: (status: OpportunityStatus) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="board-bulkbar" role="region" aria-label="Massenaktionen für ausgewählte Chancen">
+      <span className="board-bulkbar__count">
+        {count > 0 ? <strong>{count} ausgewählt</strong> : null}
+        {message ? <span className="board-bulkbar__msg muted">{message}</span> : null}
+      </span>
+      <div className="board-bulkbar__actions">
+        {BULK_TARGETS.map((target) => (
+          <button
+            key={target.status}
+            type="button"
+            className="button secondary compact"
+            disabled={count === 0 || pending}
+            onClick={() => onAction(target.status)}
+          >
+            {target.label}
+          </button>
+        ))}
+        <button type="button" className="board-bulkbar__clear" onClick={onClear} disabled={pending}>
+          Aufheben
+        </button>
+      </div>
     </div>
   );
 }
@@ -245,12 +375,22 @@ function TableView({
   activeChips,
   onParam,
   onSelect,
+  checkedIds,
+  allChecked,
+  selectable,
+  onToggleOne,
+  onToggleAll,
 }: {
   opportunities: Opportunity[];
   filter: BoardFilter;
   activeChips: Array<{ key: string; label: string }>;
   onParam: (key: string, value: string | null) => void;
   onSelect: (id: string) => void;
+  checkedIds: Set<string>;
+  allChecked: boolean;
+  selectable: boolean;
+  onToggleOne: (id: string) => void;
+  onToggleAll: () => void;
 }) {
   return (
     <section className="card">
@@ -318,35 +458,57 @@ function TableView({
       ) : (
         <div className="board-table" role="table" aria-label="Chancen-Tabelle">
           <div className="board-table__head" role="row">
-            <span role="columnheader">Typ</span>
-            <span role="columnheader">Prio</span>
-            <span role="columnheader">Wirkung</span>
-            <span role="columnheader">Aufwand</span>
-            <span role="columnheader">Konfidenz</span>
-            <span role="columnheader">Evidenz-Trend</span>
-            <span role="columnheader">Status</span>
+            {selectable ? (
+              <span role="columnheader" className="board-table__select">
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={onToggleAll}
+                  aria-label="Alle sichtbaren Chancen auswählen"
+                />
+              </span>
+            ) : null}
+            <div className="board-table__cells">
+              <span role="columnheader">Typ</span>
+              <span role="columnheader">Prio</span>
+              <span role="columnheader">Wirkung</span>
+              <span role="columnheader">Aufwand</span>
+              <span role="columnheader">Konfidenz</span>
+              <span role="columnheader">Evidenz-Trend</span>
+              <span role="columnheader">Status</span>
+            </div>
           </div>
           {opportunities.map((op) => (
-            <button
-              key={op.id}
-              type="button"
-              role="row"
-              className="board-table__row"
-              onClick={() => onSelect(op.id)}
-              aria-label={`${opportunityTypeLabel(op.type)} — Evidenz-Kette öffnen`}
-            >
-              <span role="cell" className={`badge board-cat board-cat--${opportunityTypeColorKey(op.type)}`}>
-                {opportunityTypeLabel(op.type)}
-              </span>
-              <span role="cell">{op.priority}</span>
-              <span role="cell">{op.expectedImpact}</span>
-              <span role="cell">{op.effort}</span>
-              <span role="cell"><ConfidenceBadge level={confidenceToLevel(op.confidence)} showLabel={false} /></span>
-              <span role="cell" className="board-table__spark">
-                <Sparkline data={evidenceSparkline(op)} ariaLabel="Vorher/Nachher-Trend" height={28} />
-              </span>
-              <span role="cell"><span className={`status ${op.status}`}>{op.status}</span></span>
-            </button>
+            <div key={op.id} role="row" className="board-table__row">
+              {selectable ? (
+                <span role="cell" className="board-table__select">
+                  <input
+                    type="checkbox"
+                    checked={checkedIds.has(op.id)}
+                    onChange={() => onToggleOne(op.id)}
+                    aria-label={`${opportunityTypeLabel(op.type)} auswählen`}
+                  />
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="board-table__open board-table__cells"
+                onClick={() => onSelect(op.id)}
+                aria-label={`${opportunityTypeLabel(op.type)} — Evidenz-Kette öffnen`}
+              >
+                <span role="cell" className={`badge board-cat board-cat--${opportunityTypeColorKey(op.type)}`}>
+                  {opportunityTypeLabel(op.type)}
+                </span>
+                <span role="cell">{op.priority}</span>
+                <span role="cell">{op.expectedImpact}</span>
+                <span role="cell">{op.effort}</span>
+                <span role="cell"><ConfidenceBadge level={confidenceToLevel(op.confidence)} showLabel={false} /></span>
+                <span role="cell" className="board-table__spark">
+                  <Sparkline data={evidenceSparkline(op)} ariaLabel="Vorher/Nachher-Trend" height={28} />
+                </span>
+                <span role="cell"><span className={`status ${op.status}`}>{op.status}</span></span>
+              </button>
+            </div>
           ))}
         </div>
       )}

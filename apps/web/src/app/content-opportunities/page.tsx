@@ -1,11 +1,17 @@
 import "../../features/content-opportunities/board.css";
 
 import { AppShell } from "../../components/app-shell";
+import { Icon } from "../../components/icon";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { OpportunityBoardClient } from "../../features/content-opportunities";
 import { loadOpportunityBoard } from "../../lib/board-api";
-import { generateOpportunitiesAction, syncSearchPerformanceAction } from "./actions";
+import { actionLock, type ReadinessState } from "../../lib/readiness";
+import {
+  bulkTransitionOpportunitiesAction,
+  generateOpportunitiesAction,
+  syncSearchPerformanceAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +31,19 @@ export default async function Page({
   const validatedCount = opportunities.filter((o) => o.status === "validated").length;
   const quickWins = opportunities.filter((o) => o.expectedImpact >= 4 && o.effort <= 2).length;
   const topPriority = [...opportunities].sort((a, b) => b.priority - a.priority)[0] ?? null;
+
+  // Action gating: both hero actions need a project + site (real prerequisites
+  // for generating opportunities / syncing performance). Use the same readiness
+  // helper that drives nav locks + banners so the disabled reason is consistent.
+  const readiness: ReadinessState = {
+    hasProject: Boolean(data.selectedProject),
+    hasSite: Boolean(data.selectedSite),
+    hasIntegration: data.connected,
+    hasCrawl: false,
+  };
+  const heroLock = actionLock(readiness, ["project", "site"]);
+  const lockReason = !data.connected ? "API nicht erreichbar." : heroLock.reason;
+  const heroDisabled = !data.connected || heroLock.locked;
 
   return (
     <AppShell activePath="/content-opportunities">
@@ -52,28 +71,28 @@ export default async function Page({
           </p>
         ) : null}
         <div className="action-row">
-          <form action={generateOpportunitiesAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-            <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-            <button
-              className="button"
-              type="submit"
-              disabled={!data.connected || !data.selectedProject || !data.selectedSite}
-            >
-              Alle Opportunity-Klassen generieren
-            </button>
-          </form>
-          <form action={syncSearchPerformanceAction}>
-            <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-            <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-            <button
-              className="button secondary"
-              type="submit"
-              disabled={!data.connected || !data.selectedProject || !data.selectedSite}
-            >
-              Search Performance synchronisieren
-            </button>
-          </form>
+          <div className="locked-action">
+            <form action={generateOpportunitiesAction}>
+              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+              <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+              <button className="button" type="submit" disabled={heroDisabled}>
+                Alle Opportunity-Klassen generieren
+              </button>
+            </form>
+            <form action={syncSearchPerformanceAction}>
+              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+              <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+              <button className="button secondary" type="submit" disabled={heroDisabled}>
+                Search Performance synchronisieren
+              </button>
+            </form>
+            {heroDisabled && lockReason ? (
+              <span className="locked-action__reason">
+                <Icon name="lock" />
+                {lockReason}
+              </span>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -88,7 +107,10 @@ export default async function Page({
         />
       </section>
 
-      <OpportunityBoardClient opportunities={opportunities} />
+      <OpportunityBoardClient
+        opportunities={opportunities}
+        onBulkTransition={bulkTransitionOpportunitiesAction}
+      />
     </AppShell>
   );
 }

@@ -624,13 +624,17 @@ Die Screens sind gebaut und liefern echte Daten; folgende Endpunkt-Lücken werde
 - **🟡 Indexierbarkeits-Funnel:** `indexed`-Stufe braucht GSC-Index-Coverage (fehlt → ehrlich leer); `indexable` exakt statt „durchgeführte Assessments" braucht ein Aggregat (indexable vs. blockiert).
 - **🟡 Section-Aggregat (Audit):** Treemap/Issue-Gruppierung sampelt bis 200 URLs/Issues clientseitig; ein server-seitiges per-Sektion-Aggregat skaliert für große Sites.
 - **🔭 Content-Fit (Dossier)** und **Crawl-Diff (UX-6b)**: bewusst ausgelassen — neues Backend nötig.
-- **UI-Rest (kein Backend):** Bulk-Bar im Board (§G) noch nicht gebaut; Status-Übergänge laufen über den Drawer/Server-Actions.
+- **UI-Rest (kein Backend):** ✅ erledigt (2026-06-24) — **Bulk-Action-Bar im Board (§G/§3.9)** gebaut: Mehrfachauswahl in der Tabellen-Ansicht (Checkbox-Spalte + „Alle auswählen"), einschwebende Leiste mit „N ausgewählt" + Status-Übergängen (In Arbeit / Umgesetzt / Validiert / Verwerfen). Bulk-Server-Action `bulkTransitionOpportunitiesAction` ist resilient (ungültige State-Machine-Übergänge werden übersprungen, Summary an den Client). Einzel-Übergänge laufen weiter über den Drawer/Server-Actions.
 
 ---
 
 ## Post-Sprint-Ergänzungen (2026-06-07)
 
 Nach Abschluss von Block 1–3 ergänzt, um Nutzerführung und Erklärbarkeit zu schärfen. Alle Komponenten sind im `/kit` als lebende Doku sichtbar.
+
+### UX-Restpunkte (2026-06-24)
+- **Bulk-Action-Bar** im Opportunity-Board (§3.9/§G) gebaut — siehe §N.1.
+- **`actionLock()` verdrahtet:** die Hero-Buttons der Content-Opportunities („Generieren" / „Search Performance synchronisieren") nutzen jetzt den getesteten `actionLock(state, ["project","site"])`-Helper statt Ad-hoc-Bedingungen; der Disabled-Grund wird über `.locked-action__reason` (Schloss-Icon + Klartext) angezeigt — konsistent zu Keywords/Backlinks/Reports.
 
 ### Abhängigkeits-Wasserfall & Gating
 - **Readiness-Modell** (`lib/readiness.ts`, rein + getestet): leitet aus den Foundation-Daten (Projekt → Site → Datenquelle → Crawl) ab, welche Bereiche freigeschaltet sind. Pro Route Vorbedingungen (`ROUTE_PREREQUISITES`), erste-unerfüllte-Auflösung, Onboarding-Schritte und `actionLock()` für gesperrte Aktionen.
