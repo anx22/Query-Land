@@ -15,7 +15,8 @@ Häppchen leert.
 - `apps/web/src/lib/crawl-worker-client.ts` — `InProcessCrawlWorkerApiClient`:
   spricht die eingebettete API direkt über `callInternalApi` an (kein HTTP-Hop),
   spiegelt `HttpCrawlWorkerApiClient` der Crawler-Service-Variante.
-- `apps/web/vercel.json` → `crons`: `path: /api/cron/crawl`, `schedule: */5 * * * *`.
+- `apps/web/vercel.json` → `crons`: `path: /api/cron/crawl`, `schedule: 0 3 * * *`
+  (täglich 03:00 UTC — der einzige auf **Hobby** erlaubte Takt; siehe unten).
 
 Der Endpoint ist transport-agnostisch: er ist ein authentifizierter `GET`. Egal
 ob Vercel-Cron, GitHub Action oder ein externer Scheduler ihn aufruft.
