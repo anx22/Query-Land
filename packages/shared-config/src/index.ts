@@ -154,10 +154,23 @@ export const stackDecision = {
   auth: "Backend-owned email/password sessions stored in the embedded database"
 } as const;
 
-const defaultDatabaseUrl = process.env.VERCEL ? "sqlite:/tmp/seo-os.sqlite" : "sqlite:data/seo-os.sqlite";
+// On Vercel a missing DATABASE_URL must fail loudly: the only writable path is
+// ephemeral /tmp, so silently falling back there would lose all data on every
+// cold start. Locally we keep a persistent file default for convenience.
+function resolveDatabaseUrl(): string {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (process.env.VERCEL) {
+    throw new Error(
+      "DATABASE_URL is required on Vercel. Set it to your Neon Postgres connection string " +
+        "under Project Settings → Environment Variables. Without it the app would fall back to " +
+        "ephemeral /tmp storage and lose all data on every cold start."
+    );
+  }
+  return "sqlite:data/seo-os.sqlite";
+}
 
 export const apiDefaults = {
   port: Number.parseInt(process.env.API_PORT ?? "4000", 10),
   version: "0.2.0-sqlite-auth",
-  databaseUrl: process.env.DATABASE_URL ?? defaultDatabaseUrl
+  databaseUrl: resolveDatabaseUrl()
 } as const;
