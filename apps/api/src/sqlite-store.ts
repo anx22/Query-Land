@@ -61,6 +61,20 @@ export async function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): 
   ]);
 }
 
+// Never expose credentials in the health payload — /health may be reachable
+// publicly in production. Reduce a connection string to a safe driver/host/db
+// descriptor, stripping any user:password component.
+function redactDatabaseUrl(location: string): string {
+  try {
+    const url = new URL(location);
+    const db = url.pathname.replace(/^\//, "") || "(default)";
+    return `${url.protocol}//${url.host}/${db}`;
+  } catch {
+    // Non-URL locations (e.g. "sqlite::memory:") carry no credentials.
+    return location;
+  }
+}
+
 function createHealthStore(_db: AsyncDatabase, location: string): HealthStore {
   return {
     health(): HealthSnapshot {
@@ -71,7 +85,7 @@ function createHealthStore(_db: AsyncDatabase, location: string): HealthStore {
         checkedAt: new Date().toISOString(),
         checks: [
           { name: "http", status: "ok" },
-          { name: "database", status: "ok", details: location },
+          { name: "database", status: "ok", details: redactDatabaseUrl(location) },
           { name: "auth_tables", status: "ok", details: "users and sessions are stored in the backend database." },
           { name: "raw_normalized_contract", status: "ok", details: "raw_events and normalized_metrics are separate tables." }
         ]
