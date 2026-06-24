@@ -12,8 +12,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -27,7 +27,7 @@ interface GenResult {
 }
 
 test("search opportunities generate low-hanging, money-page and cannibalization classes (idempotent)", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Engine", slug: "engine" })).id;
     const siteId = data<{ id: string }>(await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://engine.example.com", scopeType: "domain" })).id;
@@ -51,12 +51,12 @@ test("search opportunities generate low-hanging, money-page and cannibalization 
     const again = data<{ created: number }>(await app("POST", `/projects/${projectId}/sites/${siteId}/opportunities/generate`, {}));
     assert.equal(again.created, 0, "re-running the generator is idempotent");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("internal link gap opportunities are generated from orphan URLs once a link graph exists", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   const BASE = "https://links.example.com";
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Links", slug: "links" })).id;
@@ -83,6 +83,6 @@ test("internal link gap opportunities are generated from orphan URLs once a link
     assert.deepEqual(gapUrls, [`${BASE}/a`, `${BASE}/c`]);
     assert.ok(gaps.every((opp) => opp.evidence.some((ev) => ev.sourceConfidence === "A")), "orphan evidence is crawl-based (class A)");
   } finally {
-    store.close();
+    await store.close();
   }
 });

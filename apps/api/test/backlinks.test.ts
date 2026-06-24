@@ -12,8 +12,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -55,7 +55,7 @@ test("authority summary computes follow ratio, anchors and top targets (pure)", 
 });
 
 test("import persists a GSC-links snapshot (class B); list/referring/authority read the latest", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Authority", slug: "authority" })).id;
     await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://acme.example.com", scopeType: "domain" });
@@ -76,12 +76,12 @@ test("import persists a GSC-links snapshot (class B); list/referring/authority r
     assert.equal(authority.totalBacklinks, result.totalBacklinks);
     assert.ok(authority.followRatio > 0 && authority.followRatio <= 1);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("a second import yields a meaningful new/lost diff", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Diff", slug: "diff" })).id;
     await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://acme.example.com", scopeType: "domain" });
@@ -103,12 +103,12 @@ test("a second import yields a meaningful new/lost diff", async () => {
     const snapshots = data<unknown[]>(await app("GET", `/projects/${projectId}/backlink-snapshots`));
     assert.equal(snapshots.length, 2, "snapshot history accumulates");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("import requires a site; diff requires a snapshot", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Empty", slug: "empty" })).id;
     const noSite = await app("POST", `/projects/${projectId}/backlinks/import`, {});
@@ -120,6 +120,6 @@ test("import requires a site; diff requires a snapshot", async () => {
     assert.equal(noSnapshot.status, 404);
     assert.equal((noSnapshot.body as { error: { code: string } }).error.code, "no_snapshots");
   } finally {
-    store.close();
+    await store.close();
   }
 });

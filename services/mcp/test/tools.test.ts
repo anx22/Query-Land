@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { createSQLiteStore, type SQLiteStore as BackendStore } from "@seo-tool/api";
 import type { AuditIssueRecord, DiscoveredUrl, Opportunity } from "@seo-tool/domain-model";
 import { callTool } from "../src/dispatch.js";
 import { createSeoMcpTools, ToolError } from "../src/tools.js";
+
+// Each test spins up an in-memory PGlite store. Closing it per test (via the
+// test context's after hook) releases the embedded WASM database promptly so no
+// dangling PGlite async work outlives the run.
 
 interface Seeded {
   store: BackendStore;
@@ -14,14 +18,15 @@ interface Seeded {
   opportunity: Opportunity;
 }
 
-function seed(): Seeded {
-  const store = createSQLiteStore("sqlite::memory:");
-  const project = store.createProject({ name: "MCP Test", slug: `mcp-test-${Math.random().toString(36).slice(2)}` });
-  const site = store.createSite(project.id, { baseUrl: "https://shop.example", scopeType: "domain", businessValue: 70 });
+async function seed(t: TestContext): Promise<Seeded> {
+  const store = await createSQLiteStore("sqlite::memory:");
+  t.after(async () => { await store.close(); });
+  const project = await store.createProject({ name: "MCP Test", slug: `mcp-test-${Math.random().toString(36).slice(2)}` });
+  const site = await store.createSite(project.id, { baseUrl: "https://shop.example", scopeType: "domain", businessValue: 70 });
   const url = "https://shop.example/product/widget";
   const otherUrl = "https://shop.example/about";
 
-  const discovered = store.recordDiscoveredUrls(project.id, site.id, [
+  const discovered = await store.recordDiscoveredUrls(project.id, site.id, [
     {
       id: "du-widget",
       projectId: project.id,
@@ -48,7 +53,7 @@ function seed(): Seeded {
   const discoveredUrl = discovered.urls.find((candidate) => candidate.url === url);
   assert.ok(discoveredUrl, "seeded discovered URL must exist");
 
-  const fetch = store.recordFetchResult(project.id, site.id, discoveredUrl.id, {
+  const fetch = await store.recordFetchResult(project.id, site.id, discoveredUrl.id, {
     url,
     finalUrl: url,
     statusCode: 200,
@@ -57,7 +62,7 @@ function seed(): Seeded {
     redirectChain: [],
     fetchedAt: new Date().toISOString()
   });
-  store.recordIndexabilityAssessment(project.id, site.id, discoveredUrl.id, {
+  await store.recordIndexabilityAssessment(project.id, site.id, discoveredUrl.id, {
     url,
     state: "indexable",
     isIndexable: true,
@@ -68,7 +73,7 @@ function seed(): Seeded {
   });
 
   // Internal links: about -> widget (inlink to widget), widget -> about (outlink from widget).
-  store.recordInternalLinks(project.id, site.id, [
+  await store.recordInternalLinks(project.id, site.id, [
     { fromUrl: otherUrl, toUrl: url, anchor: "Widget", rel: null },
     { fromUrl: url, toUrl: otherUrl, anchor: "About", rel: null }
   ]);
@@ -85,11 +90,11 @@ function seed(): Seeded {
     detectedAt: new Date().toISOString(),
     resolvedAt: null
   };
-  store.recordAuditIssues(project.id, site.id, [issue], { checkedDiscoveredUrlIds: [discoveredUrl.id] });
+  await store.recordAuditIssues(project.id, site.id, [issue], { checkedDiscoveredUrlIds: [discoveredUrl.id] });
 
-  store.computeHealthScore(project.id, site.id);
+  await store.computeHealthScore(project.id, site.id);
 
-  const opportunity = store.createOpportunity(project.id, {
+  const opportunity = await store.createOpportunity(project.id, {
     type: "technical_fix",
     affectedUrls: [url],
     currentState: "Page is missing a title tag",
@@ -110,10 +115,10 @@ function seed(): Seeded {
   return { store, projectId: project.id, siteId: site.id, url, discoveredUrl, opportunity };
 }
 
-test("get_project_summary returns project, sites with health, counts and top issues", () => {
-  const { store, projectId, siteId } = seed();
+test("get_project_summary returns project, sites with health, counts and top issues", async (t) => {
+  const { store, projectId, siteId } = await seed(t);
   const tools = createSeoMcpTools(store);
-  const summary = callTool(tools, "get_project_summary", { projectId }) as {
+  const summary = (await callTool(tools, "get_project_summary", { projectId })) as {
     project: { id: string };
     sites: Array<{ site: { id: string }; latestHealthScore: { score: number } | null; openIssueCount: number }>;
     openOpportunityCount: number;
@@ -130,10 +135,10 @@ test("get_project_summary returns project, sites with health, counts and top iss
   assert.equal(summary.topOpenAuditIssues[0].severity, "high");
 });
 
-test("get_url_dossier resolves a URL with fetch/index/links/issues/opportunities/anchor", () => {
-  const { store, projectId, url } = seed();
+test("get_url_dossier resolves a URL with fetch/index/links/issues/opportunities/anchor", async (t) => {
+  const { store, projectId, url } = await seed(t);
   const tools = createSeoMcpTools(store);
-  const dossier = callTool(tools, "get_url_dossier", { projectId, url }) as {
+  const dossier = (await callTool(tools, "get_url_dossier", { projectId, url })) as {
     discoveredUrl: { url: string };
     fetchHistory: unknown[];
     indexabilityAssessments: unknown[];
@@ -153,13 +158,13 @@ test("get_url_dossier resolves a URL with fetch/index/links/issues/opportunities
   assert.equal(dossier.relatedOpportunities.length, 1);
 
   // Unknown URL surfaces a ToolError.
-  assert.throws(() => callTool(tools, "get_url_dossier", { projectId, url: "https://shop.example/missing" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_url");
+  await assert.rejects(async () => await callTool(tools, "get_url_dossier", { projectId, url: "https://shop.example/missing" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_url");
 });
 
-test("list_opportunities returns a priority-sorted page with evidence and validationMetric", () => {
-  const { store, projectId, opportunity } = seed();
+test("list_opportunities returns a priority-sorted page with evidence and validationMetric", async (t) => {
+  const { store, projectId, opportunity } = await seed(t);
   const tools = createSeoMcpTools(store);
-  const page = callTool(tools, "list_opportunities", { projectId, status: "open" }) as {
+  const page = (await callTool(tools, "list_opportunities", { projectId, status: "open" })) as {
     data: Array<{ id: string; priority: number; validationMetric: string; evidence: unknown[] }>;
     total: number;
   };
@@ -172,14 +177,14 @@ test("list_opportunities returns a priority-sorted page with evidence and valida
   assert.ok(page.data[0].priority > 0);
 
   // Filtering by a non-matching type yields an empty page.
-  const filtered = callTool(tools, "list_opportunities", { projectId, type: "money_page" }) as { total: number };
+  const filtered = (await callTool(tools, "list_opportunities", { projectId, type: "money_page" })) as { total: number };
   assert.equal(filtered.total, 0);
 });
 
-test("get_crawl_issues returns an audit issue page and validates the site scope", () => {
-  const { store, projectId, siteId } = seed();
+test("get_crawl_issues returns an audit issue page and validates the site scope", async (t) => {
+  const { store, projectId, siteId } = await seed(t);
   const tools = createSeoMcpTools(store);
-  const page = callTool(tools, "get_crawl_issues", { projectId, siteId, status: "open", severity: "high" }) as {
+  const page = (await callTool(tools, "get_crawl_issues", { projectId, siteId, status: "open", severity: "high" })) as {
     data: Array<{ id: string; rule: string }>;
     total: number;
   };
@@ -187,13 +192,13 @@ test("get_crawl_issues returns an audit issue page and validates the site scope"
   assert.equal(page.total, 1);
   assert.equal(page.data[0].rule, "missing_title");
 
-  assert.throws(() => callTool(tools, "get_crawl_issues", { projectId, siteId: "site-nope" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_site");
+  await assert.rejects(async () => await callTool(tools, "get_crawl_issues", { projectId, siteId: "site-nope" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_site");
 });
 
-test("explain_opportunity returns the full record with evidence and resolved anchor", () => {
-  const { store, opportunity } = seed();
+test("explain_opportunity returns the full record with evidence and resolved anchor", async (t) => {
+  const { store, opportunity } = await seed(t);
   const tools = createSeoMcpTools(store);
-  const explained = callTool(tools, "explain_opportunity", { opportunityId: opportunity.id }) as {
+  const explained = (await callTool(tools, "explain_opportunity", { opportunityId: opportunity.id })) as {
     opportunity: { id: string };
     evidence: unknown[];
     currentState: string;
@@ -208,15 +213,15 @@ test("explain_opportunity returns the full record with evidence and resolved anc
   assert.ok(explained.recommendedAction.length > 0);
   assert.ok(explained.priority > 0);
 
-  assert.throws(() => callTool(tools, "explain_opportunity", { opportunityId: "opp-missing" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_opportunity");
+  await assert.rejects(async () => await callTool(tools, "explain_opportunity", { opportunityId: "opp-missing" }), (error: unknown) => error instanceof ToolError && error.code === "unknown_opportunity");
 });
 
-test("callTool rejects unknown tool names and missing required args", () => {
-  const { store, projectId } = seed();
+test("callTool rejects unknown tool names and missing required args", async (t) => {
+  const { store, projectId } = await seed(t);
   const tools = createSeoMcpTools(store);
 
   assert.throws(() => callTool(tools, "not_a_tool", {}), (error: unknown) => error instanceof ToolError && error.code === "unknown_tool");
-  assert.throws(() => callTool(tools, "get_project_summary", {}), (error: unknown) => error instanceof ToolError && error.code === "missing_field");
+  await assert.rejects(async () => await callTool(tools, "get_project_summary", {}), (error: unknown) => error instanceof ToolError && error.code === "missing_field");
   void projectId;
 });
 
@@ -227,20 +232,21 @@ interface BacklinkSeeded {
   projectId: string;
 }
 
-function seedBacklinks(): BacklinkSeeded {
-  const store = createSQLiteStore("sqlite::memory:");
-  const project = store.createProject({ name: "Backlink Test", slug: `bl-test-${Math.random().toString(36).slice(2)}` });
-  store.createSite(project.id, { baseUrl: "https://bl.example", scopeType: "domain", businessValue: 50 });
+async function seedBacklinks(t: TestContext): Promise<BacklinkSeeded> {
+  const store = await createSQLiteStore("sqlite::memory:");
+  t.after(async () => { await store.close(); });
+  const project = await store.createProject({ name: "Backlink Test", slug: `bl-test-${Math.random().toString(36).slice(2)}` });
+  await store.createSite(project.id, { baseUrl: "https://bl.example", scopeType: "domain", businessValue: 50 });
   // Two imports to produce a meaningful diff.
-  store.importBacklinks(project.id);
-  store.importBacklinks(project.id);
+  await store.importBacklinks(project.id);
+  await store.importBacklinks(project.id);
   return { store, projectId: project.id };
 }
 
-test("get_authority_summary returns totalBacklinks > 0 and a followRatio", () => {
-  const { store, projectId } = seedBacklinks();
+test("get_authority_summary returns totalBacklinks > 0 and a followRatio", async (t) => {
+  const { store, projectId } = await seedBacklinks(t);
   const tools = createSeoMcpTools(store);
-  const summary = callTool(tools, "get_authority_summary", { projectId }) as {
+  const summary = (await callTool(tools, "get_authority_summary", { projectId })) as {
     totalBacklinks: number;
     referringDomains: number;
     followRatio: number;
@@ -251,10 +257,10 @@ test("get_authority_summary returns totalBacklinks > 0 and a followRatio", () =>
   assert.ok(summary.referringDomains >= 0, "referringDomains should be >= 0");
 });
 
-test("list_referring_domains returns a non-empty array after import", () => {
-  const { store, projectId } = seedBacklinks();
+test("list_referring_domains returns a non-empty array after import", async (t) => {
+  const { store, projectId } = await seedBacklinks(t);
   const tools = createSeoMcpTools(store);
-  const domains = callTool(tools, "list_referring_domains", { projectId }) as Array<{ domain: string; backlinks: number }>;
+  const domains = (await callTool(tools, "list_referring_domains", { projectId })) as Array<{ domain: string; backlinks: number }>;
 
   assert.ok(Array.isArray(domains), "result should be an array");
   assert.ok(domains.length > 0, "should have at least one referring domain after import");
@@ -262,10 +268,10 @@ test("list_referring_domains returns a non-empty array after import", () => {
   assert.ok(typeof domains[0].backlinks === "number", "each entry should have a backlinks count");
 });
 
-test("get_backlink_changes returns newReferringDomains and lostReferringDomains arrays", () => {
-  const { store, projectId } = seedBacklinks();
+test("get_backlink_changes returns newReferringDomains and lostReferringDomains arrays", async (t) => {
+  const { store, projectId } = await seedBacklinks(t);
   const tools = createSeoMcpTools(store);
-  const diff = callTool(tools, "get_backlink_changes", { projectId }) as {
+  const diff = (await callTool(tools, "get_backlink_changes", { projectId })) as {
     newReferringDomains: string[];
     lostReferringDomains: string[];
     newBacklinks: unknown[];
@@ -282,49 +288,50 @@ test("get_backlink_changes returns newReferringDomains and lostReferringDomains 
   assert.ok(typeof diff.netReferringDomainChange === "number", "netReferringDomainChange should be a number");
 });
 
-test("get_backlink_changes throws no_snapshots for a project with no imports", () => {
-  const store = createSQLiteStore("sqlite::memory:");
-  const project = store.createProject({ name: "Empty Project", slug: `empty-${Math.random().toString(36).slice(2)}` });
-  store.createSite(project.id, { baseUrl: "https://empty.example", scopeType: "domain", businessValue: 50 });
+test("get_backlink_changes throws no_snapshots for a project with no imports", async (t) => {
+  const store = await createSQLiteStore("sqlite::memory:");
+  t.after(async () => { await store.close(); });
+  const project = await store.createProject({ name: "Empty Project", slug: `empty-${Math.random().toString(36).slice(2)}` });
+  await store.createSite(project.id, { baseUrl: "https://empty.example", scopeType: "domain", businessValue: 50 });
   const tools = createSeoMcpTools(store);
 
-  assert.throws(
-    () => callTool(tools, "get_backlink_changes", { projectId: project.id }),
+  await assert.rejects(
+    async () => await callTool(tools, "get_backlink_changes", { projectId: project.id }),
     (error: unknown) => error instanceof ToolError && error.code === "no_snapshots"
   );
 });
 
 // ── Report / Alert tools ────────────────────────────────────────────────────
 
-test("get_latest_report returns the most recent report after generation", () => {
-  const { store, projectId } = seed();
+test("get_latest_report returns the most recent report after generation", async (t) => {
+  const { store, projectId } = await seed(t);
   const tools = createSeoMcpTools(store);
 
   // Before any report is generated, the result should be null.
-  const empty = callTool(tools, "get_latest_report", { projectId }) as { report: null };
+  const empty = (await callTool(tools, "get_latest_report", { projectId })) as { report: null };
   assert.equal(empty.report, null);
 
   // Generate a report, then the tool should return it.
-  store.generateReport(projectId, "weekly_summary");
-  const result = callTool(tools, "get_latest_report", { projectId }) as { report: { id: string; type: string } };
+  await store.generateReport(projectId, "weekly_summary");
+  const result = (await callTool(tools, "get_latest_report", { projectId })) as { report: { id: string; type: string } };
   assert.ok(result.report !== null, "report should be present after generation");
   assert.equal(result.report.type, "weekly_summary");
 });
 
-test("list_alert_events returns >= 1 event after rule creation and evaluation", () => {
-  const { store, projectId } = seed();
+test("list_alert_events returns >= 1 event after rule creation and evaluation", async (t) => {
+  const { store, projectId } = await seed(t);
   const tools = createSeoMcpTools(store);
 
   // Before any rule is created, the list should be empty.
-  const before = callTool(tools, "list_alert_events", { projectId }) as unknown[];
+  const before = (await callTool(tools, "list_alert_events", { projectId })) as unknown[];
   assert.ok(Array.isArray(before), "result should be an array");
   assert.equal(before.length, 0);
 
   // Create a rule that will always trigger (open_opportunities >= 0).
-  store.createAlertRule(projectId, { metric: "open_opportunities", comparator: "gte", threshold: 0 });
-  store.evaluateAlerts(projectId);
+  await store.createAlertRule(projectId, { metric: "open_opportunities", comparator: "gte", threshold: 0 });
+  await store.evaluateAlerts(projectId);
 
-  const events = callTool(tools, "list_alert_events", { projectId }) as Array<{ id: string; triggered: boolean; metric: string }>;
+  const events = (await callTool(tools, "list_alert_events", { projectId })) as Array<{ id: string; triggered: boolean; metric: string }>;
   assert.ok(Array.isArray(events), "result should be an array");
   assert.ok(events.length >= 1, "should have at least one alert event after evaluation");
   assert.equal(events[0].metric, "open_opportunities");
@@ -333,15 +340,15 @@ test("list_alert_events returns >= 1 event after rule creation and evaluation", 
 
 // ── AI Visibility / Proposal tools (M6) ────────────────────────────────────
 
-test("get_ai_visibility returns numeric prompts and score after snapshot recorded", () => {
-  const { store, projectId, siteId } = seed();
+test("get_ai_visibility returns numeric prompts and score after snapshot recorded", async (t) => {
+  const { store, projectId, siteId } = await seed(t);
   const tools = createSeoMcpTools(store);
 
   // Seed a prompt and record a snapshot so the score is meaningful.
-  const aiPrompt = store.createAiPrompt(projectId, { prompt: "best widget shop" });
-  store.recordAiSnapshot(projectId, aiPrompt.id);
+  const aiPrompt = await store.createAiPrompt(projectId, { prompt: "best widget shop" });
+  await store.recordAiSnapshot(projectId, aiPrompt.id);
 
-  const score = callTool(tools, "get_ai_visibility", { projectId }) as {
+  const score = (await callTool(tools, "get_ai_visibility", { projectId })) as {
     prompts: number;
     citedPrompts: number;
     brandMentions: number;
@@ -356,34 +363,34 @@ test("get_ai_visibility returns numeric prompts and score after snapshot recorde
   void siteId;
 });
 
-test("create_dev_ticket returns a proposed dev_ticket; propose_fix_pr returns fix_pr; list_proposals returns both", () => {
-  const { store, projectId } = seed();
+test("create_dev_ticket returns a proposed dev_ticket; propose_fix_pr returns fix_pr; list_proposals returns both", async (t) => {
+  const { store, projectId } = await seed(t);
   const tools = createSeoMcpTools(store);
 
   // create_dev_ticket
-  const ticket = callTool(tools, "create_dev_ticket", {
+  const ticket = (await callTool(tools, "create_dev_ticket", {
     projectId,
     title: "Fix missing title tags",
     body: "The product template is missing <title> elements. Add unique titles to every product page."
-  }) as { id: string; kind: string; status: string; source: string };
+  })) as { id: string; kind: string; status: string; source: string };
 
   assert.equal(ticket.status, "proposed", "dev ticket should be in proposed status");
   assert.equal(ticket.kind, "dev_ticket", "kind should be dev_ticket");
   assert.equal(ticket.source, "mcp", "source should be mcp");
 
   // propose_fix_pr
-  const pr = callTool(tools, "propose_fix_pr", {
+  const pr = (await callTool(tools, "propose_fix_pr", {
     projectId,
     title: "Add title tags to product template",
     body: "PR to insert unique <title> tags into the product template component."
-  }) as { id: string; kind: string; status: string; source: string };
+  })) as { id: string; kind: string; status: string; source: string };
 
   assert.equal(pr.status, "proposed", "fix PR should be in proposed status");
   assert.equal(pr.kind, "fix_pr", "kind should be fix_pr");
   assert.equal(pr.source, "mcp", "source should be mcp");
 
   // list_proposals should return >= 2 entries
-  const proposals = callTool(tools, "list_proposals", { projectId }) as Array<{ id: string; kind: string }>;
+  const proposals = (await callTool(tools, "list_proposals", { projectId })) as Array<{ id: string; kind: string }>;
   assert.ok(Array.isArray(proposals), "proposals should be an array");
   assert.ok(proposals.length >= 2, "should have at least 2 proposals after creating ticket and PR");
 

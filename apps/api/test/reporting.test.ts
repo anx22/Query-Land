@@ -12,8 +12,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -32,13 +32,13 @@ const SAMPLE_REPORT: Report = {
   ]
 };
 
-async function seedProject(app: ReturnType<typeof testApp>["app"], slug: string) {
+async function seedProject(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string) {
   const projectId = data<{ id: string }>(await app("POST", "/projects", { name: `Report ${slug}`, slug })).id;
   await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://acme.example.com", scopeType: "domain" });
   return projectId;
 }
 
-async function seedOpportunity(app: ReturnType<typeof testApp>["app"], projectId: string) {
+async function seedOpportunity(app: Awaited<ReturnType<typeof testApp>>["app"], projectId: string) {
   await app("POST", `/projects/${projectId}/opportunities`, {
     type: "money_page", affectedUrls: ["https://acme.example.com/x"],
     currentState: "x", recommendedAction: "y",
@@ -76,7 +76,7 @@ test("compareAlert covers all comparators (pure)", () => {
 });
 
 test("weekly report aggregates four sections and exports/delivers", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await seedProject(app, "weekly");
     await seedOpportunity(app, projectId);
@@ -104,12 +104,12 @@ test("weekly report aggregates four sections and exports/delivers", async () => 
     const deliveries = data<unknown[]>(await app("GET", `/reports/${report.id}/deliveries`));
     assert.equal(deliveries.length, 1);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("a weekly schedule runs once when due and is idempotent until next cadence", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await seedProject(app, "sched");
     await app("POST", `/projects/${projectId}/report-schedules`, { type: "weekly_summary", cadence: "weekly", channel: "slack" });
@@ -120,12 +120,12 @@ test("a weekly schedule runs once when due and is idempotent until next cadence"
     const secondRun = data<{ generated: number }>(await app("POST", `/projects/${projectId}/report-schedules/run-due`, {}));
     assert.equal(secondRun.generated, 0, "not due again within the cadence window");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("alert rule evaluation records triggered events against current metrics", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await seedProject(app, "alerts");
     await seedOpportunity(app, projectId);
@@ -142,12 +142,12 @@ test("alert rule evaluation records triggered events against current metrics", a
     const history = data<unknown[]>(await app("GET", `/projects/${projectId}/alert-events`));
     assert.equal(history.length, 2);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("report generation rejects unknown project and invalid type", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const missing = await app("POST", `/projects/proj-nope/reports`, { type: "weekly_summary" });
     assert.equal(missing.status, 404);
@@ -155,6 +155,6 @@ test("report generation rejects unknown project and invalid type", async () => {
     const badType = await app("POST", `/projects/${projectId}/reports`, { type: "nonsense" });
     assert.equal(badType.status, 400);
   } finally {
-    store.close();
+    await store.close();
   }
 });

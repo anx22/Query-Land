@@ -3,7 +3,7 @@ import type { SourceMapEntry } from "@seo-tool/domain-model";
 import { mapSourceMapEntry } from "../sqlite-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 export type SourceMapConfidence = "exact" | "manifest" | "heuristic" | "unknown";
 
@@ -78,17 +78,17 @@ export interface PrCheckResult {
 }
 
 export interface SourceMapStore {
-  listSourceMapEntries(): SourceMapEntry[];
-  upsertSourceMapEntry(projectId: string, input: SourceMapUpsertInput): SourceMapEntry;
-  resolveSourceAnchor(url: string): ResolvedSourceAnchor | null;
-  createDeployMarker(projectId: string, input: DeployMarkerInput): DeployMarker;
-  listDeployMarkers(projectId: string): DeployMarker[];
+  listSourceMapEntries(): Promise<SourceMapEntry[]>;
+  upsertSourceMapEntry(projectId: string, input: SourceMapUpsertInput): Promise<SourceMapEntry>;
+  resolveSourceAnchor(url: string): Promise<ResolvedSourceAnchor | null>;
+  createDeployMarker(projectId: string, input: DeployMarkerInput): Promise<DeployMarker>;
+  listDeployMarkers(projectId: string): Promise<DeployMarker[]>;
   // WP-3.3: Pre-Merge-Gate — geänderte Repo-Pfade -> betroffene Templates/URLs -> offene Opportunities.
-  evaluatePrCheck(projectId: string, input: PrCheckInput): PrCheckResult;
-  listPrChecks(projectId: string): PrCheckResult[];
+  evaluatePrCheck(projectId: string, input: PrCheckInput): Promise<PrCheckResult>;
+  listPrChecks(projectId: string): Promise<PrCheckResult[]>;
 }
 
-export function createSourceMapStore(db: SQLiteDatabase, audit: AuditLog): SourceMapStore {
+export function createSourceMapStore(db: AsyncDatabase, audit: AuditLog): SourceMapStore {
   return new SQLiteSourceMapStore(db, audit);
 }
 
@@ -102,20 +102,20 @@ function requireString(value: unknown, field: string): string {
 }
 
 class SQLiteSourceMapStore implements SourceMapStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  listSourceMapEntries(): SourceMapEntry[] {
-    return this.db.prepare(`
+  async listSourceMapEntries(): Promise<SourceMapEntry[]> {
+    return (await this.db.prepare(`
       SELECT url_template_map.id, url_template_map.project_id, url_template_map.url_pattern, templates.name AS template,
              templates.component, templates.repo_path, url_template_map.confidence
       FROM url_template_map
       JOIN templates ON templates.id = url_template_map.template_id
       ORDER BY url_template_map.created_at ASC
-    `).all().map(mapSourceMapEntry);
+    `).all()).map(mapSourceMapEntry);
   }
 
-  upsertSourceMapEntry(projectId: string, input: SourceMapUpsertInput): SourceMapEntry {
-    const project = this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId);
+  async upsertSourceMapEntry(projectId: string, input: SourceMapUpsertInput): Promise<SourceMapEntry> {
+    const project = await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId);
     if (!project) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
@@ -128,39 +128,34 @@ class SQLiteSourceMapStore implements SourceMapStore {
     const defaultBranch = input.defaultBranch && input.defaultBranch.trim() !== "" ? input.defaultBranch : "main";
     const now = new Date().toISOString();
 
-    this.db.exec("BEGIN");
-    try {
+    await this.db.transaction(async (tx) => {
       // source_repo: find or create per project + repo_url.
-      let repoId = (this.db.prepare(`SELECT id FROM source_repos WHERE project_id = ? AND repo_url = ?`).get(projectId, repoUrl) as { id: string } | undefined)?.id;
+      let repoId = (await tx.prepare(`SELECT id FROM source_repos WHERE project_id = ? AND repo_url = ?`).get(projectId, repoUrl) as { id: string } | undefined)?.id;
       if (!repoId) {
         repoId = `repo-${randomUUID()}`;
-        this.db.prepare(`INSERT INTO source_repos (id, project_id, repo_url, default_branch, created_at) VALUES (?, ?, ?, ?, ?)`).run(repoId, projectId, repoUrl, defaultBranch, now);
+        await tx.prepare(`INSERT INTO source_repos (id, project_id, repo_url, default_branch, created_at) VALUES (?, ?, ?, ?, ?)`).run(repoId, projectId, repoUrl, defaultBranch, now);
       }
       // template: find or create per source_repo + repo_path; keep name/component current.
-      const existingTemplate = this.db.prepare(`SELECT id FROM templates WHERE source_repo_id = ? AND repo_path = ?`).get(repoId, repoPath) as { id: string } | undefined;
+      const existingTemplate = await tx.prepare(`SELECT id FROM templates WHERE source_repo_id = ? AND repo_path = ?`).get(repoId, repoPath) as { id: string } | undefined;
       let templateId: string;
       if (existingTemplate) {
         templateId = existingTemplate.id;
-        this.db.prepare(`UPDATE templates SET name = ?, component = ? WHERE id = ?`).run(templateName, component, templateId);
+        await tx.prepare(`UPDATE templates SET name = ?, component = ? WHERE id = ?`).run(templateName, component, templateId);
       } else {
         templateId = `tpl-${randomUUID()}`;
-        this.db.prepare(`INSERT INTO templates (id, source_repo_id, name, component, repo_path) VALUES (?, ?, ?, ?, ?)`).run(templateId, repoId, templateName, component, repoPath);
+        await tx.prepare(`INSERT INTO templates (id, source_repo_id, name, component, repo_path) VALUES (?, ?, ?, ?, ?)`).run(templateId, repoId, templateName, component, repoPath);
       }
       // url_template_map: upsert per project + url_pattern + template.
-      const existingMap = this.db.prepare(`SELECT id FROM url_template_map WHERE project_id = ? AND url_pattern = ? AND template_id = ?`).get(projectId, urlPattern, templateId) as { id: string } | undefined;
+      const existingMap = await tx.prepare(`SELECT id FROM url_template_map WHERE project_id = ? AND url_pattern = ? AND template_id = ?`).get(projectId, urlPattern, templateId) as { id: string } | undefined;
       if (existingMap) {
-        this.db.prepare(`UPDATE url_template_map SET confidence = ? WHERE id = ?`).run(confidence, existingMap.id);
+        await tx.prepare(`UPDATE url_template_map SET confidence = ? WHERE id = ?`).run(confidence, existingMap.id);
       } else {
-        this.db.prepare(`INSERT INTO url_template_map (id, project_id, url_pattern, template_id, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(`utm-${randomUUID()}`, projectId, urlPattern, templateId, confidence, now);
+        await tx.prepare(`INSERT INTO url_template_map (id, project_id, url_pattern, template_id, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(`utm-${randomUUID()}`, projectId, urlPattern, templateId, confidence, now);
       }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    });
 
-    this.audit("system", "source_map.upsert", "url_template_map", urlPattern, { projectId, repoPath });
-    const entry = this.db.prepare(`
+    await this.audit("system", "source_map.upsert", "url_template_map", urlPattern, { projectId, repoPath });
+    const entry = await this.db.prepare(`
       SELECT url_template_map.id, url_template_map.project_id, url_template_map.url_pattern, templates.name AS template,
              templates.component, templates.repo_path, url_template_map.confidence
       FROM url_template_map
@@ -171,9 +166,9 @@ class SQLiteSourceMapStore implements SourceMapStore {
     return mapSourceMapEntry(entry as Record<string, unknown>);
   }
 
-  resolveSourceAnchor(url: string): ResolvedSourceAnchor | null {
+  async resolveSourceAnchor(url: string): Promise<ResolvedSourceAnchor | null> {
     requireString(url, "url");
-    const entries = this.listSourceMapEntries();
+    const entries = await this.listSourceMapEntries();
     // Exact match beats prefix heuristic; among prefixes the longest pattern wins.
     const exact = entries.find((entry) => entry.urlPattern === url);
     const chosen = exact ?? entries
@@ -189,8 +184,8 @@ class SQLiteSourceMapStore implements SourceMapStore {
     };
   }
 
-  createDeployMarker(projectId: string, input: DeployMarkerInput): DeployMarker {
-    const project = this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId);
+  async createDeployMarker(projectId: string, input: DeployMarkerInput): Promise<DeployMarker> {
+    const project = await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId);
     if (!project) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
@@ -198,13 +193,13 @@ class SQLiteSourceMapStore implements SourceMapStore {
     const deployedAt = input.deployedAt && input.deployedAt.trim() !== "" ? input.deployedAt : new Date().toISOString();
     const metadata = input.metadata && typeof input.metadata === "object" && !Array.isArray(input.metadata) ? input.metadata : {};
     const id = `deploy-${randomUUID()}`;
-    this.db.prepare(`INSERT INTO deploy_markers (id, project_id, commit_sha, deployed_at, metadata) VALUES (?, ?, ?, ?, ?)`).run(id, projectId, commitSha, deployedAt, JSON.stringify(metadata));
-    this.audit("system", "deploy_marker.create", "deploy_marker", id, { projectId, commitSha });
+    await this.db.prepare(`INSERT INTO deploy_markers (id, project_id, commit_sha, deployed_at, metadata) VALUES (?, ?, ?, ?, ?)`).run(id, projectId, commitSha, deployedAt, JSON.stringify(metadata));
+    await this.audit("system", "deploy_marker.create", "deploy_marker", id, { projectId, commitSha });
     return { id, projectId, commitSha, deployedAt, metadata };
   }
 
-  listDeployMarkers(projectId: string): DeployMarker[] {
-    return this.db.prepare(`SELECT * FROM deploy_markers WHERE project_id = ? ORDER BY deployed_at DESC, id ASC`).all(projectId).map((row) => ({
+  async listDeployMarkers(projectId: string): Promise<DeployMarker[]> {
+    return (await this.db.prepare(`SELECT * FROM deploy_markers WHERE project_id = ? ORDER BY deployed_at DESC, id ASC`).all(projectId)).map((row) => ({
       id: String(row.id),
       projectId: String(row.project_id),
       commitSha: String(row.commit_sha),
@@ -213,8 +208,8 @@ class SQLiteSourceMapStore implements SourceMapStore {
     }));
   }
 
-  evaluatePrCheck(projectId: string, input: PrCheckInput): PrCheckResult {
-    if (!this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+  async evaluatePrCheck(projectId: string, input: PrCheckInput): Promise<PrCheckResult> {
+    if (!await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
     const changedPaths = Array.isArray(input.changedPaths) ? input.changedPaths.filter((path) => typeof path === "string" && path.trim() !== "").map((path) => path.trim()) : [];
@@ -223,7 +218,7 @@ class SQLiteSourceMapStore implements SourceMapStore {
     }
 
     // Geänderte Pfade -> betroffene Source-Map-Einträge (Template + URL-Muster).
-    const entries = this.listSourceMapEntries();
+    const entries = await this.listSourceMapEntries();
     const affectedTemplates: PrCheckAffectedTemplate[] = [];
     for (const entry of entries) {
       const matched = changedPaths.find((changed) => pathsRelated(changed, entry.repoPath));
@@ -234,7 +229,7 @@ class SQLiteSourceMapStore implements SourceMapStore {
     const affectedUrlPatterns = [...new Set(affectedTemplates.map((template) => template.urlPattern))];
 
     // Offene Opportunities, die betroffen sind — über URL-Muster oder direkten Source-Anchor.
-    const openRows = this.db.prepare(`SELECT id, type, status, priority, affected_urls, source_anchor FROM opportunities WHERE project_id = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId) as Array<{ id: string; type: string; status: string; priority: number; affected_urls: string; source_anchor: string | null }>;
+    const openRows = await this.db.prepare(`SELECT id, type, status, priority, affected_urls, source_anchor FROM opportunities WHERE project_id = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId) as Array<{ id: string; type: string; status: string; priority: number; affected_urls: string; source_anchor: string | null }>;
     const relatedOpportunities: PrCheckRelatedOpportunity[] = [];
     for (const row of openRows) {
       const affectedUrls = safeJsonArray(row.affected_urls);
@@ -260,15 +255,15 @@ class SQLiteSourceMapStore implements SourceMapStore {
     const createdAt = new Date().toISOString();
     const prNumber = typeof input.prNumber === "number" && Number.isFinite(input.prNumber) ? Math.trunc(input.prNumber) : null;
     const headSha = typeof input.headSha === "string" && input.headSha.trim() !== "" ? input.headSha.trim() : null;
-    this.db.prepare(`INSERT INTO pr_checks (id, project_id, pr_number, head_sha, changed_paths, status, affected_templates, affected_url_patterns, related_opportunity_ids, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    await this.db.prepare(`INSERT INTO pr_checks (id, project_id, pr_number, head_sha, changed_paths, status, affected_templates, affected_url_patterns, related_opportunity_ids, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       id, projectId, prNumber, headSha, JSON.stringify(changedPaths), status, JSON.stringify(affectedTemplates), JSON.stringify(affectedUrlPatterns), JSON.stringify(relatedOpportunities), createdAt
     );
-    this.audit("system", "pr_check.evaluate", "pr_check", id, { projectId, status, affected: affectedTemplates.length, related: relatedOpportunities.length });
+    await this.audit("system", "pr_check.evaluate", "pr_check", id, { projectId, status, affected: affectedTemplates.length, related: relatedOpportunities.length });
     return { id, projectId, prNumber, headSha, changedPaths, status, affectedTemplates, affectedUrlPatterns, relatedOpportunities, createdAt };
   }
 
-  listPrChecks(projectId: string): PrCheckResult[] {
-    return this.db.prepare(`SELECT * FROM pr_checks WHERE project_id = ? ORDER BY created_at DESC, id ASC`).all(projectId).map((row) => ({
+  async listPrChecks(projectId: string): Promise<PrCheckResult[]> {
+    return (await this.db.prepare(`SELECT * FROM pr_checks WHERE project_id = ? ORDER BY created_at DESC, id ASC`).all(projectId)).map((row) => ({
       id: String(row.id),
       projectId: String(row.project_id),
       prNumber: row.pr_number === null || row.pr_number === undefined ? null : Number(row.pr_number),

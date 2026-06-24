@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -20,7 +20,7 @@ function data<T>(response: ApiResponse): T {
   return (response.body as { data: T }).data;
 }
 
-async function freshProject(app: ReturnType<typeof testApp>["app"], slug: string): Promise<string> {
+async function freshProject(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string): Promise<string> {
   return data<{ id: string }>(await app("POST", "/projects", { name: `Opp ${slug}`, slug })).id;
 }
 
@@ -41,7 +41,7 @@ const baseInput = {
 };
 
 test("create opportunity computes priority, stores evidence, defaults to open", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "create");
     const created = await app("POST", `/projects/${projectId}/opportunities`, baseInput);
@@ -56,12 +56,12 @@ test("create opportunity computes priority, stores evidence, defaults to open", 
     const fetched = data<{ id: string }>(await app("GET", `/opportunities/${opp.id}`));
     assert.equal(fetched.id, opp.id);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("create opportunity requires evidence of confidence class A-C", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "evidence");
     const noEvidence = await app("POST", `/projects/${projectId}/opportunities`, { ...baseInput, evidence: [] });
@@ -75,24 +75,24 @@ test("create opportunity requires evidence of confidence class A-C", async () =>
     assert.equal(weakEvidence.status, 400);
     assert.equal((weakEvidence.body as { error: { code: string } }).error.code, "evidence_confidence_too_low");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("create opportunity rejects non-positive effort via priority formula", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "effort");
     const bad = await app("POST", `/projects/${projectId}/opportunities`, { ...baseInput, effort: 0 });
     assert.equal(bad.status, 400);
     assert.equal((bad.body as { error: { code: string } }).error.code, "validation_error");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("list opportunities supports status and type filters, ordered by priority", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "list");
     const low = data<{ id: string }>(await app("POST", `/projects/${projectId}/opportunities`, { ...baseInput, businessValue: 1 }));
@@ -110,12 +110,12 @@ test("list opportunities supports status and type filters, ordered by priority",
     assert.equal(openOnly.length, 2);
     assert.ok(openOnly.some((o) => o.id === low.id));
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("status transitions follow the §6.5 lifecycle and reject illegal jumps", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "lifecycle");
     const opp = data<{ id: string }>(await app("POST", `/projects/${projectId}/opportunities`, baseInput));
@@ -135,6 +135,6 @@ test("status transitions follow the §6.5 lifecycle and reject illegal jumps", a
     assert.equal(badReopen.status, 409);
     assert.equal(data<{ status: string }>(await app("POST", `/opportunities/${opp.id}/transition`, { status: "reopened" })).status, "reopened");
   } finally {
-    store.close();
+    await store.close();
   }
 });

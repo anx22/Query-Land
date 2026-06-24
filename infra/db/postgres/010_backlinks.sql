@@ -3,6 +3,9 @@
 -- New/Lost = neuester vs. vorheriger Snapshot. Quelle GSC-Links-Stub (Confidence B, DEC-002).
 CREATE TABLE IF NOT EXISTS backlink_snapshots (
   id TEXT PRIMARY KEY,
+  -- monotonic insertion order; replaces the implicit SQLite rowid used as a
+  -- deterministic tiebreaker when two snapshots share the same captured_at.
+  seq BIGINT GENERATED ALWAYS AS IDENTITY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   captured_at TEXT NOT NULL,
   total_backlinks INTEGER NOT NULL,

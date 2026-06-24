@@ -3,7 +3,7 @@ import { computeVisibilityScore, type RankSnapshot, type SerpDevice, type SerpDi
 import { getSerpProvider } from "../serp/index.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 const DEFAULT_MARKET = "DE";
 
@@ -18,15 +18,15 @@ export interface RankSnapshotResult {
 }
 
 export interface RankStore {
-  recordRankSnapshot(projectId: string, keywordId: string, options?: RecordRankOptions): RankSnapshotResult;
-  listRankSnapshots(projectId: string, keywordId: string): RankSnapshot[];
-  listSerpSnapshots(projectId: string, keywordId: string): SerpSnapshot[];
-  serpDiff(projectId: string, keywordId: string): SerpDiff;
-  computeVisibility(projectId: string, market?: string): VisibilityScore;
-  listVisibilityScores(projectId: string, market?: string): VisibilityScore[];
+  recordRankSnapshot(projectId: string, keywordId: string, options?: RecordRankOptions): Promise<RankSnapshotResult>;
+  listRankSnapshots(projectId: string, keywordId: string): Promise<RankSnapshot[]>;
+  listSerpSnapshots(projectId: string, keywordId: string): Promise<SerpSnapshot[]>;
+  serpDiff(projectId: string, keywordId: string): Promise<SerpDiff>;
+  computeVisibility(projectId: string, market?: string): Promise<VisibilityScore>;
+  listVisibilityScores(projectId: string, market?: string): Promise<VisibilityScore[]>;
 }
 
-export function createRankStore(db: SQLiteDatabase, audit: AuditLog): RankStore {
+export function createRankStore(db: AsyncDatabase, audit: AuditLog): RankStore {
   return new SQLiteRankStore(db, audit);
 }
 
@@ -40,16 +40,16 @@ function hostOf(baseUrl: string | null | undefined): string | null {
 }
 
 class SQLiteRankStore implements RankStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  recordRankSnapshot(projectId: string, keywordId: string, options: RecordRankOptions = {}): RankSnapshotResult {
-    const keyword = this.db.prepare(`SELECT phrase, market FROM keywords WHERE id = ? AND project_id = ?`).get(keywordId, projectId) as { phrase: string; market: string } | undefined;
+  async recordRankSnapshot(projectId: string, keywordId: string, options: RecordRankOptions = {}): Promise<RankSnapshotResult> {
+    const keyword = await this.db.prepare(`SELECT phrase, market FROM keywords WHERE id = ? AND project_id = ?`).get(keywordId, projectId) as { phrase: string; market: string } | undefined;
     if (!keyword) {
       throw new RequestError(404, "unknown_keyword", "Keyword not found for project");
     }
     const market = options.market ?? keyword.market ?? DEFAULT_MARKET;
     const device: SerpDevice = options.device ?? "desktop";
-    const site = this.db.prepare(`SELECT base_url FROM sites WHERE project_id = ? ORDER BY created_at ASC LIMIT 1`).get(projectId) as { base_url?: string } | undefined;
+    const site = await this.db.prepare(`SELECT base_url FROM sites WHERE project_id = ? ORDER BY created_at ASC LIMIT 1`).get(projectId) as { base_url?: string } | undefined;
     const ownDomain = hostOf(site?.base_url);
 
     const provider = getSerpProvider();
@@ -59,40 +59,35 @@ class SQLiteRankStore implements RankStore {
     const rankSnapshotId = `rank-${randomUUID()}`;
     const ownResult = fetched.ownPosition === null ? null : fetched.results.find((result) => result.position === fetched.ownPosition) ?? null;
 
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare(`INSERT INTO serp_snapshots (id, project_id, keyword_id, market, device, captured_at, results, serp_features, own_position, source_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    await this.db.transaction(async (tx) => {
+      await tx.prepare(`INSERT INTO serp_snapshots (id, project_id, keyword_id, market, device, captured_at, results, serp_features, own_position, source_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         serpSnapshotId, projectId, keywordId, market, device, now, JSON.stringify(fetched.results), JSON.stringify(fetched.serpFeatures), fetched.ownPosition, provider.sourceConfidence
       );
-      this.db.prepare(`INSERT INTO rank_snapshots (id, project_id, keyword_id, serp_snapshot_id, market, device, position, url, captured_at, source_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      await tx.prepare(`INSERT INTO rank_snapshots (id, project_id, keyword_id, serp_snapshot_id, market, device, position, url, captured_at, source_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         rankSnapshotId, projectId, keywordId, serpSnapshotId, market, device, fetched.ownPosition, ownResult?.url ?? null, now, provider.sourceConfidence
       );
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    });
 
-    this.audit("system", "rank.snapshot", "keyword", keywordId, { projectId, market, device, ownPosition: fetched.ownPosition });
+    await this.audit("system", "rank.snapshot", "keyword", keywordId, { projectId, market, device, ownPosition: fetched.ownPosition });
     return {
       serpSnapshot: { id: serpSnapshotId, projectId, keywordId, market, device, capturedAt: now, results: fetched.results, serpFeatures: fetched.serpFeatures, ownPosition: fetched.ownPosition, sourceConfidence: provider.sourceConfidence },
       rankSnapshot: { id: rankSnapshotId, projectId, keywordId, serpSnapshotId, market, device, position: fetched.ownPosition, url: ownResult?.url ?? null, capturedAt: now, sourceConfidence: provider.sourceConfidence }
     };
   }
 
-  listRankSnapshots(projectId: string, keywordId: string): RankSnapshot[] {
-    this.assertKeyword(projectId, keywordId);
-    return this.db.prepare(`SELECT * FROM rank_snapshots WHERE project_id = ? AND keyword_id = ? ORDER BY captured_at ASC, id ASC`).all(projectId, keywordId).map((row) => this.mapRank(row));
+  async listRankSnapshots(projectId: string, keywordId: string): Promise<RankSnapshot[]> {
+    await this.assertKeyword(projectId, keywordId);
+    return (await this.db.prepare(`SELECT * FROM rank_snapshots WHERE project_id = ? AND keyword_id = ? ORDER BY captured_at ASC, id ASC`).all(projectId, keywordId)).map((row) => this.mapRank(row));
   }
 
-  listSerpSnapshots(projectId: string, keywordId: string): SerpSnapshot[] {
-    this.assertKeyword(projectId, keywordId);
-    return this.db.prepare(`SELECT * FROM serp_snapshots WHERE project_id = ? AND keyword_id = ? ORDER BY captured_at ASC, id ASC`).all(projectId, keywordId).map((row) => this.mapSerp(row));
+  async listSerpSnapshots(projectId: string, keywordId: string): Promise<SerpSnapshot[]> {
+    await this.assertKeyword(projectId, keywordId);
+    return (await this.db.prepare(`SELECT * FROM serp_snapshots WHERE project_id = ? AND keyword_id = ? ORDER BY captured_at ASC, id ASC`).all(projectId, keywordId)).map((row) => this.mapSerp(row));
   }
 
-  serpDiff(projectId: string, keywordId: string): SerpDiff {
-    this.assertKeyword(projectId, keywordId);
-    const snapshots = this.db.prepare(`SELECT * FROM serp_snapshots WHERE project_id = ? AND keyword_id = ? ORDER BY captured_at DESC, id DESC LIMIT 2`).all(projectId, keywordId).map((row) => this.mapSerp(row));
+  async serpDiff(projectId: string, keywordId: string): Promise<SerpDiff> {
+    await this.assertKeyword(projectId, keywordId);
+    const snapshots = (await this.db.prepare(`SELECT * FROM serp_snapshots WHERE project_id = ? AND keyword_id = ? ORDER BY captured_at DESC, id DESC LIMIT 2`).all(projectId, keywordId)).map((row) => this.mapSerp(row));
     if (snapshots.length === 0) {
       throw new RequestError(404, "no_serp_snapshots", "No SERP snapshots recorded for this keyword");
     }
@@ -116,12 +111,12 @@ class SQLiteRankStore implements RankStore {
     };
   }
 
-  computeVisibility(projectId: string, market: string = DEFAULT_MARKET): VisibilityScore {
-    if (!this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+  async computeVisibility(projectId: string, market: string = DEFAULT_MARKET): Promise<VisibilityScore> {
+    if (!await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
     // Neueste Rank-Position je Keyword im Markt (das getrackte Set).
-    const rows = this.db.prepare(`
+    const rows = await this.db.prepare(`
       SELECT r.position AS position FROM rank_snapshots r
       WHERE r.project_id = ? AND r.market = ? AND r.id = (
         SELECT x.id FROM rank_snapshots x WHERE x.keyword_id = r.keyword_id AND x.market = r.market ORDER BY x.captured_at DESC, x.id DESC LIMIT 1
@@ -131,21 +126,21 @@ class SQLiteRankStore implements RankStore {
 
     const now = new Date().toISOString();
     const id = `vis-${randomUUID()}`;
-    this.db.prepare(`INSERT INTO visibility_scores (id, project_id, market, score, tracked_keywords, average_position, computed_at) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    await this.db.prepare(`INSERT INTO visibility_scores (id, project_id, market, score, tracked_keywords, average_position, computed_at) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
       id, projectId, market, result.score, result.trackedKeywords, result.averagePosition, now
     );
-    this.audit("system", "visibility.compute", "project", projectId, { market, score: result.score, trackedKeywords: result.trackedKeywords });
+    await this.audit("system", "visibility.compute", "project", projectId, { market, score: result.score, trackedKeywords: result.trackedKeywords });
     return { id, projectId, market, score: result.score, trackedKeywords: result.trackedKeywords, averagePosition: result.averagePosition, computedAt: now };
   }
 
-  listVisibilityScores(projectId: string, market?: string): VisibilityScore[] {
+  async listVisibilityScores(projectId: string, market?: string): Promise<VisibilityScore[]> {
     const clauses = ["project_id = ?"];
     const args: unknown[] = [projectId];
     if (market) {
       clauses.push("market = ?");
       args.push(market);
     }
-    return this.db.prepare(`SELECT * FROM visibility_scores WHERE ${clauses.join(" AND ")} ORDER BY computed_at DESC, id DESC`).all(...args).map((row) => ({
+    return (await this.db.prepare(`SELECT * FROM visibility_scores WHERE ${clauses.join(" AND ")} ORDER BY computed_at DESC, id DESC`).all(...args)).map((row) => ({
       id: String(row.id),
       projectId: String(row.project_id),
       market: String(row.market),
@@ -156,8 +151,8 @@ class SQLiteRankStore implements RankStore {
     }));
   }
 
-  private assertKeyword(projectId: string, keywordId: string): void {
-    if (!this.db.prepare(`SELECT 1 FROM keywords WHERE id = ? AND project_id = ?`).get(keywordId, projectId)) {
+  private async assertKeyword(projectId: string, keywordId: string): Promise<void> {
+    if (!await this.db.prepare(`SELECT 1 FROM keywords WHERE id = ? AND project_id = ?`).get(keywordId, projectId)) {
       throw new RequestError(404, "unknown_keyword", "Keyword not found for project");
     }
   }

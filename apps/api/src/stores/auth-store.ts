@@ -4,7 +4,7 @@ import { hashPassword, hashToken, verifyPassword } from "../password.js";
 import { mapUser } from "../sqlite-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { sqliteConstraintError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 export interface RegisterInput {
   email: string;
@@ -20,21 +20,21 @@ export interface LoginResult {
 }
 
 export interface AuthStore {
-  registerUser(input: RegisterInput): AuthUser;
-  login(email: string, password: string): LoginResult | null;
-  getUserBySessionToken(token: string): AuthUser | null;
-  invalidateSessionToken(token: string): boolean;
-  cleanupExpiredSessions(now?: string): number;
+  registerUser(input: RegisterInput): Promise<AuthUser>;
+  login(email: string, password: string): Promise<LoginResult | null>;
+  getUserBySessionToken(token: string): Promise<AuthUser | null>;
+  invalidateSessionToken(token: string): Promise<boolean>;
+  cleanupExpiredSessions(now?: string): Promise<number>;
 }
 
-export function createAuthStore(db: SQLiteDatabase, audit: AuditLog): AuthStore {
+export function createAuthStore(db: AsyncDatabase, audit: AuditLog): AuthStore {
   return new SQLiteAuthStore(db, audit);
 }
 
 class SQLiteAuthStore implements AuthStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  registerUser(input: RegisterInput): AuthUser {
+  async registerUser(input: RegisterInput): Promise<AuthUser> {
     const email = normalizeEmail(input.email);
     const password = validatePassword(input.password);
     const now = new Date().toISOString();
@@ -48,17 +48,17 @@ class SQLiteAuthStore implements AuthStore {
       updatedAt: now
     };
     try {
-      this.db.prepare(`INSERT INTO users (id, email, name, password_hash, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(user.id, user.email, user.name, hashPassword(password), user.role, user.status, user.createdAt, user.updatedAt);
+      await this.db.prepare(`INSERT INTO users (id, email, name, password_hash, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(user.id, user.email, user.name, hashPassword(password), user.role, user.status, user.createdAt, user.updatedAt);
     } catch (error) {
       throw sqliteConstraintError(error, "duplicate_email", "Email already exists");
     }
-    this.audit(user.id, "auth.register", "user", user.id, { role: user.role });
+    await this.audit(user.id, "auth.register", "user", user.id, { role: user.role });
     return user;
   }
 
-  login(email: string, password: string): LoginResult | null {
+  async login(email: string, password: string): Promise<LoginResult | null> {
     const normalizedEmail = normalizeEmail(email);
-    const row = this.db.prepare(`SELECT * FROM users WHERE email = ? AND status = 'active'`).get(normalizedEmail);
+    const row = await this.db.prepare(`SELECT * FROM users WHERE email = ? AND status = 'active'`).get(normalizedEmail);
     if (!row || !verifyPassword(password, String(row.password_hash))) {
       return null;
     }
@@ -66,13 +66,13 @@ class SQLiteAuthStore implements AuthStore {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7).toISOString();
     const sessionId = `ses-${randomUUID()}`;
-    this.db.prepare(`INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`).run(sessionId, String(row.id), hashToken(token), expiresAt, now.toISOString());
-    this.audit(String(row.id), "auth.login", "session", sessionId, { expiresAt });
+    await this.db.prepare(`INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`).run(sessionId, String(row.id), hashToken(token), expiresAt, now.toISOString());
+    await this.audit(String(row.id), "auth.login", "session", sessionId, { expiresAt });
     return { user: mapUser(row), token, expiresAt };
   }
 
-  getUserBySessionToken(token: string): AuthUser | null {
-    const row = this.db.prepare(`
+  async getUserBySessionToken(token: string): Promise<AuthUser | null> {
+    const row = await this.db.prepare(`
       SELECT users.*
       FROM sessions
       JOIN users ON users.id = sessions.user_id
@@ -81,13 +81,13 @@ class SQLiteAuthStore implements AuthStore {
     return row ? mapUser(row) : null;
   }
 
-  invalidateSessionToken(token: string): boolean {
-    const result = this.db.prepare(`DELETE FROM sessions WHERE token_hash = ?`).run(hashToken(token));
+  async invalidateSessionToken(token: string): Promise<boolean> {
+    const result = await this.db.prepare(`DELETE FROM sessions WHERE token_hash = ?`).run(hashToken(token));
     return result.changes > 0;
   }
 
-  cleanupExpiredSessions(now = new Date().toISOString()): number {
-    const result = this.db.prepare(`DELETE FROM sessions WHERE expires_at <= ?`).run(now);
+  async cleanupExpiredSessions(now = new Date().toISOString()): Promise<number> {
+    const result = await this.db.prepare(`DELETE FROM sessions WHERE expires_at <= ?`).run(now);
     return result.changes;
   }
 }

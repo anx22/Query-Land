@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -22,7 +22,7 @@ function data<T>(response: ApiResponse): T {
 
 const BASE = "https://lg.example.com";
 
-async function seedSite(app: ReturnType<typeof testApp>["app"]) {
+async function seedSite(app: Awaited<ReturnType<typeof testApp>>["app"]) {
   const project = data<{ id: string }>(await app("POST", "/projects", { name: "Link Graph", slug: "link-graph" }));
   const site = data<{ id: string }>(await app("POST", `/projects/${project.id}/sites`, { baseUrl: BASE, scopeType: "domain" }));
   const root = `/projects/${project.id}/sites/${site.id}`;
@@ -37,7 +37,7 @@ async function seedSite(app: ReturnType<typeof testApp>["app"]) {
 }
 
 test("internal links record (upsert) and expose inlinks/outlinks", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { root } = await seedSite(app);
 
@@ -65,12 +65,12 @@ test("internal links record (upsert) and expose inlinks/outlinks", async () => {
     assert.equal(inB[0]?.fromUrl, `${BASE}/a`);
     assert.equal(inB[0]?.anchor, "to B v2");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("orphan detection lists discovered URLs without inbound internal links", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { root } = await seedSite(app);
     await app("POST", `${root}/internal-links`, { edges: [{ fromUrl: `${BASE}/a`, toUrl: `${BASE}/b` }] });
@@ -80,18 +80,18 @@ test("orphan detection lists discovered URLs without inbound internal links", as
     // b has an inbound edge -> not orphan; a and c remain orphans.
     assert.deepEqual(orphanUrls, [`${BASE}/a`, `${BASE}/c`]);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("recording internal links requires a non-empty edges array", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { root } = await seedSite(app);
     const empty = await app("POST", `${root}/internal-links`, { edges: [] });
     assert.equal(empty.status, 400);
     assert.equal((empty.body as { error: { code: string } }).error.code, "missing_field");
   } finally {
-    store.close();
+    await store.close();
   }
 });

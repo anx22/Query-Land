@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -20,12 +20,12 @@ function data<T>(response: ApiResponse): T {
   return (response.body as { data: T }).data;
 }
 
-async function freshProject(app: ReturnType<typeof testApp>["app"], slug: string): Promise<string> {
+async function freshProject(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string): Promise<string> {
   return data<{ id: string }>(await app("POST", "/projects", { name: `KW ${slug}`, slug })).id;
 }
 
 test("keyword groups can be created and listed; duplicate name is rejected", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "groups");
     const group = await app("POST", `/projects/${projectId}/keyword-groups`, { name: "Pricing", topic: "Money pages" });
@@ -38,12 +38,12 @@ test("keyword groups can be created and listed; duplicate name is rejected", asy
     const dup = await app("POST", `/projects/${projectId}/keyword-groups`, { name: "Pricing" });
     assert.equal(dup.status, 409);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("adding keywords classifies intent, funnel stage and brand, and dedupes", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "classify");
     const result = await app("POST", `/projects/${projectId}/keywords`, {
@@ -71,12 +71,12 @@ test("adding keywords classifies intent, funnel stage and brand, and dedupes", a
     assert.equal(again.inserted, 0);
     assert.equal(again.updated, 1);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("keywords can be filtered by intent and brand, and mapped to a URL", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "filter");
     await app("POST", `/projects/${projectId}/keywords`, {
@@ -101,6 +101,6 @@ test("keywords can be filtered by intent and brand, and mapped to a URL", async 
     const mapped = data<{ targetUrl: string | null }>(await app("POST", `/projects/${projectId}/keywords/${target!.id}/map-url`, { targetUrl: "https://acme.test/guide" }));
     assert.equal(mapped.targetUrl, "https://acme.test/guide");
   } finally {
-    store.close();
+    await store.close();
   }
 });

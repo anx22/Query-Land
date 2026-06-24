@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ALERT_COMPARATORS, ALERT_METRICS, compareAlert, type AlertComparator, type AlertEvent, type AlertMetric, type AlertRule } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 export interface AlertRuleInput {
   metric: AlertMetric;
@@ -11,28 +11,28 @@ export interface AlertRuleInput {
 }
 
 export interface AlertStore {
-  createAlertRule(projectId: string, input: AlertRuleInput): AlertRule;
-  listAlertRules(projectId: string): AlertRule[];
-  deleteAlertRule(projectId: string, ruleId: string): { deleted: boolean };
-  evaluateAlerts(projectId: string): AlertEvent[];
-  listAlertEvents(projectId: string): AlertEvent[];
+  createAlertRule(projectId: string, input: AlertRuleInput): Promise<AlertRule>;
+  listAlertRules(projectId: string): Promise<AlertRule[]>;
+  deleteAlertRule(projectId: string, ruleId: string): Promise<{ deleted: boolean }>;
+  evaluateAlerts(projectId: string): Promise<AlertEvent[]>;
+  listAlertEvents(projectId: string): Promise<AlertEvent[]>;
 }
 
-export function createAlertStore(db: SQLiteDatabase, audit: AuditLog): AlertStore {
+export function createAlertStore(db: AsyncDatabase, audit: AuditLog): AlertStore {
   return new SQLiteAlertStore(db, audit);
 }
 
 class SQLiteAlertStore implements AlertStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  private assertProject(projectId: string): void {
-    if (!this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+  private async assertProject(projectId: string): Promise<void> {
+    if (!(await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId))) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
   }
 
-  createAlertRule(projectId: string, input: AlertRuleInput): AlertRule {
-    this.assertProject(projectId);
+  async createAlertRule(projectId: string, input: AlertRuleInput): Promise<AlertRule> {
+    await this.assertProject(projectId);
     if (!ALERT_METRICS.includes(input.metric)) {
       throw new RequestError(400, "invalid_field", `metric must be one of ${ALERT_METRICS.join(", ")}`);
     }
@@ -50,43 +50,43 @@ class SQLiteAlertStore implements AlertStore {
       threshold: input.threshold,
       createdAt: new Date().toISOString()
     };
-    this.db.prepare(`INSERT INTO alert_rules (id, project_id, metric, comparator, threshold, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
+    await this.db.prepare(`INSERT INTO alert_rules (id, project_id, metric, comparator, threshold, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
       rule.id, rule.projectId, rule.metric, rule.comparator, rule.threshold, rule.createdAt
     );
-    this.audit("system", "alert_rule.create", "alert_rule", rule.id, { projectId, metric: rule.metric });
+    await this.audit("system", "alert_rule.create", "alert_rule", rule.id, { projectId, metric: rule.metric });
     return rule;
   }
 
-  listAlertRules(projectId: string): AlertRule[] {
-    return this.db.prepare(`SELECT * FROM alert_rules WHERE project_id = ? ORDER BY created_at ASC, id ASC`).all(projectId).map((row) => this.mapRule(row as Record<string, unknown>));
+  async listAlertRules(projectId: string): Promise<AlertRule[]> {
+    return (await this.db.prepare(`SELECT * FROM alert_rules WHERE project_id = ? ORDER BY created_at ASC, id ASC`).all(projectId)).map((row) => this.mapRule(row as Record<string, unknown>));
   }
 
-  deleteAlertRule(projectId: string, ruleId: string): { deleted: boolean } {
-    this.assertProject(projectId);
-    const existing = this.db.prepare(`SELECT 1 FROM alert_rules WHERE id = ? AND project_id = ?`).get(ruleId, projectId);
+  async deleteAlertRule(projectId: string, ruleId: string): Promise<{ deleted: boolean }> {
+    await this.assertProject(projectId);
+    const existing = await this.db.prepare(`SELECT 1 FROM alert_rules WHERE id = ? AND project_id = ?`).get(ruleId, projectId);
     if (!existing) {
       throw new RequestError(404, "unknown_alert_rule", "Alert rule not found for project");
     }
-    this.db.prepare(`DELETE FROM alert_rules WHERE id = ?`).run(ruleId);
-    this.audit("system", "alert_rule.delete", "alert_rule", ruleId, { projectId });
+    await this.db.prepare(`DELETE FROM alert_rules WHERE id = ?`).run(ruleId);
+    await this.audit("system", "alert_rule.delete", "alert_rule", ruleId, { projectId });
     return { deleted: true };
   }
 
   // Aktueller projektweiter Kennzahlwert je Metrik (fehlende Daten -> 0).
-  private observe(projectId: string, metric: AlertMetric): number {
+  private async observe(projectId: string, metric: AlertMetric): Promise<number> {
     switch (metric) {
       case "visibility_score": {
-        const row = this.db.prepare(`SELECT score FROM visibility_scores WHERE project_id = ? ORDER BY computed_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
+        const row = await this.db.prepare(`SELECT score FROM visibility_scores WHERE project_id = ? ORDER BY computed_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
         return row && typeof row.score === "number" ? row.score : 0;
       }
       case "health_score": {
-        const row = this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
+        const row = await this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
         return row && typeof row.score === "number" ? row.score : 0;
       }
       case "open_opportunities":
-        return Number((this.db.prepare(`SELECT COUNT(*) AS c FROM opportunities WHERE project_id = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).get(projectId) as { c: number }).c);
+        return Number((await this.db.prepare(`SELECT COUNT(*) AS c FROM opportunities WHERE project_id = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).get(projectId) as { c: number }).c);
       case "referring_domains": {
-        const row = this.db.prepare(`SELECT referring_domains FROM backlink_snapshots WHERE project_id = ? ORDER BY captured_at DESC, rowid DESC LIMIT 1`).get(projectId) as { referring_domains?: number } | undefined;
+        const row = await this.db.prepare(`SELECT referring_domains FROM backlink_snapshots WHERE project_id = ? ORDER BY captured_at DESC, seq DESC LIMIT 1`).get(projectId) as { referring_domains?: number } | undefined;
         return row && typeof row.referring_domains === "number" ? row.referring_domains : 0;
       }
       default:
@@ -94,43 +94,45 @@ class SQLiteAlertStore implements AlertStore {
     }
   }
 
-  evaluateAlerts(projectId: string): AlertEvent[] {
-    this.assertProject(projectId);
-    const rules = this.listAlertRules(projectId);
+  async evaluateAlerts(projectId: string): Promise<AlertEvent[]> {
+    await this.assertProject(projectId);
+    const rules = await this.listAlertRules(projectId);
     const evaluatedAt = new Date().toISOString();
+
+    // Observe each metric BEFORE opening the transaction: these are reads, and
+    // running them while a transaction is open would use a second connection —
+    // a deadlock on a single-connection driver and an isolation break on a
+    // pooled one. The transaction below only performs the inserts.
     const events: AlertEvent[] = [];
-    const insert = this.db.prepare(`INSERT INTO alert_events (id, project_id, rule_id, metric, comparator, threshold, observed_value, triggered, evaluated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    this.db.exec("BEGIN");
-    try {
-      for (const rule of rules) {
-        const observedValue = this.observe(projectId, rule.metric);
-        const triggered = compareAlert(observedValue, rule.comparator, rule.threshold);
-        const event: AlertEvent = {
-          id: `aevt-${randomUUID()}`,
-          projectId,
-          ruleId: rule.id,
-          metric: rule.metric,
-          comparator: rule.comparator,
-          threshold: rule.threshold,
-          observedValue,
-          triggered,
-          evaluatedAt
-        };
-        insert.run(event.id, event.projectId, event.ruleId, event.metric, event.comparator, event.threshold, event.observedValue, triggered ? 1 : 0, event.evaluatedAt);
-        events.push(event);
-      }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
+    for (const rule of rules) {
+      const observedValue = await this.observe(projectId, rule.metric);
+      const triggered = compareAlert(observedValue, rule.comparator, rule.threshold);
+      events.push({
+        id: `aevt-${randomUUID()}`,
+        projectId,
+        ruleId: rule.id,
+        metric: rule.metric,
+        comparator: rule.comparator,
+        threshold: rule.threshold,
+        observedValue,
+        triggered,
+        evaluatedAt
+      });
     }
-    this.audit("system", "alerts.evaluate", "project", projectId, { rules: rules.length, triggered: events.filter((event) => event.triggered).length });
+
+    await this.db.transaction(async (tx) => {
+      const insert = tx.prepare(`INSERT INTO alert_events (id, project_id, rule_id, metric, comparator, threshold, observed_value, triggered, evaluated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const event of events) {
+        await insert.run(event.id, event.projectId, event.ruleId, event.metric, event.comparator, event.threshold, event.observedValue, event.triggered ? 1 : 0, event.evaluatedAt);
+      }
+    });
+    await this.audit("system", "alerts.evaluate", "project", projectId, { rules: rules.length, triggered: events.filter((event) => event.triggered).length });
     return events;
   }
 
-  listAlertEvents(projectId: string): AlertEvent[] {
-    this.assertProject(projectId);
-    return this.db.prepare(`SELECT * FROM alert_events WHERE project_id = ? ORDER BY evaluated_at DESC, id DESC`).all(projectId).map((row) => this.mapEvent(row as Record<string, unknown>));
+  async listAlertEvents(projectId: string): Promise<AlertEvent[]> {
+    await this.assertProject(projectId);
+    return (await this.db.prepare(`SELECT * FROM alert_events WHERE project_id = ? ORDER BY evaluated_at DESC, id DESC`).all(projectId)).map((row) => this.mapEvent(row as Record<string, unknown>));
   }
 
   private mapRule(row: Record<string, unknown>): AlertRule {

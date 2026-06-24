@@ -1,11 +1,11 @@
-import { json, type ApiResponse } from "../http.js";
+import { json } from "../http.js";
 import { createSiteRequest } from "../request-validators.js";
 import type { ResourceRoute } from "./shared.js";
 
-export const routeSites: ResourceRoute = (store, method, pathname, _searchParams, body): ApiResponse | null => {
+export const routeSites: ResourceRoute = async (store, method, pathname, _searchParams, body) => {
   const match = pathname.match(/^\/projects\/([^/]+)\/sites$/);
   if (!match) return null;
-  if (method === "GET") return json(200, { data: store.listSites(match[1]) });
-  if (method === "POST") return json(201, { data: store.createSite(match[1], createSiteRequest(body)) });
+  if (method === "GET") return json(200, { data: await store.listSites(match[1]) });
+  if (method === "POST") return json(201, { data: await store.createSite(match[1], createSiteRequest(body)) });
   return null;
 };

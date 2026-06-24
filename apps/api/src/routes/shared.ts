@@ -12,7 +12,7 @@ export type ResourceRoute = (
   pathname: string,
   searchParams: URLSearchParams,
   body: unknown
-) => ApiResponse | null;
+) => Promise<ApiResponse | null>;
 
 export interface RoutePage<T> {
   data: T[];

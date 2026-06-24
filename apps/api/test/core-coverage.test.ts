@@ -12,8 +12,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -22,7 +22,7 @@ function data<T>(response: ApiResponse): T {
 }
 
 test("project and site CRUD persist and duplicate slug is rejected with 409", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const created = await app("POST", "/projects", { name: "Core Coverage", slug: "core-cov", defaultLocale: "de-DE", markets: [] });
     assert.equal(created.status, 201);
@@ -42,12 +42,12 @@ test("project and site CRUD persist and duplicate slug is rejected with 409", as
     assert.equal(duplicate.status, 409);
     assert.equal((duplicate.body as { error: { code: string } }).error.code, "duplicate_project_slug");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("crawl run lifecycle transitions running -> succeeded and is filterable by status", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const running = data<{ id: string; status: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
     assert.equal(running.status, "running");
@@ -64,12 +64,12 @@ test("crawl run lifecycle transitions running -> succeeded and is filterable by 
     const stillRunning = data<Array<{ id: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/crawl-runs?status=running&limit=20"));
     assert.ok(stillRunning.some((run) => run.id === running.id));
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("audit issue filtering and resolve/dismiss/reopen state transitions", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     await app("POST", "/projects/proj-demo/sites/site-demo/discovered-urls", {
       urls: [{ id: "url-cov", projectId: "proj-demo", siteId: "site-demo", url: "https://example.com/cov", normalizedUrl: "https://example.com/cov", source: "sitemap", discoveredFrom: null, depth: 1, discoveredAt: "2026-06-02T08:00:00.000Z" }]
@@ -100,12 +100,12 @@ test("audit issue filtering and resolve/dismiss/reopen state transitions", async
     assert.equal(dismissed.status, 200);
     assert.notEqual(data<{ resolvedAt: string | null }>(dismissed).resolvedAt, null);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("health score compute reflects open issues and recovers after resolution", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const project = data<{ id: string }>(await app("POST", "/projects", { name: "Health Cov", slug: "health-cov" }));
     const site = data<{ id: string }>(await app("POST", `/projects/${project.id}/sites`, { baseUrl: "https://health.example.com", scopeType: "domain" }));
@@ -130,6 +130,6 @@ test("health score compute reflects open issues and recovers after resolution", 
     const recovered = data<{ score: number }>(await app("POST", `${base}/health-scores/compute`));
     assert.ok(recovered.score > degraded.score, "resolving the issue must improve the score");
   } finally {
-    store.close();
+    await store.close();
   }
 });

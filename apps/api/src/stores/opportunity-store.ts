@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { analyzeCannibalization, analyzeCtrGap, analyzeStrikingDistance, hasRequiredEvidence, scoreOpportunity, type Evidence, type Opportunity, type OpportunityStatus, type SearchPerformanceMetricRow, type SourceAnchor } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 export type OpportunityType = Opportunity["type"];
 
@@ -44,21 +44,21 @@ export interface GenerateOpportunitiesResult {
 }
 
 export interface OpportunityStore {
-  createOpportunity(projectId: string, input: CreateOpportunityInput): Opportunity;
-  listOpportunitiesPage(projectId: string, options?: { limit?: number; offset?: number }, filters?: OpportunityListFilters): OpportunityPage;
-  getOpportunity(opportunityId: string): Opportunity;
-  transitionOpportunity(opportunityId: string, nextStatus: OpportunityStatus): Opportunity;
+  createOpportunity(projectId: string, input: CreateOpportunityInput): Promise<Opportunity>;
+  listOpportunitiesPage(projectId: string, options?: { limit?: number; offset?: number }, filters?: OpportunityListFilters): Promise<OpportunityPage>;
+  getOpportunity(opportunityId: string): Promise<Opportunity>;
+  transitionOpportunity(opportunityId: string, nextStatus: OpportunityStatus): Promise<Opportunity>;
   // §6.6 erster Generator + §6.5 Validierungsloop (binär: Indexierbarkeit).
-  generateIndexabilityOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
-  revalidateOpportunity(opportunityId: string): Opportunity;
+  generateIndexabilityOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult>;
+  revalidateOpportunity(opportunityId: string): Promise<Opportunity>;
   // WP-3.2: weitere Opportunity-Klassen (§6.1). Aus Search-Performance: low_hanging_keyword,
   // money_page, cannibalization. Aus dem Linkgraph: internal_link_gap.
-  generateSearchOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
-  generateInternalLinkOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
+  generateSearchOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult>;
+  generateInternalLinkOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult>;
   // WP-6.2: AEO-Klasse aus content-basierten Assessments (Klasse A; LLM-Signale sind Klasse E und NIE Evidenz).
-  generateAeoOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
+  generateAeoOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult>;
   // Umbrella: alle harten Klassen in einem Lauf, idempotent.
-  generateAllOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult;
+  generateAllOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult>;
 }
 
 // Statusmodell §6.5: open -> planned -> in_progress -> implemented -> validated | reopened | dismissed | expired.
@@ -77,7 +77,7 @@ const OPPORTUNITY_TYPES: readonly OpportunityType[] = ["technical_fix", "low_han
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
 
-export function createOpportunityStore(db: SQLiteDatabase, audit: AuditLog): OpportunityStore {
+export function createOpportunityStore(db: AsyncDatabase, audit: AuditLog): OpportunityStore {
   return new SQLiteOpportunityStore(db, audit);
 }
 
@@ -120,10 +120,10 @@ function requireNumber(value: unknown, field: string): number {
 }
 
 class SQLiteOpportunityStore implements OpportunityStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  createOpportunity(projectId: string, input: CreateOpportunityInput): Opportunity {
-    const project = this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId);
+  async createOpportunity(projectId: string, input: CreateOpportunityInput): Promise<Opportunity> {
+    const project = await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId);
     if (!project) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
@@ -183,9 +183,8 @@ class SQLiteOpportunityStore implements OpportunityStore {
       expiresAt
     };
 
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare(`INSERT INTO opportunities (id, project_id, type, affected_urls, affected_keywords, affected_clusters, source_anchor, current_state, recommended_action, expected_impact, effort, confidence, business_value, urgency, priority, validation_metric, owner, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    await this.db.transaction(async (tx) => {
+      await tx.prepare(`INSERT INTO opportunities (id, project_id, type, affected_urls, affected_keywords, affected_clusters, source_anchor, current_state, recommended_action, expected_impact, effort, confidence, business_value, urgency, priority, validation_metric, owner, status, created_at, updated_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         opportunity.id,
         opportunity.projectId,
         opportunity.type,
@@ -208,21 +207,17 @@ class SQLiteOpportunityStore implements OpportunityStore {
         opportunity.updatedAt,
         opportunity.expiresAt
       );
-      const insertEvidence = this.db.prepare(`INSERT INTO opportunity_evidence (id, opportunity_id, source, source_confidence, metric, before_value, current_value, time_window, affected_entity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const insertEvidence = tx.prepare(`INSERT INTO opportunity_evidence (id, opportunity_id, source, source_confidence, metric, before_value, current_value, time_window, affected_entity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
       for (const item of evidence) {
-        insertEvidence.run(`ev-${randomUUID()}`, id, item.source, item.sourceConfidence, item.metric, JSON.stringify(item.beforeValue), JSON.stringify(item.currentValue), item.timeWindow, item.affectedEntity);
+        await insertEvidence.run(`ev-${randomUUID()}`, id, item.source, item.sourceConfidence, item.metric, JSON.stringify(item.beforeValue), JSON.stringify(item.currentValue), item.timeWindow, item.affectedEntity);
       }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    });
 
-    this.audit("system", "opportunity.create", "opportunity", id, { projectId, type: opportunity.type, priority: opportunity.priority });
+    await this.audit("system", "opportunity.create", "opportunity", id, { projectId, type: opportunity.type, priority: opportunity.priority });
     return opportunity;
   }
 
-  listOpportunitiesPage(projectId: string, options: { limit?: number; offset?: number } = {}, filters: OpportunityListFilters = {}): OpportunityPage {
+  async listOpportunitiesPage(projectId: string, options: { limit?: number; offset?: number } = {}, filters: OpportunityListFilters = {}): Promise<OpportunityPage> {
     const limit = normalizeLimit(options.limit);
     const offset = normalizeOffset(options.offset);
     const clauses = ["project_id = ?"];
@@ -237,24 +232,24 @@ class SQLiteOpportunityStore implements OpportunityStore {
     }
     const where = clauses.join(" AND ");
 
-    const total = Number((this.db.prepare(`SELECT COUNT(*) AS c FROM opportunities WHERE ${where}`).get(...args) as { c: number }).c);
-    const rows = this.db.prepare(`SELECT * FROM opportunities WHERE ${where} ORDER BY priority DESC, created_at ASC LIMIT ? OFFSET ?`).all(...args, limit, offset);
-    const data = rows.map((row) => this.assembleOpportunity(row));
+    const total = Number((await this.db.prepare(`SELECT COUNT(*) AS c FROM opportunities WHERE ${where}`).get(...args) as { c: number }).c);
+    const rows = await this.db.prepare(`SELECT * FROM opportunities WHERE ${where} ORDER BY priority DESC, created_at ASC LIMIT ? OFFSET ?`).all(...args, limit, offset);
+    const data = await Promise.all(rows.map((row) => this.assembleOpportunity(row)));
     const nextOffset = offset + data.length;
     const nextCursor = nextOffset < total ? Buffer.from(`offset:${nextOffset}`, "utf8").toString("base64url") : null;
     return { data, limit, offset, total, nextCursor };
   }
 
-  getOpportunity(opportunityId: string): Opportunity {
-    const row = this.db.prepare(`SELECT * FROM opportunities WHERE id = ?`).get(opportunityId);
+  async getOpportunity(opportunityId: string): Promise<Opportunity> {
+    const row = await this.db.prepare(`SELECT * FROM opportunities WHERE id = ?`).get(opportunityId);
     if (!row) {
       throw new RequestError(404, "unknown_opportunity", "Opportunity not found");
     }
     return this.assembleOpportunity(row);
   }
 
-  transitionOpportunity(opportunityId: string, nextStatus: OpportunityStatus): Opportunity {
-    const row = this.db.prepare(`SELECT * FROM opportunities WHERE id = ?`).get(opportunityId);
+  async transitionOpportunity(opportunityId: string, nextStatus: OpportunityStatus): Promise<Opportunity> {
+    const row = await this.db.prepare(`SELECT * FROM opportunities WHERE id = ?`).get(opportunityId);
     if (!row) {
       throw new RequestError(404, "unknown_opportunity", "Opportunity not found");
     }
@@ -267,20 +262,20 @@ class SQLiteOpportunityStore implements OpportunityStore {
       throw new RequestError(409, "invalid_transition", `Cannot transition from ${current} to ${nextStatus}`);
     }
     const now = new Date().toISOString();
-    this.db.prepare(`UPDATE opportunities SET status = ?, updated_at = ? WHERE id = ?`).run(nextStatus, now, opportunityId);
-    this.audit("system", "opportunity.transition", "opportunity", opportunityId, { from: current, to: nextStatus });
-    return this.assembleOpportunity(this.db.prepare(`SELECT * FROM opportunities WHERE id = ?`).get(opportunityId) as Record<string, unknown>);
+    await this.db.prepare(`UPDATE opportunities SET status = ?, updated_at = ? WHERE id = ?`).run(nextStatus, now, opportunityId);
+    await this.audit("system", "opportunity.transition", "opportunity", opportunityId, { from: current, to: nextStatus });
+    return this.assembleOpportunity(await this.db.prepare(`SELECT * FROM opportunities WHERE id = ?`).get(opportunityId) as Record<string, unknown>);
   }
 
-  generateIndexabilityOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
-    const site = this.db.prepare(`SELECT business_value FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId) as { business_value?: number } | undefined;
+  async generateIndexabilityOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult> {
+    const site = await this.db.prepare(`SELECT business_value FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId) as { business_value?: number } | undefined;
     if (!site) {
       throw new RequestError(404, "unknown_site", "Site not found for project");
     }
     const businessValue = typeof site.business_value === "number" ? site.business_value : 50;
 
     // Neueste Indexability-Bewertung je URL; nur Blocker (is_indexable = 0).
-    const blocked = this.db.prepare(`
+    const blocked = await this.db.prepare(`
       SELECT du.url AS url, a.reasons AS reasons, a.state AS state
       FROM discovered_urls du
       JOIN url_indexability_assessments a ON a.id = (
@@ -290,7 +285,7 @@ class SQLiteOpportunityStore implements OpportunityStore {
     `).all(siteId) as Array<{ url: string; reasons: string; state: string }>;
 
     // Bereits abgedeckte URLs aus aktiven technical_fix-Opportunities (Dedupe).
-    const activeRows = this.db.prepare(`SELECT affected_urls FROM opportunities WHERE project_id = ? AND type = 'technical_fix' AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId);
+    const activeRows = await this.db.prepare(`SELECT affected_urls FROM opportunities WHERE project_id = ? AND type = 'technical_fix' AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId);
     const covered = new Set<string>();
     for (const row of activeRows) {
       for (const url of JSON.parse(String((row as { affected_urls: string }).affected_urls)) as string[]) {
@@ -303,7 +298,7 @@ class SQLiteOpportunityStore implements OpportunityStore {
     for (const row of blocked) {
       if (covered.has(row.url)) continue;
       const reasons = parseReasons(row.reasons);
-      const opportunity = this.createOpportunity(projectId, {
+      const opportunity = await this.createOpportunity(projectId, {
         type: "technical_fix",
         affectedUrls: [row.url],
         currentState: `not indexable (${row.state})${reasons ? `: ${reasons}` : ""}`,
@@ -322,8 +317,8 @@ class SQLiteOpportunityStore implements OpportunityStore {
     return { created: created.length, opportunities: created };
   }
 
-  revalidateOpportunity(opportunityId: string): Opportunity {
-    const opportunity = this.getOpportunity(opportunityId);
+  async revalidateOpportunity(opportunityId: string): Promise<Opportunity> {
+    const opportunity = await this.getOpportunity(opportunityId);
     if (opportunity.type !== "technical_fix" || opportunity.validationMetric !== "indexable") {
       throw new RequestError(400, "not_revalidatable", "Only indexability technical_fix opportunities can be revalidated");
     }
@@ -335,30 +330,30 @@ class SQLiteOpportunityStore implements OpportunityStore {
       throw new RequestError(400, "no_affected_url", "Opportunity has no affected URL to revalidate");
     }
     // Asynchrone, binäre Validierung (§2.10/§6.5): neueste Indexierbarkeit der URL erneut messen.
-    const row = this.db.prepare(`
+    const row = await this.db.prepare(`
       SELECT a.is_indexable AS is_indexable FROM discovered_urls du
       JOIN url_indexability_assessments a ON a.discovered_url_id = du.id
       WHERE du.project_id = ? AND (du.url = ? OR du.normalized_url = ?)
       ORDER BY a.assessed_at DESC, a.id DESC LIMIT 1
     `).get(opportunity.projectId, url, url) as { is_indexable?: number } | undefined;
     const indexable = !!row && Number(row.is_indexable) === 1;
-    this.db.prepare(`UPDATE opportunity_evidence SET current_value = ? WHERE opportunity_id = ? AND metric = 'indexable'`).run(JSON.stringify(indexable ? "true" : "false"), opportunityId);
+    await this.db.prepare(`UPDATE opportunity_evidence SET current_value = ? WHERE opportunity_id = ? AND metric = 'indexable'`).run(JSON.stringify(indexable ? "true" : "false"), opportunityId);
     return this.transitionOpportunity(opportunityId, indexable ? "validated" : "reopened");
   }
 
-  generateSearchOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
-    const businessValue = this.siteBusinessValue(projectId, siteId);
-    const { capturedAt, rows } = this.latestSearchRows(siteId);
+  async generateSearchOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult> {
+    const businessValue = await this.siteBusinessValue(projectId, siteId);
+    const { capturedAt, rows } = await this.latestSearchRows(siteId);
     const created: Opportunity[] = [];
     if (!capturedAt || rows.length === 0) {
       return { created: 0, opportunities: [] };
     }
 
     // Low-Hanging Keywords (Striking Distance, Position 11–20). Dedupe je Query.
-    const lowHangingCovered = this.coveredEntities(projectId, "low_hanging_keyword", "affected_keywords");
+    const lowHangingCovered = await this.coveredEntities(projectId, "low_hanging_keyword", "affected_keywords");
     for (const item of analyzeStrikingDistance(rows, { limit: 10 })) {
       if (lowHangingCovered.has(item.query)) continue;
-      created.push(this.createOpportunity(projectId, {
+      created.push(await this.createOpportunity(projectId, {
         type: "low_hanging_keyword",
         affectedUrls: [item.pageUrl],
         affectedKeywords: [item.query],
@@ -376,10 +371,10 @@ class SQLiteOpportunityStore implements OpportunityStore {
     }
 
     // Unterperformende Money-Pages (CTR-Gap in den Top-10). Dedupe je URL.
-    const moneyCovered = this.coveredEntities(projectId, "money_page", "affected_urls");
+    const moneyCovered = await this.coveredEntities(projectId, "money_page", "affected_urls");
     for (const item of analyzeCtrGap(rows, { limit: 10 })) {
       if (moneyCovered.has(item.pageUrl)) continue;
-      created.push(this.createOpportunity(projectId, {
+      created.push(await this.createOpportunity(projectId, {
         type: "money_page",
         affectedUrls: [item.pageUrl],
         affectedKeywords: [item.query],
@@ -397,10 +392,10 @@ class SQLiteOpportunityStore implements OpportunityStore {
     }
 
     // Kannibalisierung (mehrere eigene Seiten je Query). Dedupe je Query.
-    const cannibalCovered = this.coveredEntities(projectId, "cannibalization", "affected_keywords");
+    const cannibalCovered = await this.coveredEntities(projectId, "cannibalization", "affected_keywords");
     for (const item of analyzeCannibalization(rows, { limit: 10 })) {
       if (cannibalCovered.has(item.query)) continue;
-      created.push(this.createOpportunity(projectId, {
+      created.push(await this.createOpportunity(projectId, {
         type: "cannibalization",
         affectedUrls: item.pages.map((page) => page.pageUrl),
         affectedKeywords: [item.query],
@@ -420,15 +415,15 @@ class SQLiteOpportunityStore implements OpportunityStore {
     return { created: created.length, opportunities: created };
   }
 
-  generateInternalLinkOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
-    const businessValue = this.siteBusinessValue(projectId, siteId);
+  async generateInternalLinkOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult> {
+    const businessValue = await this.siteBusinessValue(projectId, siteId);
     // Ohne erfassten Linkgraph wäre jede URL ein "Orphan" — dann gibt es kein belastbares Signal.
-    const edgeCount = Number((this.db.prepare(`SELECT COUNT(*) AS c FROM internal_link_edges WHERE site_id = ?`).get(siteId) as { c: number }).c);
+    const edgeCount = Number((await this.db.prepare(`SELECT COUNT(*) AS c FROM internal_link_edges WHERE site_id = ?`).get(siteId) as { c: number }).c);
     if (edgeCount === 0) {
       return { created: 0, opportunities: [] };
     }
 
-    const orphans = this.db.prepare(`
+    const orphans = await this.db.prepare(`
       SELECT du.url AS url FROM discovered_urls du
       WHERE du.site_id = ? AND NOT EXISTS (
         SELECT 1 FROM internal_link_edges e WHERE e.site_id = du.site_id AND e.to_url = du.normalized_url
@@ -436,12 +431,12 @@ class SQLiteOpportunityStore implements OpportunityStore {
       ORDER BY du.depth ASC, du.url ASC LIMIT 20
     `).all(siteId) as Array<{ url: string }>;
 
-    const covered = this.coveredEntities(projectId, "internal_link_gap", "affected_urls");
+    const covered = await this.coveredEntities(projectId, "internal_link_gap", "affected_urls");
     const now = new Date().toISOString();
     const created: Opportunity[] = [];
     for (const row of orphans) {
       if (covered.has(row.url)) continue;
-      created.push(this.createOpportunity(projectId, {
+      created.push(await this.createOpportunity(projectId, {
         type: "internal_link_gap",
         affectedUrls: [row.url],
         currentState: "no internal inlinks (orphan)",
@@ -459,22 +454,22 @@ class SQLiteOpportunityStore implements OpportunityStore {
     return { created: created.length, opportunities: created };
   }
 
-  generateAeoOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
-    const businessValue = this.siteBusinessValue(projectId, siteId);
+  async generateAeoOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult> {
+    const businessValue = await this.siteBusinessValue(projectId, siteId);
     // Neueste AEO-Bewertung je URL; nur schwache Seiten (Score < 60). Evidenz = Crawl/Content (Klasse A).
-    const weak = this.db.prepare(`
+    const weak = await this.db.prepare(`
       SELECT a.url AS url, a.score AS score FROM aeo_assessments a
       WHERE a.site_id = ? AND a.id = (
         SELECT x.id FROM aeo_assessments x WHERE x.site_id = a.site_id AND x.url = a.url ORDER BY x.assessed_at DESC, x.id DESC LIMIT 1
       ) AND a.score < 60
     `).all(siteId) as Array<{ url: string; score: number }>;
 
-    const covered = this.coveredEntities(projectId, "aeo", "affected_urls");
+    const covered = await this.coveredEntities(projectId, "aeo", "affected_urls");
     const now = new Date().toISOString();
     const created: Opportunity[] = [];
     for (const row of weak) {
       if (covered.has(row.url)) continue;
-      created.push(this.createOpportunity(projectId, {
+      created.push(await this.createOpportunity(projectId, {
         type: "aeo",
         affectedUrls: [row.url],
         currentState: `low AEO readiness (score ${row.score}/100)`,
@@ -492,26 +487,26 @@ class SQLiteOpportunityStore implements OpportunityStore {
     return { created: created.length, opportunities: created };
   }
 
-  generateAllOpportunities(projectId: string, siteId: string): GenerateOpportunitiesResult {
+  async generateAllOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult> {
     const opportunities = [
-      ...this.generateIndexabilityOpportunities(projectId, siteId).opportunities,
-      ...this.generateSearchOpportunities(projectId, siteId).opportunities,
-      ...this.generateInternalLinkOpportunities(projectId, siteId).opportunities,
-      ...this.generateAeoOpportunities(projectId, siteId).opportunities
+      ...(await this.generateIndexabilityOpportunities(projectId, siteId)).opportunities,
+      ...(await this.generateSearchOpportunities(projectId, siteId)).opportunities,
+      ...(await this.generateInternalLinkOpportunities(projectId, siteId)).opportunities,
+      ...(await this.generateAeoOpportunities(projectId, siteId)).opportunities
     ];
     return { created: opportunities.length, opportunities };
   }
 
-  private siteBusinessValue(projectId: string, siteId: string): number {
-    const site = this.db.prepare(`SELECT business_value FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId) as { business_value?: number } | undefined;
+  private async siteBusinessValue(projectId: string, siteId: string): Promise<number> {
+    const site = await this.db.prepare(`SELECT business_value FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId) as { business_value?: number } | undefined;
     if (!site) {
       throw new RequestError(404, "unknown_site", "Site not found for project");
     }
     return typeof site.business_value === "number" ? site.business_value : 50;
   }
 
-  private coveredEntities(projectId: string, type: OpportunityType, field: "affected_urls" | "affected_keywords"): Set<string> {
-    const rows = this.db.prepare(`SELECT ${field} AS payload FROM opportunities WHERE project_id = ? AND type = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId, type);
+  private async coveredEntities(projectId: string, type: OpportunityType, field: "affected_urls" | "affected_keywords"): Promise<Set<string>> {
+    const rows = await this.db.prepare(`SELECT ${field} AS payload FROM opportunities WHERE project_id = ? AND type = ? AND status NOT IN ('dismissed', 'expired', 'validated')`).all(projectId, type);
     const covered = new Set<string>();
     for (const row of rows) {
       for (const value of JSON.parse(String((row as { payload: string }).payload)) as string[]) {
@@ -521,22 +516,22 @@ class SQLiteOpportunityStore implements OpportunityStore {
     return covered;
   }
 
-  private latestSearchRows(siteId: string): { capturedAt: string | null; rows: SearchPerformanceMetricRow[] } {
-    const max = this.db.prepare(`SELECT MAX(captured_at) AS c FROM search_performance_rows WHERE site_id = ?`).get(siteId) as { c?: string | null } | undefined;
+  private async latestSearchRows(siteId: string): Promise<{ capturedAt: string | null; rows: SearchPerformanceMetricRow[] }> {
+    const max = await this.db.prepare(`SELECT MAX(captured_at) AS c FROM search_performance_rows WHERE site_id = ?`).get(siteId) as { c?: string | null } | undefined;
     const capturedAt = max && max.c ? String(max.c) : null;
     if (!capturedAt) {
       return { capturedAt: null, rows: [] };
     }
-    const rows = this.db.prepare(`SELECT query, page_url, clicks, impressions, ctr, position FROM search_performance_rows WHERE site_id = ? AND captured_at = ?`).all(siteId, capturedAt) as Array<{ query: string; page_url: string; clicks: number; impressions: number; ctr: number; position: number }>;
+    const rows = await this.db.prepare(`SELECT query, page_url, clicks, impressions, ctr, position FROM search_performance_rows WHERE site_id = ? AND captured_at = ?`).all(siteId, capturedAt) as Array<{ query: string; page_url: string; clicks: number; impressions: number; ctr: number; position: number }>;
     return {
       capturedAt,
       rows: rows.map((row) => ({ query: String(row.query), pageUrl: String(row.page_url), clicks: Number(row.clicks), impressions: Number(row.impressions), ctr: Number(row.ctr), position: Number(row.position) }))
     };
   }
 
-  private assembleOpportunity(row: Record<string, unknown>): Opportunity {
+  private async assembleOpportunity(row: Record<string, unknown>): Promise<Opportunity> {
     const id = String(row.id);
-    const evidence = this.db.prepare(`SELECT * FROM opportunity_evidence WHERE opportunity_id = ? ORDER BY id ASC`).all(id).map((ev) => this.mapEvidence(ev));
+    const evidence = (await this.db.prepare(`SELECT * FROM opportunity_evidence WHERE opportunity_id = ? ORDER BY id ASC`).all(id)).map((ev) => this.mapEvidence(ev));
     const sourceAnchorRaw = row.source_anchor === null || row.source_anchor === undefined ? null : String(row.source_anchor);
     return {
       id,

@@ -12,8 +12,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -21,7 +21,7 @@ function data<T>(response: ApiResponse): T {
   return (response.body as { data: T }).data;
 }
 
-async function projectWithKeyword(app: ReturnType<typeof testApp>["app"], slug: string) {
+async function projectWithKeyword(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string) {
   const projectId = data<{ id: string }>(await app("POST", "/projects", { name: `Rank ${slug}`, slug })).id;
   await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://rank.example.com", scopeType: "domain" });
   const added = data<{ keywords: Array<{ id: string }> }>(await app("POST", `/projects/${projectId}/keywords`, { keywords: [{ phrase: `seo tool ${slug}` }] }));
@@ -39,7 +39,7 @@ test("visibility formula is transparent and reproducible (pure function)", () =>
 });
 
 test("recording a rank snapshot persists a deterministic SERP + rank with history", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, keywordId } = await projectWithKeyword(app, "snap");
     const recorded = await app("POST", `/projects/${projectId}/keywords/${keywordId}/rank-snapshots`, { device: "desktop" });
@@ -57,24 +57,24 @@ test("recording a rank snapshot persists a deterministic SERP + rank with histor
     assert.equal(diff.keywordId, keywordId);
     assert.ok(Array.isArray(diff.enteredDomains));
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("serp-diff requires at least one snapshot", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, keywordId } = await projectWithKeyword(app, "nodiff");
     const diff = await app("GET", `/projects/${projectId}/keywords/${keywordId}/serp-diff`);
     assert.equal(diff.status, 404);
     assert.equal((diff.body as { error: { code: string } }).error.code, "no_serp_snapshots");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("visibility compute aggregates latest ranks of the tracked set and keeps history", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, keywordId } = await projectWithKeyword(app, "vis");
     // No ranks yet -> score 0.
@@ -91,6 +91,6 @@ test("visibility compute aggregates latest ranks of the tracked set and keeps hi
     const history = data<unknown[]>(await app("GET", `/projects/${projectId}/visibility`));
     assert.equal(history.length, 2, "two visibility computations recorded");
   } finally {
-    store.close();
+    await store.close();
   }
 });

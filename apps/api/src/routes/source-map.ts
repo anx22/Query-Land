@@ -1,17 +1,17 @@
-import { json, type ApiResponse } from "../http.js";
+import { json } from "../http.js";
 import { RequestError } from "../stores/store-errors.js";
 import type { DeployMarkerInput, PrCheckInput, SourceMapUpsertInput } from "../stores/source-map-store.js";
 import type { ResourceRoute } from "./shared.js";
 
-export const routeSourceMap: ResourceRoute = (store, method, pathname, searchParams, body): ApiResponse | null => {
+export const routeSourceMap: ResourceRoute = async (store, method, pathname, searchParams, body) => {
   if (pathname === "/source-map") {
     if (method === "GET") {
-      return json(200, { data: store.listSourceMapEntries() });
+      return json(200, { data: await store.listSourceMapEntries() });
     }
     if (method === "POST") {
       const input = asObject(body);
       const projectId = requireString(input.projectId, "projectId");
-      return json(201, { data: store.upsertSourceMapEntry(projectId, input as unknown as SourceMapUpsertInput) });
+      return json(201, { data: await store.upsertSourceMapEntry(projectId, input as unknown as SourceMapUpsertInput) });
     }
     return null;
   }
@@ -21,16 +21,16 @@ export const routeSourceMap: ResourceRoute = (store, method, pathname, searchPar
     if (!url) {
       throw new RequestError(400, "missing_field", "url query parameter is required");
     }
-    return json(200, { data: store.resolveSourceAnchor(url) });
+    return json(200, { data: await store.resolveSourceAnchor(url) });
   }
 
   const deployMatch = pathname.match(/^\/projects\/([^/]+)\/deploy-markers$/);
   if (deployMatch) {
     if (method === "GET") {
-      return json(200, { data: store.listDeployMarkers(deployMatch[1]) });
+      return json(200, { data: await store.listDeployMarkers(deployMatch[1]) });
     }
     if (method === "POST") {
-      return json(201, { data: store.createDeployMarker(deployMatch[1], asObject(body) as unknown as DeployMarkerInput) });
+      return json(201, { data: await store.createDeployMarker(deployMatch[1], asObject(body) as unknown as DeployMarkerInput) });
     }
     return null;
   }
@@ -39,10 +39,10 @@ export const routeSourceMap: ResourceRoute = (store, method, pathname, searchPar
   const prCheckMatch = pathname.match(/^\/projects\/([^/]+)\/pr-checks$/);
   if (prCheckMatch) {
     if (method === "GET") {
-      return json(200, { data: store.listPrChecks(prCheckMatch[1]) });
+      return json(200, { data: await store.listPrChecks(prCheckMatch[1]) });
     }
     if (method === "POST") {
-      return json(201, { data: store.evaluatePrCheck(prCheckMatch[1], asObject(body) as unknown as PrCheckInput) });
+      return json(201, { data: await store.evaluatePrCheck(prCheckMatch[1], asObject(body) as unknown as PrCheckInput) });
     }
     return null;
   }

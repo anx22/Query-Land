@@ -3,7 +3,7 @@ import { classifyFunnelStage, classifyIntent, isBrandKeyword, normalizeKeyword, 
 import type { SourceConfidence } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 export interface KeywordInput {
   phrase: string;
@@ -37,14 +37,14 @@ export interface KeywordPage {
 }
 
 export interface KeywordStore {
-  createKeywordGroup(projectId: string, input: { name: string; topic?: string }): KeywordGroup;
-  listKeywordGroups(projectId: string): KeywordGroup[];
-  addKeywords(projectId: string, input: AddKeywordsInput): { inserted: number; updated: number; keywords: Keyword[] };
-  listKeywordsPage(projectId: string, options?: { limit?: number; offset?: number }, filters?: KeywordListFilters): KeywordPage;
-  mapKeywordToUrl(projectId: string, keywordId: string, targetUrl: string | null): Keyword;
+  createKeywordGroup(projectId: string, input: { name: string; topic?: string }): Promise<KeywordGroup>;
+  listKeywordGroups(projectId: string): Promise<KeywordGroup[]>;
+  addKeywords(projectId: string, input: AddKeywordsInput): Promise<{ inserted: number; updated: number; keywords: Keyword[] }>;
+  listKeywordsPage(projectId: string, options?: { limit?: number; offset?: number }, filters?: KeywordListFilters): Promise<KeywordPage>;
+  mapKeywordToUrl(projectId: string, keywordId: string, targetUrl: string | null): Promise<Keyword>;
 }
 
-export function createKeywordStore(db: SQLiteDatabase, audit: AuditLog): KeywordStore {
+export function createKeywordStore(db: AsyncDatabase, audit: AuditLog): KeywordStore {
   return new SQLiteKeywordStore(db, audit);
 }
 
@@ -62,16 +62,16 @@ function normalizeOffset(offset?: number): number {
 }
 
 class SQLiteKeywordStore implements KeywordStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  private assertProject(projectId: string): void {
-    if (!this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+  private async assertProject(projectId: string): Promise<void> {
+    if (!await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
   }
 
-  createKeywordGroup(projectId: string, input: { name: string; topic?: string }): KeywordGroup {
-    this.assertProject(projectId);
+  async createKeywordGroup(projectId: string, input: { name: string; topic?: string }): Promise<KeywordGroup> {
+    await this.assertProject(projectId);
     if (!input.name || input.name.trim() === "") {
       throw new RequestError(400, "missing_field", "name is required");
     }
@@ -83,22 +83,22 @@ class SQLiteKeywordStore implements KeywordStore {
       createdAt: new Date().toISOString()
     };
     try {
-      this.db.prepare(`INSERT INTO keyword_groups (id, project_id, name, topic, created_at) VALUES (?, ?, ?, ?, ?)`).run(group.id, group.projectId, group.name, group.topic, group.createdAt);
+      await this.db.prepare(`INSERT INTO keyword_groups (id, project_id, name, topic, created_at) VALUES (?, ?, ?, ?, ?)`).run(group.id, group.projectId, group.name, group.topic, group.createdAt);
     } catch (error) {
       throw sqliteConstraintError(error, "duplicate_keyword_group", "Keyword group name already exists for this project");
     }
-    this.audit("system", "keyword_group.create", "keyword_group", group.id, { projectId, name: group.name });
+    await this.audit("system", "keyword_group.create", "keyword_group", group.id, { projectId, name: group.name });
     return group;
   }
 
-  listKeywordGroups(projectId: string): KeywordGroup[] {
-    return this.db.prepare(`SELECT * FROM keyword_groups WHERE project_id = ? ORDER BY created_at ASC`).all(projectId).map((row) => this.mapGroup(row));
+  async listKeywordGroups(projectId: string): Promise<KeywordGroup[]> {
+    return (await this.db.prepare(`SELECT * FROM keyword_groups WHERE project_id = ? ORDER BY created_at ASC`).all(projectId)).map((row) => this.mapGroup(row));
   }
 
-  addKeywords(projectId: string, input: AddKeywordsInput): { inserted: number; updated: number; keywords: Keyword[] } {
-    this.assertProject(projectId);
+  async addKeywords(projectId: string, input: AddKeywordsInput): Promise<{ inserted: number; updated: number; keywords: Keyword[] }> {
+    await this.assertProject(projectId);
     const groupId = input.groupId ?? null;
-    if (groupId && !this.db.prepare(`SELECT 1 FROM keyword_groups WHERE id = ? AND project_id = ?`).get(groupId, projectId)) {
+    if (groupId && !await this.db.prepare(`SELECT 1 FROM keyword_groups WHERE id = ? AND project_id = ?`).get(groupId, projectId)) {
       throw new RequestError(404, "unknown_keyword_group", "Keyword group not found for project");
     }
     if (!Array.isArray(input.keywords) || input.keywords.length === 0) {
@@ -111,11 +111,10 @@ class SQLiteKeywordStore implements KeywordStore {
     let updated = 0;
     const keywords: Keyword[] = [];
 
-    this.db.exec("BEGIN");
-    try {
-      const findStmt = this.db.prepare(`SELECT id, created_at FROM keywords WHERE project_id = ? AND normalized_phrase = ? AND market = ?`);
-      const insertStmt = this.db.prepare(`INSERT INTO keywords (id, project_id, group_id, phrase, normalized_phrase, intent, brand, funnel_stage, market, target_url, source, source_confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      const updateStmt = this.db.prepare(`UPDATE keywords SET group_id = ?, phrase = ?, intent = ?, brand = ?, funnel_stage = ?, target_url = ?, source = ?, source_confidence = ?, updated_at = ? WHERE id = ?`);
+    await this.db.transaction(async (tx) => {
+      const findStmt = tx.prepare(`SELECT id, created_at FROM keywords WHERE project_id = ? AND normalized_phrase = ? AND market = ?`);
+      const insertStmt = tx.prepare(`INSERT INTO keywords (id, project_id, group_id, phrase, normalized_phrase, intent, brand, funnel_stage, market, target_url, source, source_confidence, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const updateStmt = tx.prepare(`UPDATE keywords SET group_id = ?, phrase = ?, intent = ?, brand = ?, funnel_stage = ?, target_url = ?, source = ?, source_confidence = ?, updated_at = ? WHERE id = ?`);
 
       for (const item of input.keywords) {
         if (typeof item.phrase !== "string" || item.phrase.trim() === "") {
@@ -130,33 +129,29 @@ class SQLiteKeywordStore implements KeywordStore {
         const sourceConfidence: SourceConfidence = item.sourceConfidence ?? (source === "manual" ? "A" : source === "gsc" ? "B" : "C");
         const targetUrl = item.targetUrl ?? null;
 
-        const existing = findStmt.get(projectId, normalized, market) as { id: string; created_at: string } | undefined;
+        const existing = await findStmt.get(projectId, normalized, market) as { id: string; created_at: string } | undefined;
         let id: string;
         let createdAt: string;
         if (existing) {
           id = existing.id;
           createdAt = String(existing.created_at);
-          updateStmt.run(groupId, item.phrase.trim(), intent, brand ? 1 : 0, funnelStage, targetUrl, source, sourceConfidence, now, id);
+          await updateStmt.run(groupId, item.phrase.trim(), intent, brand ? 1 : 0, funnelStage, targetUrl, source, sourceConfidence, now, id);
           updated += 1;
         } else {
           id = `kw-${randomUUID()}`;
           createdAt = now;
-          insertStmt.run(id, projectId, groupId, item.phrase.trim(), normalized, intent, brand ? 1 : 0, funnelStage, market, targetUrl, source, sourceConfidence, now, now);
+          await insertStmt.run(id, projectId, groupId, item.phrase.trim(), normalized, intent, brand ? 1 : 0, funnelStage, market, targetUrl, source, sourceConfidence, now, now);
           inserted += 1;
         }
         keywords.push({ id, projectId, groupId, phrase: item.phrase.trim(), normalizedPhrase: normalized, intent, brand, funnelStage, market, targetUrl, source, sourceConfidence, createdAt, updatedAt: now });
       }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    });
 
-    this.audit("system", "keywords.add", "project", projectId, { inserted, updated });
+    await this.audit("system", "keywords.add", "project", projectId, { inserted, updated });
     return { inserted, updated, keywords };
   }
 
-  listKeywordsPage(projectId: string, options: { limit?: number; offset?: number } = {}, filters: KeywordListFilters = {}): KeywordPage {
+  async listKeywordsPage(projectId: string, options: { limit?: number; offset?: number } = {}, filters: KeywordListFilters = {}): Promise<KeywordPage> {
     const limit = normalizeLimit(options.limit);
     const offset = normalizeOffset(options.offset);
     const clauses = ["project_id = ?"];
@@ -178,23 +173,23 @@ class SQLiteKeywordStore implements KeywordStore {
       args.push(filters.market);
     }
     const where = clauses.join(" AND ");
-    const total = Number((this.db.prepare(`SELECT COUNT(*) AS c FROM keywords WHERE ${where}`).get(...args) as { c: number }).c);
-    const rows = this.db.prepare(`SELECT * FROM keywords WHERE ${where} ORDER BY created_at ASC, id ASC LIMIT ? OFFSET ?`).all(...args, limit, offset);
+    const total = Number((await this.db.prepare(`SELECT COUNT(*) AS c FROM keywords WHERE ${where}`).get(...args) as { c: number }).c);
+    const rows = await this.db.prepare(`SELECT * FROM keywords WHERE ${where} ORDER BY created_at ASC, id ASC LIMIT ? OFFSET ?`).all(...args, limit, offset);
     const data = rows.map((row) => this.mapKeyword(row));
     const nextOffset = offset + data.length;
     const nextCursor = nextOffset < total ? Buffer.from(`offset:${nextOffset}`, "utf8").toString("base64url") : null;
     return { data, limit, offset, total, nextCursor };
   }
 
-  mapKeywordToUrl(projectId: string, keywordId: string, targetUrl: string | null): Keyword {
-    const row = this.db.prepare(`SELECT * FROM keywords WHERE id = ? AND project_id = ?`).get(keywordId, projectId);
+  async mapKeywordToUrl(projectId: string, keywordId: string, targetUrl: string | null): Promise<Keyword> {
+    const row = await this.db.prepare(`SELECT * FROM keywords WHERE id = ? AND project_id = ?`).get(keywordId, projectId);
     if (!row) {
       throw new RequestError(404, "unknown_keyword", "Keyword not found for project");
     }
     const now = new Date().toISOString();
-    this.db.prepare(`UPDATE keywords SET target_url = ?, updated_at = ? WHERE id = ?`).run(targetUrl, now, keywordId);
-    this.audit("system", "keyword.map_url", "keyword", keywordId, { projectId, targetUrl });
-    return this.mapKeyword(this.db.prepare(`SELECT * FROM keywords WHERE id = ?`).get(keywordId) as Record<string, unknown>);
+    await this.db.prepare(`UPDATE keywords SET target_url = ?, updated_at = ? WHERE id = ?`).run(targetUrl, now, keywordId);
+    await this.audit("system", "keyword.map_url", "keyword", keywordId, { projectId, targetUrl });
+    return this.mapKeyword(await this.db.prepare(`SELECT * FROM keywords WHERE id = ?`).get(keywordId) as Record<string, unknown>);
   }
 
   private mapGroup(row: Record<string, unknown>): KeywordGroup {

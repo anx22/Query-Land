@@ -8,16 +8,20 @@ import type { ProjectChildStore } from "./routes.js";
 
 export type AppStore = HealthStore & AuthStore & ProjectStore & ProjectChildStore;
 
-export function createApp(store: AppStore = createSQLiteStore()) {
+export function createApp(store: AppStore) {
   return async function appHandleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
     return routeRequest(store, method, pathname, body, context);
   };
 }
 
-const defaultHandleRequest = createApp();
+// Lazily create the default (embedded) store once. createSQLiteStore is async
+// (it connects + migrates), so the default handler resolves it on first use.
+let defaultStorePromise: Promise<AppStore> | null = null;
 
 export async function handleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
-  return defaultHandleRequest(method, pathname, body, context);
+  defaultStorePromise ??= createSQLiteStore();
+  const store = await defaultStorePromise;
+  return routeRequest(store, method, pathname, body, context);
 }
 
 async function routeRequest(store: AppStore, method: string, requestPath: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
@@ -45,33 +49,33 @@ async function routeTopLevel(store: AppStore, method: string, pathname: string, 
 
   if (method === "POST" && pathname === "/auth/register") {
     const input = authRequest(body, true);
-    return json(201, { data: store.registerUser(input) });
+    return json(201, { data: await store.registerUser(input) });
   }
 
   if (method === "POST" && pathname === "/auth/login") {
     const input = authRequest(body, false);
-    const result = store.login(input.email, input.password);
+    const result = await store.login(input.email, input.password);
     return result ? json(200, { data: result }) : apiError(401, "invalid_credentials", "Invalid credentials", requestId);
   }
 
   if (method === "GET" && pathname === "/auth/session") {
     const token = bearerToken(context.headers?.authorization ?? context.headers?.Authorization);
-    const user = token ? store.getUserBySessionToken(token) : null;
+    const user = token ? await store.getUserBySessionToken(token) : null;
     return user ? json(200, { data: { user } }) : apiError(401, "invalid_session", "Missing, invalid or expired session", requestId);
   }
 
   if (method === "POST" && pathname === "/auth/logout") {
     const token = bearerToken(context.headers?.authorization ?? context.headers?.Authorization);
-    const invalidated = token ? store.invalidateSessionToken(token) : false;
+    const invalidated = token ? await store.invalidateSessionToken(token) : false;
     return invalidated ? json(204, null) : apiError(401, "invalid_session", "Missing, invalid or expired session", requestId);
   }
 
   if (method === "GET" && pathname === "/projects") {
-    return json(200, { data: store.listProjects() });
+    return json(200, { data: await store.listProjects() });
   }
 
   if (method === "POST" && pathname === "/projects") {
-    return json(201, { data: store.createProject(createProjectRequest(body)) });
+    return json(201, { data: await store.createProject(createProjectRequest(body)) });
   }
 
   return routeProjectChildren(store, method, pathname, searchParams, body, requestId);

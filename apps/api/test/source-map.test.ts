@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -20,12 +20,12 @@ function data<T>(response: ApiResponse): T {
   return (response.body as { data: T }).data;
 }
 
-async function freshProject(app: ReturnType<typeof testApp>["app"], slug: string): Promise<string> {
+async function freshProject(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string): Promise<string> {
   return data<{ id: string }>(await app("POST", "/projects", { name: `SM ${slug}`, slug })).id;
 }
 
 test("upsert source map entry creates and then updates without duplicating", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "upsert");
     const created = await app("POST", "/source-map", {
@@ -46,12 +46,12 @@ test("upsert source map entry creates and then updates without duplicating", asy
     assert.equal(mine.length, 1, "no duplicate mapping for same url+template");
     assert.equal(mine[0]?.confidence, "manifest");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("resolve source anchor matches exact pattern and longest prefix", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "resolve");
     await app("POST", "/source-map", { projectId, repoUrl: "https://github.com/acme/site", urlPattern: "https://acme.test/blog", templateName: "BlogIndex", component: "Blog", repoPath: "apps/web/app/blog/page.tsx" });
@@ -67,12 +67,12 @@ test("resolve source anchor matches exact pattern and longest prefix", async () 
     const miss = data<unknown>(await app("GET", "/source-map/resolve?url=" + encodeURIComponent("https://other.test/x")));
     assert.equal(miss, null);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("deploy markers can be created and listed per project", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "deploy");
     const created = await app("POST", `/projects/${projectId}/deploy-markers`, { commitSha: "abc1234", metadata: { env: "production" } });
@@ -83,17 +83,17 @@ test("deploy markers can be created and listed per project", async () => {
     assert.equal(list.length, 1);
     assert.equal(list[0]?.metadata.env, "production");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("source map upsert validates required fields", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "validate");
     const bad = await app("POST", "/source-map", { projectId, repoUrl: "https://github.com/acme/site", urlPattern: "" });
     assert.equal(bad.status, 400);
   } finally {
-    store.close();
+    await store.close();
   }
 });

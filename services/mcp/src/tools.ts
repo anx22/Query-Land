@@ -39,7 +39,7 @@ export interface McpTool {
   name: string;
   description: string;
   inputSchema: JsonSchema;
-  handler(args: Record<string, unknown>): unknown;
+  handler(args: Record<string, unknown>): Promise<unknown>;
 }
 
 /**
@@ -121,17 +121,17 @@ function optionalCount(args: Record<string, unknown>, field: string): number | u
   return Math.max(0, Math.trunc(value));
 }
 
-function findSite(store: BackendStore, projectId: string, siteId: string): Site {
-  const site = store.listSites(projectId).find((candidate) => candidate.id === siteId);
+async function findSite(store: BackendStore, projectId: string, siteId: string): Promise<Site> {
+  const site = (await store.listSites(projectId)).find((candidate) => candidate.id === siteId);
   if (!site) {
     throw new ToolError("unknown_site", `Site ${siteId} was not found in project ${projectId}`);
   }
   return site;
 }
 
-function requireProjectId(store: BackendStore, args: Record<string, unknown>): string {
+async function requireProjectId(store: BackendStore, args: Record<string, unknown>): Promise<string> {
   const projectId = requireString(args, "projectId");
-  if (!store.listProjects().some((candidate) => candidate.id === projectId)) {
+  if (!(await store.listProjects()).some((candidate) => candidate.id === projectId)) {
     throw new ToolError("unknown_project", `Project ${projectId} was not found`);
   }
   return projectId;
@@ -143,27 +143,27 @@ interface SiteHealth {
   openIssueCount: number;
 }
 
-function buildProjectSummary(store: BackendStore, projectId: string) {
-  const project = store.listProjects().find((candidate) => candidate.id === projectId);
+async function buildProjectSummary(store: BackendStore, projectId: string) {
+  const project = (await store.listProjects()).find((candidate) => candidate.id === projectId);
   if (!project) {
     throw new ToolError("unknown_project", `Project ${projectId} was not found`);
   }
-  const sites = store.listSites(projectId);
+  const sites = await store.listSites(projectId);
 
-  const siteHealth: SiteHealth[] = sites.map((site) => {
-    const healthScores = store.listHealthScores(projectId, site.id);
+  const siteHealth: SiteHealth[] = await Promise.all(sites.map(async (site) => {
+    const healthScores = await store.listHealthScores(projectId, site.id);
     // listHealthScores is ordered generated_at DESC, so the first entry is latest.
     const latestHealthScore = healthScores[0] ?? null;
-    const openIssues = store.listAuditIssuesPage(projectId, site.id, { limit: 1, offset: 0 }, { status: "open" });
+    const openIssues = await store.listAuditIssuesPage(projectId, site.id, { limit: 1, offset: 0 }, { status: "open" });
     return { site, latestHealthScore, openIssueCount: openIssues.total };
-  });
+  }));
 
-  const openOpportunities = store.listOpportunitiesPage(projectId, { limit: 1, offset: 0 }, { status: "open" });
+  const openOpportunities = await store.listOpportunitiesPage(projectId, { limit: 1, offset: 0 }, { status: "open" });
 
   // Top open audit issues across every site, severity-ranked (critical first).
   const topIssues: AuditIssueRecord[] = [];
   for (const site of sites) {
-    const page = store.listAuditIssuesPage(projectId, site.id, { limit: MAX_PAGE, offset: 0 }, { status: "open" });
+    const page = await store.listAuditIssuesPage(projectId, site.id, { limit: MAX_PAGE, offset: 0 }, { status: "open" });
     topIssues.push(...page.data);
   }
   topIssues.sort((left, right) => severityRank(left.severity) - severityRank(right.severity));
@@ -200,12 +200,12 @@ interface ResolvedUrlRow {
  * Locate the discovered-URL row for a (project[, site], url) tuple. When siteId
  * is omitted we scan all sites in the project. Matches url OR normalizedUrl.
  */
-function resolveDiscoveredUrl(store: BackendStore, projectId: string, siteId: string | undefined, url: string): ResolvedUrlRow {
-  const sites = siteId ? [findSite(store, projectId, siteId)] : store.listSites(projectId);
+async function resolveDiscoveredUrl(store: BackendStore, projectId: string, siteId: string | undefined, url: string): Promise<ResolvedUrlRow> {
+  const sites = siteId ? [await findSite(store, projectId, siteId)] : await store.listSites(projectId);
   for (const site of sites) {
     let offset = 0;
     for (;;) {
-      const page = store.listUrlExplorerRows(projectId, site.id, { limit: MAX_PAGE, offset });
+      const page = await store.listUrlExplorerRows(projectId, site.id, { limit: MAX_PAGE, offset });
       const match = page.data.find(
         (row) => row.discoveredUrl.url === url || row.discoveredUrl.normalizedUrl === url
       );
@@ -219,20 +219,20 @@ function resolveDiscoveredUrl(store: BackendStore, projectId: string, siteId: st
   throw new ToolError("unknown_url", `No discovered URL matching ${url} was found in project ${projectId}`);
 }
 
-function buildUrlDossier(store: BackendStore, projectId: string, siteId: string | undefined, url: string) {
-  const { site, discoveredUrl } = resolveDiscoveredUrl(store, projectId, siteId, url);
+async function buildUrlDossier(store: BackendStore, projectId: string, siteId: string | undefined, url: string) {
+  const { site, discoveredUrl } = await resolveDiscoveredUrl(store, projectId, siteId, url);
 
-  const fetchHistory: UrlFetchRecord[] = store.listFetchResults(projectId, site.id, discoveredUrl.id);
-  const indexabilityAssessments: IndexabilityRecord[] = store.listIndexabilityAssessments(projectId, site.id, discoveredUrl.id);
+  const fetchHistory: UrlFetchRecord[] = await store.listFetchResults(projectId, site.id, discoveredUrl.id);
+  const indexabilityAssessments: IndexabilityRecord[] = await store.listIndexabilityAssessments(projectId, site.id, discoveredUrl.id);
 
-  const inlinks = store.listInternalLinks(projectId, site.id, "in", discoveredUrl.normalizedUrl, { limit: MAX_PAGE });
-  const outlinks = store.listInternalLinks(projectId, site.id, "out", discoveredUrl.normalizedUrl, { limit: MAX_PAGE });
+  const inlinks = await store.listInternalLinks(projectId, site.id, "in", discoveredUrl.normalizedUrl, { limit: MAX_PAGE });
+  const outlinks = await store.listInternalLinks(projectId, site.id, "out", discoveredUrl.normalizedUrl, { limit: MAX_PAGE });
 
   // Audit issues that reference this URL (matched by URL or normalized URL).
   const auditIssues: AuditIssueRecord[] = [];
   let issueOffset = 0;
   for (;;) {
-    const page = store.listAuditIssuesPage(projectId, site.id, { limit: MAX_PAGE, offset: issueOffset });
+    const page = await store.listAuditIssuesPage(projectId, site.id, { limit: MAX_PAGE, offset: issueOffset });
     for (const issue of page.data) {
       if (issue.url === discoveredUrl.url || issue.url === discoveredUrl.normalizedUrl || issue.discoveredUrlId === discoveredUrl.id) {
         auditIssues.push(issue);
@@ -246,7 +246,7 @@ function buildUrlDossier(store: BackendStore, projectId: string, siteId: string 
   const relatedOpportunities: Opportunity[] = [];
   let oppOffset = 0;
   for (;;) {
-    const page = store.listOpportunitiesPage(projectId, { limit: MAX_PAGE, offset: oppOffset });
+    const page = await store.listOpportunitiesPage(projectId, { limit: MAX_PAGE, offset: oppOffset });
     for (const opportunity of page.data) {
       if (opportunity.affectedUrls.includes(discoveredUrl.url) || opportunity.affectedUrls.includes(discoveredUrl.normalizedUrl)) {
         relatedOpportunities.push(opportunity);
@@ -256,7 +256,7 @@ function buildUrlDossier(store: BackendStore, projectId: string, siteId: string 
     oppOffset += page.data.length;
   }
 
-  const sourceAnchor = store.resolveSourceAnchor(discoveredUrl.url);
+  const sourceAnchor = await store.resolveSourceAnchor(discoveredUrl.url);
 
   return {
     site,
@@ -289,7 +289,7 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args) {
+      async handler(args) {
         const projectId = requireString(args, "projectId");
         return buildProjectSummary(store, projectId);
       }
@@ -308,8 +308,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId", "url"],
         additionalProperties: false
       },
-      handler(args) {
-        const projectId = requireProjectId(store, args);
+      async handler(args) {
+        const projectId = await requireProjectId(store, args);
         const siteId = optionalString(args, "siteId");
         const url = requireString(args, "url");
         return buildUrlDossier(store, projectId, siteId, url);
@@ -331,7 +331,7 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args) {
+      async handler(args) {
         const projectId = requireString(args, "projectId");
         const status = optionalEnum(args, "status", OPPORTUNITY_STATUSES);
         const type = optionalEnum(args, "type", OPPORTUNITY_TYPES);
@@ -358,11 +358,11 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId", "siteId"],
         additionalProperties: false
       },
-      handler(args) {
+      async handler(args) {
         const projectId = requireString(args, "projectId");
         const siteId = requireString(args, "siteId");
         // Validate scope up front so callers get a clear not-found rather than an empty page.
-        findSite(store, projectId, siteId);
+        await findSite(store, projectId, siteId);
         const status = optionalEnum(args, "status", AUDIT_ISSUE_STATUSES);
         const severity = optionalEnum(args, "severity", AUDIT_ISSUE_SEVERITIES);
         const rule = optionalEnum(args, "rule", AUDIT_ISSUE_RULES);
@@ -383,16 +383,16 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["opportunityId"],
         additionalProperties: false
       },
-      handler(args) {
+      async handler(args) {
         const opportunityId = requireString(args, "opportunityId");
         let opportunity: Opportunity;
         try {
-          opportunity = store.getOpportunity(opportunityId);
+          opportunity = await store.getOpportunity(opportunityId);
         } catch {
           throw new ToolError("unknown_opportunity", `Opportunity ${opportunityId} was not found`);
         }
         const sourceAnchor =
-          opportunity.affectedUrls.length > 0 ? store.resolveSourceAnchor(opportunity.affectedUrls[0]) : null;
+          opportunity.affectedUrls.length > 0 ? await store.resolveSourceAnchor(opportunity.affectedUrls[0]) : null;
         return {
           opportunity,
           evidence: opportunity.evidence,
@@ -416,8 +416,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args): AuthoritySummary {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<AuthoritySummary> {
+        const projectId = await requireProjectId(store, args);
         return store.authoritySummary(projectId);
       }
     },
@@ -433,8 +433,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args): ReferringDomain[] {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<ReferringDomain[]> {
+        const projectId = await requireProjectId(store, args);
         return store.listReferringDomains(projectId);
       }
     },
@@ -450,10 +450,10 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args): BacklinkDiff {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<BacklinkDiff> {
+        const projectId = await requireProjectId(store, args);
         try {
-          return store.backlinkDiff(projectId);
+          return await store.backlinkDiff(projectId);
         } catch (error) {
           // The backlink store throws a RequestError with code "no_snapshots" when
           // no snapshots have been imported yet. Surface this as a clean ToolError.
@@ -476,9 +476,9 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args): { report: Report | null } {
-        const projectId = requireProjectId(store, args);
-        const report = store.listReports(projectId)[0] ?? null;
+      async handler(args): Promise<{ report: Report | null }> {
+        const projectId = await requireProjectId(store, args);
+        const report = (await store.listReports(projectId))[0] ?? null;
         return { report };
       }
     },
@@ -494,8 +494,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args): AlertEvent[] {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<AlertEvent[]> {
+        const projectId = await requireProjectId(store, args);
         return store.listAlertEvents(projectId);
       }
     },
@@ -511,8 +511,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args): AiVisibilityScore {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<AiVisibilityScore> {
+        const projectId = await requireProjectId(store, args);
         return store.aiVisibilityScore(projectId);
       }
     },
@@ -528,8 +528,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId"],
         additionalProperties: false
       },
-      handler(args): Proposal[] {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<Proposal[]> {
+        const projectId = await requireProjectId(store, args);
         return store.listProposals(projectId);
       }
     },
@@ -548,8 +548,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId", "title", "body"],
         additionalProperties: false
       },
-      handler(args): Proposal {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<Proposal> {
+        const projectId = await requireProjectId(store, args);
         const title = requireString(args, "title");
         const body = requireString(args, "body");
         const opportunityId = optionalString(args, "opportunityId");
@@ -571,8 +571,8 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         required: ["projectId", "title", "body"],
         additionalProperties: false
       },
-      handler(args): Proposal {
-        const projectId = requireProjectId(store, args);
+      async handler(args): Promise<Proposal> {
+        const projectId = await requireProjectId(store, args);
         const title = requireString(args, "title");
         const body = requireString(args, "body");
         const opportunityId = optionalString(args, "opportunityId");

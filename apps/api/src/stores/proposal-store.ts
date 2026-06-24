@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PROPOSAL_KINDS, PROPOSAL_STATUSES, type Proposal, type ProposalKind, type ProposalStatus } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 export interface CreateProposalInput {
   kind: ProposalKind;
@@ -20,20 +20,20 @@ const ALLOWED_TRANSITIONS: Record<ProposalStatus, ProposalStatus[]> = {
 };
 
 export interface ProposalStore {
-  createProposal(projectId: string, input: CreateProposalInput): Proposal;
-  listProposals(projectId: string): Proposal[];
-  transitionProposal(proposalId: string, status: ProposalStatus): Proposal;
+  createProposal(projectId: string, input: CreateProposalInput): Promise<Proposal>;
+  listProposals(projectId: string): Promise<Proposal[]>;
+  transitionProposal(proposalId: string, status: ProposalStatus): Promise<Proposal>;
 }
 
-export function createProposalStore(db: SQLiteDatabase, audit: AuditLog): ProposalStore {
+export function createProposalStore(db: AsyncDatabase, audit: AuditLog): ProposalStore {
   return new SQLiteProposalStore(db, audit);
 }
 
 class SQLiteProposalStore implements ProposalStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  createProposal(projectId: string, input: CreateProposalInput): Proposal {
-    if (!this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+  async createProposal(projectId: string, input: CreateProposalInput): Promise<Proposal> {
+    if (!(await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId))) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
     if (!PROPOSAL_KINDS.includes(input.kind)) {
@@ -46,7 +46,7 @@ class SQLiteProposalStore implements ProposalStore {
       throw new RequestError(400, "missing_field", "body is required");
     }
     const opportunityId = input.opportunityId ?? null;
-    if (opportunityId && !this.db.prepare(`SELECT 1 FROM opportunities WHERE id = ? AND project_id = ?`).get(opportunityId, projectId)) {
+    if (opportunityId && !(await this.db.prepare(`SELECT 1 FROM opportunities WHERE id = ? AND project_id = ?`).get(opportunityId, projectId))) {
       throw new RequestError(404, "unknown_opportunity", "Opportunity not found for project");
     }
     const now = new Date().toISOString();
@@ -63,22 +63,22 @@ class SQLiteProposalStore implements ProposalStore {
       createdAt: now,
       updatedAt: now
     };
-    this.db.prepare(`INSERT INTO proposals (id, project_id, kind, title, body, opportunity_id, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    await this.db.prepare(`INSERT INTO proposals (id, project_id, kind, title, body, opportunity_id, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       proposal.id, proposal.projectId, proposal.kind, proposal.title, proposal.body, proposal.opportunityId, proposal.status, proposal.source, proposal.createdAt, proposal.updatedAt
     );
-    this.audit("system", "proposal.create", "proposal", proposal.id, { projectId, kind: proposal.kind, source: proposal.source });
+    await this.audit("system", "proposal.create", "proposal", proposal.id, { projectId, kind: proposal.kind, source: proposal.source });
     return proposal;
   }
 
-  listProposals(projectId: string): Proposal[] {
-    if (!this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+  async listProposals(projectId: string): Promise<Proposal[]> {
+    if (!(await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId))) {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
-    return this.db.prepare(`SELECT * FROM proposals WHERE project_id = ? ORDER BY created_at DESC, id DESC`).all(projectId).map((row) => this.mapProposal(row as Record<string, unknown>));
+    return (await this.db.prepare(`SELECT * FROM proposals WHERE project_id = ? ORDER BY created_at DESC, id DESC`).all(projectId)).map((row) => this.mapProposal(row as Record<string, unknown>));
   }
 
-  transitionProposal(proposalId: string, status: ProposalStatus): Proposal {
-    const row = this.db.prepare(`SELECT * FROM proposals WHERE id = ?`).get(proposalId);
+  async transitionProposal(proposalId: string, status: ProposalStatus): Promise<Proposal> {
+    const row = await this.db.prepare(`SELECT * FROM proposals WHERE id = ?`).get(proposalId);
     if (!row) {
       throw new RequestError(404, "unknown_proposal", "Proposal not found");
     }
@@ -90,9 +90,9 @@ class SQLiteProposalStore implements ProposalStore {
       throw new RequestError(409, "invalid_transition", `Cannot transition proposal from ${current} to ${status}`);
     }
     const now = new Date().toISOString();
-    this.db.prepare(`UPDATE proposals SET status = ?, updated_at = ? WHERE id = ?`).run(status, now, proposalId);
-    this.audit("system", "proposal.transition", "proposal", proposalId, { from: current, to: status });
-    return this.mapProposal(this.db.prepare(`SELECT * FROM proposals WHERE id = ?`).get(proposalId) as Record<string, unknown>);
+    await this.db.prepare(`UPDATE proposals SET status = ?, updated_at = ? WHERE id = ?`).run(status, now, proposalId);
+    await this.audit("system", "proposal.transition", "proposal", proposalId, { from: current, to: status });
+    return this.mapProposal(await this.db.prepare(`SELECT * FROM proposals WHERE id = ?`).get(proposalId) as Record<string, unknown>);
   }
 
   private mapProposal(row: Record<string, unknown>): Proposal {

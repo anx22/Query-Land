@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -20,7 +20,7 @@ function data<T>(response: ApiResponse): T {
   return (response.body as { data: T }).data;
 }
 
-async function seed(app: ReturnType<typeof testApp>["app"], slug: string) {
+async function seed(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string) {
   const project = data<{ id: string }>(await app("POST", "/projects", { name: `WV ${slug}`, slug }));
   const site = data<{ id: string }>(await app("POST", `/projects/${project.id}/sites`, { baseUrl: "https://wv.example.com", scopeType: "domain" }));
   const integration = data<{ id: string }>(await app("POST", "/integrations", { projectId: project.id, provider: "pagespeed" }));
@@ -30,7 +30,7 @@ async function seed(app: ReturnType<typeof testApp>["app"], slug: string) {
 type WebVital = { metric: string; value: number; sourceConfidence: string };
 
 test("site-scoped PageSpeed sync produces web vitals that the read API returns", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, siteId, integrationId } = await seed(app, "happy");
 
@@ -46,12 +46,12 @@ test("site-scoped PageSpeed sync produces web vitals that the read API returns",
     assert.ok(vitals.every((v) => v.sourceConfidence === "B"), "web vitals carry confidence class B");
     assert.equal(vitals.find((v) => v.metric === "psi_lcp_ms")?.value, 2410);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("repeated sync keeps one latest value per web-vital metric", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, siteId, integrationId } = await seed(app, "latest");
     await app("POST", `/integrations/${integrationId}/sync`, { siteId });
@@ -59,17 +59,17 @@ test("repeated sync keeps one latest value per web-vital metric", async () => {
     const vitals = data<WebVital[]>(await app("GET", `/projects/${projectId}/sites/${siteId}/web-vitals`));
     assert.equal(vitals.length, 4, "latest-per-metric, not duplicated across runs");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("project-scoped sync does not populate site web vitals", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, siteId, integrationId } = await seed(app, "project-scope");
     await app("POST", `/integrations/${integrationId}/sync`); // no siteId -> project scope
     assert.deepEqual(data<WebVital[]>(await app("GET", `/projects/${projectId}/sites/${siteId}/web-vitals`)), []);
   } finally {
-    store.close();
+    await store.close();
   }
 });

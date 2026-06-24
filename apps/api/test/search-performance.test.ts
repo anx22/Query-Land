@@ -12,8 +12,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -64,7 +64,7 @@ test("cannibalization groups multiple own pages per query", () => {
 });
 
 test("sync persists a GSC batch (class B) and intelligence derives signals", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "SP", slug: "sp" })).id;
     const siteId = data<{ id: string }>(await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://acme.example.com", scopeType: "domain" })).id;
@@ -91,18 +91,18 @@ test("sync persists a GSC batch (class B) and intelligence derives signals", asy
     assert.ok(intelligence.summary.cannibalization >= 1);
     assert.ok(intelligence.cannibalization[0].pages.length >= 2);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("search-performance sync rejects unknown site", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "SP2", slug: "sp2" })).id;
     const missing = await app("POST", `/projects/${projectId}/sites/site-nope/search-performance/sync`, {});
     assert.equal(missing.status, 404);
     assert.equal((missing.body as { error: { code: string } }).error.code, "unknown_site");
   } finally {
-    store.close();
+    await store.close();
   }
 });

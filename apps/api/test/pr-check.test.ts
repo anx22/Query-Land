@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -22,7 +22,7 @@ function data<T>(response: ApiResponse): T {
 
 const BASE = "https://acme.test";
 
-async function setup(app: ReturnType<typeof testApp>["app"]) {
+async function setup(app: Awaited<ReturnType<typeof testApp>>["app"]) {
   const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Gate", slug: "gate" })).id;
   await app("POST", `/projects/${projectId}/sites`, { baseUrl: BASE, scopeType: "domain" });
   // Map two URLs to templates.
@@ -31,7 +31,7 @@ async function setup(app: ReturnType<typeof testApp>["app"]) {
   return projectId;
 }
 
-async function createOpportunity(app: ReturnType<typeof testApp>["app"], projectId: string, overrides: Record<string, unknown>) {
+async function createOpportunity(app: Awaited<ReturnType<typeof testApp>>["app"], projectId: string, overrides: Record<string, unknown>) {
   const base = {
     type: "money_page",
     affectedUrls: [`${BASE}/pricing`],
@@ -45,7 +45,7 @@ async function createOpportunity(app: ReturnType<typeof testApp>["app"], project
 }
 
 test("pr-check flags review_required when a changed path maps to a URL with an open opportunity", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await setup(app);
     await createOpportunity(app, projectId, {});
@@ -62,12 +62,12 @@ test("pr-check flags review_required when a changed path maps to a URL with an o
     const history = data<unknown[]>(await app("GET", `/projects/${projectId}/pr-checks`));
     assert.equal(history.length, 1, "pr-check result is persisted as history");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("pr-check passes when a mapped path has no open opportunities", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await setup(app);
     const gate = data<{ status: string; affectedTemplates: unknown[]; relatedOpportunities: unknown[] }>(await app("POST", `/projects/${projectId}/pr-checks`, { changedPaths: ["src/templates/about.tsx"] }));
@@ -75,24 +75,24 @@ test("pr-check passes when a mapped path has no open opportunities", async () =>
     assert.equal(gate.affectedTemplates.length, 1);
     assert.equal(gate.relatedOpportunities.length, 0);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("pr-check reports unmapped when no changed path resolves via the source map", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await setup(app);
     const gate = data<{ status: string; affectedTemplates: unknown[] }>(await app("POST", `/projects/${projectId}/pr-checks`, { changedPaths: ["src/lib/unrelated.ts"] }));
     assert.equal(gate.status, "unmapped");
     assert.equal(gate.affectedTemplates.length, 0);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("pr-check matches an opportunity by its source anchor repository path", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await setup(app);
     // Opportunity whose URL is NOT mapped, but carries a source anchor on a changed path.
@@ -108,18 +108,18 @@ test("pr-check matches an opportunity by its source anchor repository path", asy
     assert.equal(gate.relatedOpportunities.length, 1);
     assert.equal(gate.relatedOpportunities[0].matchedBy, "source_anchor");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("pr-check requires a non-empty changedPaths array", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await setup(app);
     const empty = await app("POST", `/projects/${projectId}/pr-checks`, { changedPaths: [] });
     assert.equal(empty.status, 400);
     assert.equal((empty.body as { error: { code: string } }).error.code, "missing_field");
   } finally {
-    store.close();
+    await store.close();
   }
 });

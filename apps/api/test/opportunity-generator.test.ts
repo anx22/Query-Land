@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -22,7 +22,7 @@ function data<T>(response: ApiResponse): T {
 
 const URL = "https://gen.example.com/pricing";
 
-async function siteWithBlockedUrl(app: ReturnType<typeof testApp>["app"], slug: string) {
+async function siteWithBlockedUrl(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string) {
   const projectId = data<{ id: string }>(await app("POST", "/projects", { name: `Gen ${slug}`, slug })).id;
   const siteId = data<{ id: string }>(await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://gen.example.com", scopeType: "domain", businessValue: 90 })).id;
   const base = `/projects/${projectId}/sites/${siteId}`;
@@ -36,7 +36,7 @@ async function siteWithBlockedUrl(app: ReturnType<typeof testApp>["app"], slug: 
 }
 
 test("indexability blockers generate technical_fix opportunities (idempotent)", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, siteId } = await siteWithBlockedUrl(app, "generate");
 
@@ -53,12 +53,12 @@ test("indexability blockers generate technical_fix opportunities (idempotent)", 
     const second = data<{ created: number }>(await app("POST", `/projects/${projectId}/sites/${siteId}/opportunities/generate-indexability`));
     assert.equal(second.created, 0);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("validation loop: implemented + now-indexable -> validated with updated evidence", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, siteId, base } = await siteWithBlockedUrl(app, "validated");
     const oppId = data<{ opportunities: Array<{ id: string }> }>(await app("POST", `/projects/${projectId}/sites/${siteId}/opportunities/generate-indexability`)).opportunities[0].id;
@@ -79,12 +79,12 @@ test("validation loop: implemented + now-indexable -> validated with updated evi
     assert.equal(evidence?.beforeValue, "false");
     assert.equal(evidence?.currentValue, "true");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("validation loop: implemented but still blocked -> reopened", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, siteId } = await siteWithBlockedUrl(app, "reopened");
     const oppId = data<{ opportunities: Array<{ id: string }> }>(await app("POST", `/projects/${projectId}/sites/${siteId}/opportunities/generate-indexability`)).opportunities[0].id;
@@ -95,12 +95,12 @@ test("validation loop: implemented but still blocked -> reopened", async () => {
     const result = data<{ status: string }>(await app("POST", `/opportunities/${oppId}/revalidate`));
     assert.equal(result.status, "reopened");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("revalidate rejects opportunities that are not implemented", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const { projectId, siteId } = await siteWithBlockedUrl(app, "guard");
     const oppId = data<{ opportunities: Array<{ id: string }> }>(await app("POST", `/projects/${projectId}/sites/${siteId}/opportunities/generate-indexability`)).opportunities[0].id;
@@ -108,6 +108,6 @@ test("revalidate rejects opportunities that are not implemented", async () => {
     assert.equal(tooEarly.status, 409);
     assert.equal((tooEarly.body as { error: { code: string } }).error.code, "invalid_state");
   } finally {
-    store.close();
+    await store.close();
   }
 });

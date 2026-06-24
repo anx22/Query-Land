@@ -18,7 +18,7 @@ function dataOf<T>(response: ApiResponse): T {
 }
 
 test("Welle-1 Foundation-Gate: project -> site -> connector -> crawl -> job -> reload persists", async () => {
-  const store = createSQLiteStore("sqlite::memory:");
+  const store = await createSQLiteStore("sqlite::memory:");
   const app = createApp(store);
 
   // 1. Projekt anlegen

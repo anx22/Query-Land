@@ -11,8 +11,8 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 
 type ApiResponse = { status: number; body: unknown };
 
-function testApp() {
-  const store = createSQLiteStore("sqlite::memory:");
+async function testApp() {
+  const store = await createSQLiteStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -20,7 +20,7 @@ function data<T>(response: ApiResponse): T {
   return (response.body as { data: T }).data;
 }
 
-async function freshProject(app: ReturnType<typeof testApp>["app"], slug: string): Promise<string> {
+async function freshProject(app: Awaited<ReturnType<typeof testApp>>["app"], slug: string): Promise<string> {
   return data<{ id: string }>(await app("POST", "/projects", { name: `Connector ${slug}`, slug })).id;
 }
 
@@ -31,7 +31,7 @@ type SyncResult = {
 };
 
 test("GSC connector sync persists raw + normalized data and marks the integration connected", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "gsc-sync");
     const integration = data<{ id: string }>(await app("POST", "/integrations", { projectId, provider: "gsc" }));
@@ -49,12 +49,12 @@ test("GSC connector sync persists raw + normalized data and marks the integratio
     // Raw (1) vs. normalized (mehrere) belegen die getrennte Persistenz.
     assert.notEqual(sync.normalizedMetricsInserted, 1);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("GA4 connector sync also works (spec acceptance: GSC + GA4 connectable)", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "ga4-sync");
     const integration = data<{ id: string }>(await app("POST", "/integrations", { projectId, provider: "ga4" }));
@@ -63,12 +63,12 @@ test("GA4 connector sync also works (spec acceptance: GSC + GA4 connectable)", a
     assert.equal(sync.integration.provider, "ga4");
     assert.ok(sync.normalizedMetricsInserted >= 3);
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("connector sync is repeatable and refreshes freshness without breaking", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "repeat-sync");
     const integration = data<{ id: string }>(await app("POST", "/integrations", { projectId, provider: "pagespeed" }));
@@ -77,12 +77,12 @@ test("connector sync is repeatable and refreshes freshness without breaking", as
     assert.equal(second.integration.status, "connected");
     assert.notEqual(first.rawEventId, second.rawEventId, "each run records a new raw event (history)");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("connector sync rejects providers without an implemented connector", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const projectId = await freshProject(app, "unsupported-sync");
     const integration = data<{ id: string }>(await app("POST", "/integrations", { projectId, provider: "serp" }));
@@ -90,17 +90,17 @@ test("connector sync rejects providers without an implemented connector", async 
     assert.equal(sync.status, 400);
     assert.equal((sync.body as { error: { code: string } }).error.code, "unsupported_connector");
   } finally {
-    store.close();
+    await store.close();
   }
 });
 
 test("connector sync on unknown integration id returns 404", async () => {
-  const { app, store } = testApp();
+  const { app, store } = await testApp();
   try {
     const sync = await app("POST", "/integrations/int-does-not-exist/sync");
     assert.equal(sync.status, 404);
     assert.equal((sync.body as { error: { code: string } }).error.code, "unknown_integration");
   } finally {
-    store.close();
+    await store.close();
   }
 });

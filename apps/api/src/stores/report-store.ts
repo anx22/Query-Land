@@ -16,7 +16,7 @@ import {
 } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
-import type { SQLiteDatabase } from "./sqlite-types.js";
+import type { AsyncDatabase } from "../db/index.js";
 
 const CADENCE_DAYS: Record<ReportCadence, number> = { weekly: 7, monthly: 30 };
 
@@ -33,42 +33,42 @@ export interface RunDueResult {
 }
 
 export interface ReportStore {
-  generateReport(projectId: string, type: ReportType): Report;
-  getReport(reportId: string): Report;
-  listReports(projectId: string): Report[];
-  exportReport(reportId: string, format: ReportExportFormat): ReportExport;
-  deliverReport(reportId: string, channel: DeliveryChannel, target?: string | null): ReportDelivery;
-  listReportDeliveries(reportId: string): ReportDelivery[];
-  createReportSchedule(projectId: string, input: ReportScheduleInput): ReportSchedule;
-  listReportSchedules(projectId: string): ReportSchedule[];
-  runDueReportSchedules(projectId: string): RunDueResult;
+  generateReport(projectId: string, type: ReportType): Promise<Report>;
+  getReport(reportId: string): Promise<Report>;
+  listReports(projectId: string): Promise<Report[]>;
+  exportReport(reportId: string, format: ReportExportFormat): Promise<ReportExport>;
+  deliverReport(reportId: string, channel: DeliveryChannel, target?: string | null): Promise<ReportDelivery>;
+  listReportDeliveries(reportId: string): Promise<ReportDelivery[]>;
+  createReportSchedule(projectId: string, input: ReportScheduleInput): Promise<ReportSchedule>;
+  listReportSchedules(projectId: string): Promise<ReportSchedule[]>;
+  runDueReportSchedules(projectId: string): Promise<RunDueResult>;
 }
 
-export function createReportStore(db: SQLiteDatabase, audit: AuditLog): ReportStore {
+export function createReportStore(db: AsyncDatabase, audit: AuditLog): ReportStore {
   return new SQLiteReportStore(db, audit);
 }
 
 class SQLiteReportStore implements ReportStore {
-  constructor(private readonly db: SQLiteDatabase, private readonly audit: AuditLog) {}
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
 
-  private requireProject(projectId: string): { name: string } {
-    const row = this.db.prepare(`SELECT name FROM projects WHERE id = ?`).get(projectId) as { name?: string } | undefined;
+  private async requireProject(projectId: string): Promise<{ name: string }> {
+    const row = await this.db.prepare(`SELECT name FROM projects WHERE id = ?`).get(projectId) as { name?: string } | undefined;
     if (!row || typeof row.name !== "string") {
       throw new RequestError(404, "unknown_project", "Project not found");
     }
     return { name: row.name };
   }
 
-  private count(sql: string, ...args: unknown[]): number {
-    const row = this.db.prepare(sql).get(...args) as { c?: number } | undefined;
+  private async count(sql: string, ...args: unknown[]): Promise<number> {
+    const row = await this.db.prepare(sql).get(...args) as { c?: number } | undefined;
     return Number(row?.c ?? 0);
   }
 
-  private overviewSection(projectId: string): ReportSection {
-    const sites = this.count(`SELECT COUNT(*) AS c FROM sites WHERE project_id = ?`, projectId);
-    const health = this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
-    const openOpportunities = this.count(`SELECT COUNT(*) AS c FROM opportunities WHERE project_id = ? AND status NOT IN ('dismissed', 'expired', 'validated')`, projectId);
-    const visibility = this.db.prepare(`SELECT score FROM visibility_scores WHERE project_id = ? ORDER BY computed_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
+  private async overviewSection(projectId: string): Promise<ReportSection> {
+    const sites = await this.count(`SELECT COUNT(*) AS c FROM sites WHERE project_id = ?`, projectId);
+    const health = await this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
+    const openOpportunities = await this.count(`SELECT COUNT(*) AS c FROM opportunities WHERE project_id = ? AND status NOT IN ('dismissed', 'expired', 'validated')`, projectId);
+    const visibility = await this.db.prepare(`SELECT score FROM visibility_scores WHERE project_id = ? ORDER BY computed_at DESC LIMIT 1`).get(projectId) as { score?: number } | undefined;
     return {
       title: "Übersicht",
       rows: [
@@ -80,18 +80,18 @@ class SQLiteReportStore implements ReportStore {
     };
   }
 
-  private opportunitySection(projectId: string): ReportSection {
-    const byStatus = this.db.prepare(`SELECT status, COUNT(*) AS c FROM opportunities WHERE project_id = ? GROUP BY status`).all(projectId) as Array<{ status: string; c: number }>;
-    const top = this.db.prepare(`SELECT type, priority FROM opportunities WHERE project_id = ? ORDER BY priority DESC, created_at ASC LIMIT 3`).all(projectId) as Array<{ type: string; priority: number }>;
+  private async opportunitySection(projectId: string): Promise<ReportSection> {
+    const byStatus = await this.db.prepare(`SELECT status, COUNT(*) AS c FROM opportunities WHERE project_id = ? GROUP BY status`).all(projectId) as Array<{ status: string; c: number }>;
+    const top = await this.db.prepare(`SELECT type, priority FROM opportunities WHERE project_id = ? ORDER BY priority DESC, created_at ASC LIMIT 3`).all(projectId) as Array<{ type: string; priority: number }>;
     const rows = byStatus.map((row) => ({ label: `Status ${row.status}`, value: Number(row.c) }));
     top.forEach((row, index) => rows.push({ label: `Top ${index + 1} (${row.type})`, value: Number(row.priority) }));
     if (rows.length === 0) rows.push({ label: "Opportunities", value: 0 });
     return { title: "Opportunities", rows };
   }
 
-  private visibilitySection(projectId: string): ReportSection {
-    const visibility = this.db.prepare(`SELECT score, tracked_keywords, average_position FROM visibility_scores WHERE project_id = ? ORDER BY computed_at DESC LIMIT 1`).get(projectId) as { score?: number; tracked_keywords?: number; average_position?: number | null } | undefined;
-    const keywords = this.count(`SELECT COUNT(*) AS c FROM keywords WHERE project_id = ?`, projectId);
+  private async visibilitySection(projectId: string): Promise<ReportSection> {
+    const visibility = await this.db.prepare(`SELECT score, tracked_keywords, average_position FROM visibility_scores WHERE project_id = ? ORDER BY computed_at DESC LIMIT 1`).get(projectId) as { score?: number; tracked_keywords?: number; average_position?: number | null } | undefined;
+    const keywords = await this.count(`SELECT COUNT(*) AS c FROM keywords WHERE project_id = ?`, projectId);
     return {
       title: "Sichtbarkeit & Keywords",
       rows: [
@@ -103,8 +103,8 @@ class SQLiteReportStore implements ReportStore {
     };
   }
 
-  private authoritySection(projectId: string): ReportSection {
-    const snapshot = this.db.prepare(`SELECT total_backlinks, referring_domains FROM backlink_snapshots WHERE project_id = ? ORDER BY captured_at DESC, rowid DESC LIMIT 1`).get(projectId) as { total_backlinks?: number; referring_domains?: number } | undefined;
+  private async authoritySection(projectId: string): Promise<ReportSection> {
+    const snapshot = await this.db.prepare(`SELECT total_backlinks, referring_domains FROM backlink_snapshots WHERE project_id = ? ORDER BY captured_at DESC, seq DESC LIMIT 1`).get(projectId) as { total_backlinks?: number; referring_domains?: number } | undefined;
     return {
       title: "Authority",
       rows: [
@@ -114,15 +114,15 @@ class SQLiteReportStore implements ReportStore {
     };
   }
 
-  private buildSections(projectId: string, type: ReportType): ReportSection[] {
+  private async buildSections(projectId: string, type: ReportType): Promise<ReportSection[]> {
     switch (type) {
       case "opportunity_digest":
-        return [this.overviewSection(projectId), this.opportunitySection(projectId)];
+        return [await this.overviewSection(projectId), await this.opportunitySection(projectId)];
       case "authority_report":
-        return [this.overviewSection(projectId), this.authoritySection(projectId)];
+        return [await this.overviewSection(projectId), await this.authoritySection(projectId)];
       case "weekly_summary":
       default:
-        return [this.overviewSection(projectId), this.opportunitySection(projectId), this.visibilitySection(projectId), this.authoritySection(projectId)];
+        return [await this.overviewSection(projectId), await this.opportunitySection(projectId), await this.visibilitySection(projectId), await this.authoritySection(projectId)];
     }
   }
 
@@ -131,12 +131,12 @@ class SQLiteReportStore implements ReportStore {
     return `${label} · ${projectName}`;
   }
 
-  generateReport(projectId: string, type: ReportType): Report {
-    const { name } = this.requireProject(projectId);
+  async generateReport(projectId: string, type: ReportType): Promise<Report> {
+    const { name } = await this.requireProject(projectId);
     if (!REPORT_TYPES.includes(type)) {
       throw new RequestError(400, "invalid_field", `type must be one of ${REPORT_TYPES.join(", ")}`);
     }
-    const sections = this.buildSections(projectId, type);
+    const sections = await this.buildSections(projectId, type);
     const report: Report = {
       id: `rep-${randomUUID()}`,
       projectId,
@@ -145,35 +145,35 @@ class SQLiteReportStore implements ReportStore {
       sections,
       generatedAt: new Date().toISOString()
     };
-    this.db.prepare(`INSERT INTO reports (id, project_id, type, title, sections, generated_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
+    await this.db.prepare(`INSERT INTO reports (id, project_id, type, title, sections, generated_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
       report.id, report.projectId, report.type, report.title, JSON.stringify(report.sections), report.generatedAt
     );
-    this.audit("system", "report.generate", "report", report.id, { projectId, type });
+    await this.audit("system", "report.generate", "report", report.id, { projectId, type });
     return report;
   }
 
-  getReport(reportId: string): Report {
-    const row = this.db.prepare(`SELECT * FROM reports WHERE id = ?`).get(reportId);
+  async getReport(reportId: string): Promise<Report> {
+    const row = await this.db.prepare(`SELECT * FROM reports WHERE id = ?`).get(reportId);
     if (!row) {
       throw new RequestError(404, "unknown_report", "Report not found");
     }
     return this.mapReport(row as Record<string, unknown>);
   }
 
-  listReports(projectId: string): Report[] {
-    this.requireProject(projectId);
-    return this.db.prepare(`SELECT * FROM reports WHERE project_id = ? ORDER BY generated_at DESC, id DESC`).all(projectId).map((row) => this.mapReport(row as Record<string, unknown>));
+  async listReports(projectId: string): Promise<Report[]> {
+    await this.requireProject(projectId);
+    return (await this.db.prepare(`SELECT * FROM reports WHERE project_id = ? ORDER BY generated_at DESC, id DESC`).all(projectId)).map((row) => this.mapReport(row as Record<string, unknown>));
   }
 
-  exportReport(reportId: string, format: ReportExportFormat): ReportExport {
+  async exportReport(reportId: string, format: ReportExportFormat): Promise<ReportExport> {
     if (format !== "csv" && format !== "html" && format !== "pdf") {
       throw new RequestError(400, "invalid_field", "format must be csv, html or pdf");
     }
-    return renderReportExport(this.getReport(reportId), format);
+    return renderReportExport(await this.getReport(reportId), format);
   }
 
-  deliverReport(reportId: string, channel: DeliveryChannel, target?: string | null): ReportDelivery {
-    this.getReport(reportId);
+  async deliverReport(reportId: string, channel: DeliveryChannel, target?: string | null): Promise<ReportDelivery> {
+    await this.getReport(reportId);
     if (!DELIVERY_CHANNELS.includes(channel)) {
       throw new RequestError(400, "invalid_field", `channel must be one of ${DELIVERY_CHANNELS.join(", ")}`);
     }
@@ -186,16 +186,16 @@ class SQLiteReportStore implements ReportStore {
       status: "sent",
       deliveredAt: new Date().toISOString()
     };
-    this.db.prepare(`INSERT INTO report_deliveries (id, report_id, channel, target, status, delivered_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
+    await this.db.prepare(`INSERT INTO report_deliveries (id, report_id, channel, target, status, delivered_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
       delivery.id, delivery.reportId, delivery.channel, delivery.target, delivery.status, delivery.deliveredAt
     );
-    this.audit("system", "report.deliver", "report", reportId, { channel, status: delivery.status });
+    await this.audit("system", "report.deliver", "report", reportId, { channel, status: delivery.status });
     return delivery;
   }
 
-  listReportDeliveries(reportId: string): ReportDelivery[] {
-    this.getReport(reportId);
-    return this.db.prepare(`SELECT * FROM report_deliveries WHERE report_id = ? ORDER BY delivered_at DESC, id DESC`).all(reportId).map((row) => ({
+  async listReportDeliveries(reportId: string): Promise<ReportDelivery[]> {
+    await this.getReport(reportId);
+    return (await this.db.prepare(`SELECT * FROM report_deliveries WHERE report_id = ? ORDER BY delivered_at DESC, id DESC`).all(reportId)).map((row) => ({
       id: String(row.id),
       reportId: String(row.report_id),
       channel: String(row.channel) as DeliveryChannel,
@@ -205,8 +205,8 @@ class SQLiteReportStore implements ReportStore {
     }));
   }
 
-  createReportSchedule(projectId: string, input: ReportScheduleInput): ReportSchedule {
-    this.requireProject(projectId);
+  async createReportSchedule(projectId: string, input: ReportScheduleInput): Promise<ReportSchedule> {
+    await this.requireProject(projectId);
     if (!REPORT_TYPES.includes(input.type)) {
       throw new RequestError(400, "invalid_field", `type must be one of ${REPORT_TYPES.join(", ")}`);
     }
@@ -224,46 +224,43 @@ class SQLiteReportStore implements ReportStore {
       lastRunAt: null,
       createdAt: new Date().toISOString()
     };
-    this.db.prepare(`INSERT INTO report_schedules (id, project_id, type, cadence, channel, target, last_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    await this.db.prepare(`INSERT INTO report_schedules (id, project_id, type, cadence, channel, target, last_run_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
       schedule.id, schedule.projectId, schedule.type, schedule.cadence, schedule.channel, schedule.target, schedule.lastRunAt, schedule.createdAt
     );
-    this.audit("system", "report_schedule.create", "report_schedule", schedule.id, { projectId, type: schedule.type, cadence: schedule.cadence });
+    await this.audit("system", "report_schedule.create", "report_schedule", schedule.id, { projectId, type: schedule.type, cadence: schedule.cadence });
     return schedule;
   }
 
-  listReportSchedules(projectId: string): ReportSchedule[] {
-    this.requireProject(projectId);
-    return this.db.prepare(`SELECT * FROM report_schedules WHERE project_id = ? ORDER BY created_at ASC, id ASC`).all(projectId).map((row) => this.mapSchedule(row as Record<string, unknown>));
+  async listReportSchedules(projectId: string): Promise<ReportSchedule[]> {
+    await this.requireProject(projectId);
+    return (await this.db.prepare(`SELECT * FROM report_schedules WHERE project_id = ? ORDER BY created_at ASC, id ASC`).all(projectId)).map((row) => this.mapSchedule(row as Record<string, unknown>));
   }
 
   // Automatisierung (Gate "Wochenreport automatisiert"): erzeugt für jeden fälligen Schedule einen
   // Report (idempotent je Fälligkeit), liefert ihn bei gesetztem Kanal aus und markiert last_run_at.
   // Ein echter Cron-Trigger (Worker) ist Follow-up (GAP-REPORT-003).
-  runDueReportSchedules(projectId: string): RunDueResult {
-    this.requireProject(projectId);
+  async runDueReportSchedules(projectId: string): Promise<RunDueResult> {
+    await this.requireProject(projectId);
     const now = Date.now();
-    const schedules = this.listReportSchedules(projectId);
+    const schedules = await this.listReportSchedules(projectId);
     const reports: Report[] = [];
-    this.db.exec("BEGIN");
-    try {
-      for (const schedule of schedules) {
-        const lastRun = schedule.lastRunAt === null ? NaN : Date.parse(schedule.lastRunAt);
-        // null oder unparsebar -> fällig (ein korruptes last_run_at darf einen Schedule nicht für immer blockieren).
-        const due = schedule.lastRunAt === null || Number.isNaN(lastRun) || (now - lastRun) >= CADENCE_DAYS[schedule.cadence] * 24 * 60 * 60 * 1000;
-        if (!due) continue;
-        const report = this.generateReport(projectId, schedule.type);
-        if (schedule.channel) {
-          this.deliverReport(report.id, schedule.channel, schedule.target);
-        }
-        this.db.prepare(`UPDATE report_schedules SET last_run_at = ? WHERE id = ?`).run(new Date().toISOString(), schedule.id);
-        reports.push(report);
+    // No outer transaction here: generateReport/deliverReport each run their own
+    // transactions, and nesting them on a single-connection driver deadlocks.
+    // Each report generation is atomic on its own; the per-schedule timestamp
+    // update is a single statement applied right after.
+    for (const schedule of schedules) {
+      const lastRun = schedule.lastRunAt === null ? NaN : Date.parse(schedule.lastRunAt);
+      // null oder unparsebar -> fällig (ein korruptes last_run_at darf einen Schedule nicht für immer blockieren).
+      const due = schedule.lastRunAt === null || Number.isNaN(lastRun) || (now - lastRun) >= CADENCE_DAYS[schedule.cadence] * 24 * 60 * 60 * 1000;
+      if (!due) continue;
+      const report = await this.generateReport(projectId, schedule.type);
+      if (schedule.channel) {
+        await this.deliverReport(report.id, schedule.channel, schedule.target);
       }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
+      await this.db.prepare(`UPDATE report_schedules SET last_run_at = ? WHERE id = ?`).run(new Date().toISOString(), schedule.id);
+      reports.push(report);
     }
-    this.audit("system", "report_schedule.run_due", "project", projectId, { generated: reports.length });
+    await this.audit("system", "report_schedule.run_due", "project", projectId, { generated: reports.length });
     return { generated: reports.length, reports };
   }
 

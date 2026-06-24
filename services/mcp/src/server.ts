@@ -10,8 +10,8 @@ import { createSeoMcpTools } from "./tools.js";
  * The database location is read from DATABASE_URL (same env var as the rest of
  * the app); createSQLiteStore falls back to apiDefaults.databaseUrl when unset.
  */
-export function startServer(): void {
-  const store = createSQLiteStore(process.env.DATABASE_URL);
+export async function startServer(): Promise<void> {
+  const store = await createSQLiteStore(process.env.DATABASE_URL);
   const tools = createSeoMcpTools(store);
 
   const server = new Server(
@@ -31,11 +31,11 @@ export function startServer(): void {
   });
 
   // tools/call — dispatch to our handler and wrap the result as MCP content.
-  server.setRequestHandler(CallToolRequestSchema, (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const name = request.params.name;
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
     try {
-      const result = callTool(tools, name, args);
+      const result = await callTool(tools, name, args);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }]
       };
@@ -60,5 +60,9 @@ export function startServer(): void {
 
 // Run as a binary when executed directly.
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
-  startServer();
+  startServer().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`MCP server startup error: ${message}\n`);
+    process.exit(1);
+  });
 }

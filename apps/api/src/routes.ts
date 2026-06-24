@@ -48,7 +48,7 @@ const resourceRoutes: ResourceRoute[] = [
 
 export async function routeProjectChildren(store: ProjectChildStore, method: string, pathname: string, searchParams: URLSearchParams, body: unknown, requestId: string): Promise<ApiResponse> {
   for (const route of resourceRoutes) {
-    const response = route(store, method, pathname, searchParams, body);
+    const response = await route(store, method, pathname, searchParams, body);
     if (response) return response;
   }
   return apiError(404, "not_found", "Route not found", requestId);
