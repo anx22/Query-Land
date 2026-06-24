@@ -441,6 +441,696 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/AuditIssueRecord'
+  /projects/{projectId}/sites/{siteId}/web-vitals:
+    get:
+      summary: List latest Core Web Vitals metrics for a site
+      operationId: listSiteWebVitals
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest web vitals per metric
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        metric:
+                          type: string
+                        value:
+                          type: number
+                        measuredAt:
+                          type: string
+                        sourceConfidence:
+                          type: string
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/search-performance/sync:
+    post:
+      summary: Sync GSC search-performance rows for a site (deterministic stub, class B)
+      operationId: syncSearchPerformance
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Search-performance batch persisted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inserted:
+                        type: integer
+                      capturedAt:
+                        type: string
+                      market:
+                        type: string
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/search-performance:
+    get:
+      summary: List the latest search-performance batch (query x page matrix)
+      operationId: listSearchPerformance
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest search-performance rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        query:
+                          type: string
+                        pageUrl:
+                          type: string
+                        clicks:
+                          type: integer
+                        impressions:
+                          type: integer
+                        ctr:
+                          type: number
+                        position:
+                          type: number
+                        sourceConfidence:
+                          type: string
+                  meta:
+                    type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/search-performance/intelligence:
+    get:
+      summary: Search-performance intelligence (striking distance, CTR gaps, cannibalization)
+      operationId: searchPerformanceIntelligence
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Derived search-performance signals from the latest batch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      capturedAt:
+                        type: string
+                        nullable: true
+                      strikingDistance:
+                        type: array
+                        items:
+                          type: object
+                      ctrGaps:
+                        type: array
+                        items:
+                          type: object
+                      cannibalization:
+                        type: array
+                        items:
+                          type: object
+                      summary:
+                        type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/opportunities:
+    get:
+      summary: List opportunities for a project (priority-ordered)
+      operationId: listOpportunities
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Opportunity list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Create an opportunity (requires evidence of confidence class A-C)
+      operationId: createOpportunity
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Opportunity created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Missing fields or insufficient evidence
+        '404':
+          description: Project not found
+  /opportunities/{opportunityId}:
+    get:
+      summary: Get a single opportunity with its evidence
+      operationId: getOpportunity
+      parameters:
+        - name: opportunityId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Opportunity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Opportunity not found
+  /opportunities/{opportunityId}/transition:
+    post:
+      summary: Transition an opportunity status along the lifecycle (§6.5)
+      operationId: transitionOpportunity
+      parameters:
+        - name: opportunityId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Updated opportunity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Illegal status transition
+        '404':
+          description: Opportunity not found
+  /projects/{projectId}/sites/{siteId}/opportunities/generate-indexability:
+    post:
+      summary: Generate technical_fix opportunities from current indexability blockers (§6.6)
+      operationId: generateIndexabilityOpportunities
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Generation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/opportunities/generate:
+    post:
+      summary: Generate all five hard opportunity classes in one idempotent run (§6.1)
+      operationId: generateAllOpportunities
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Generation result across technical_fix, low_hanging_keyword, money_page, cannibalization and internal_link_gap
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Site not found
+  /opportunities/{opportunityId}/revalidate:
+    post:
+      summary: Re-check an implemented indexability fix and set validated or reopened (§6.5)
+      operationId: revalidateOpportunity
+      parameters:
+        - name: opportunityId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated opportunity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Opportunity is not in a revalidatable state
+        '404':
+          description: Opportunity not found
+  /projects/{projectId}/keyword-groups:
+    get:
+      summary: List keyword groups for a project
+      operationId: listKeywordGroups
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Keyword groups
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Create a keyword group
+      operationId: createKeywordGroup
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                topic:
+                  type: string
+      responses:
+        '201':
+          description: Keyword group created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Duplicate group name
+  /projects/{projectId}/keywords:
+    get:
+      summary: List keywords (filter by groupId, intent, brand, market)
+      operationId: listKeywords
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: intent
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: brand
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Keyword list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Bulk add keywords (auto intent/brand/funnel classification)
+      operationId: addKeywords
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Keywords added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+  /projects/{projectId}/keywords/{keywordId}/map-url:
+    post:
+      summary: Map a keyword to a target URL
+      operationId: mapKeywordToUrl
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetUrl:
+                  type: string
+      responses:
+        '200':
+          description: Updated keyword
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Keyword not found
+  /projects/{projectId}/keywords/{keywordId}/rank-snapshots:
+    get:
+      summary: List rank snapshots (own position history) for a keyword
+      operationId: listRankSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rank snapshot history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Record a rank/SERP snapshot via the SERP provider (stub, DEC-002)
+      operationId: recordRankSnapshot
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                market:
+                  type: string
+                device:
+                  type: string
+      responses:
+        '201':
+          description: Snapshot recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Keyword not found
+  /projects/{projectId}/keywords/{keywordId}/serp-snapshots:
+    get:
+      summary: List SERP snapshots for a keyword
+      operationId: listSerpSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SERP snapshot history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+  /projects/{projectId}/keywords/{keywordId}/serp-diff:
+    get:
+      summary: Diff the two latest SERP snapshots for a keyword
+      operationId: serpDiff
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: keywordId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SERP diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: No SERP snapshots
+  /projects/{projectId}/visibility:
+    get:
+      summary: List visibility score history for a project
+      operationId: listVisibilityScores
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Visibility history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+  /projects/{projectId}/visibility/compute:
+    post:
+      summary: Compute the project visibility index over the tracked keyword set (§8)
+      operationId: computeVisibility
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                market:
+                  type: string
+      responses:
+        '201':
+          description: Visibility score
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
   /integrations:
     get:
       summary: List integration accounts
@@ -476,6 +1166,37 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/IntegrationAccount'
+  /integrations/{integrationId}/sync:
+    post:
+      summary: Run a connector sync (fetch -> validate -> normalize) storing raw and normalized data separately
+      operationId: runConnectorSync
+      parameters:
+        - name: integrationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connector sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      integration:
+                        $ref: '#/components/schemas/IntegrationAccount'
+                      rawEventId:
+                        type: string
+                      normalizedMetricsInserted:
+                        type: integer
+        '400':
+          description: Provider has no implemented connector
+        '404':
+          description: Integration not found
   /jobs:
     get:
       summary: List foundation jobs
@@ -578,6 +1299,1056 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/SourceMapEntry'
+    post:
+      summary: Upsert a url->template->repo source map entry (§4.3)
+      operationId: upsertSourceMapEntry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Source map entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SourceMapEntry'
+        '400':
+          description: Missing fields
+        '404':
+          description: Project not found
+  /source-map/resolve:
+    get:
+      summary: Resolve the source anchor for a URL (exact or longest-prefix match)
+      operationId: resolveSourceAnchor
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved anchor or null
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+  /projects/{projectId}/deploy-markers:
+    get:
+      summary: List deploy markers for a project
+      operationId: listDeployMarkers
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deploy markers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Create a deploy marker (for crawl/GSC delta correlation, §4.3)
+      operationId: createDeployMarker
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                commitSha:
+                  type: string
+      responses:
+        '201':
+          description: Deploy marker created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/pr-checks:
+    get:
+      summary: List Source-Map pre-merge gate results for a project (history)
+      operationId: listPrChecks
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PR check history (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+    post:
+      summary: Evaluate a Source-Map pre-merge gate for changed repo paths (§4.3)
+      operationId: evaluatePrCheck
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - changedPaths
+              properties:
+                changedPaths:
+                  type: array
+                  items:
+                    type: string
+                prNumber:
+                  type: integer
+                headSha:
+                  type: string
+      responses:
+        '201':
+          description: Gate result (passed | review_required | unmapped) with affected templates and related opportunities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                      affectedTemplates:
+                        type: array
+                        items:
+                          type: object
+                      affectedUrlPatterns:
+                        type: array
+                        items:
+                          type: string
+                      relatedOpportunities:
+                        type: array
+                        items:
+                          type: object
+        '400':
+          description: changedPaths missing or empty
+        '404':
+          description: Project not found
+  /projects/{projectId}/backlinks/import:
+    post:
+      summary: Import a GSC backlinks snapshot (deterministic stub, class B, §5 Modul 5)
+      operationId: importBacklinks
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Snapshot imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      snapshotId:
+                        type: string
+                      totalBacklinks:
+                        type: integer
+                      referringDomains:
+                        type: integer
+                      capturedAt:
+                        type: string
+        '400':
+          description: No site configured for the project
+        '404':
+          description: Project not found
+  /projects/{projectId}/backlinks:
+    get:
+      summary: List backlinks from the latest snapshot
+      operationId: listBacklinks
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backlinks (latest snapshot)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  meta:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/backlinks/diff:
+    get:
+      summary: New/lost backlinks and referring domains (latest vs previous snapshot)
+      operationId: backlinkDiff
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backlink diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      newBacklinks:
+                        type: array
+                        items:
+                          type: object
+                      lostBacklinks:
+                        type: array
+                        items:
+                          type: object
+                      newReferringDomains:
+                        type: array
+                        items:
+                          type: string
+                      lostReferringDomains:
+                        type: array
+                        items:
+                          type: string
+                      netBacklinkChange:
+                        type: integer
+                      netReferringDomainChange:
+                        type: integer
+        '404':
+          description: No backlink snapshots imported yet
+  /projects/{projectId}/referring-domains:
+    get:
+      summary: Aggregated referring domains from the latest snapshot
+      operationId: listReferringDomains
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Referring domains
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/authority:
+    get:
+      summary: Authority summary (follow ratio, top referring domains, anchors, targets)
+      operationId: authoritySummary
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authority summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/backlink-snapshots:
+    get:
+      summary: Backlink snapshot history for a project
+      operationId: listBacklinkSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Snapshot history (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/reports:
+    get:
+      summary: List generated reports for a project (newest first)
+      operationId: listReports
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reports
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Generate a report (weekly_summary, opportunity_digest, authority_report)
+      operationId: generateReport
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+      responses:
+        '201':
+          description: Generated report with sections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Invalid report type
+        '404':
+          description: Project not found
+  /reports/{reportId}:
+    get:
+      summary: Get a generated report
+      operationId: getReport
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Report not found
+  /reports/{reportId}/export:
+    get:
+      summary: Export a report as CSV or printable HTML
+      operationId: exportReport
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [csv, html, pdf]
+      responses:
+        '200':
+          description: Export envelope (format, contentType, filename, content)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Report not found
+  /reports/{reportId}/deliver:
+    post:
+      summary: Deliver a report via a stub channel (email/slack)
+      operationId: deliverReport
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - channel
+              properties:
+                channel:
+                  type: string
+                target:
+                  type: string
+      responses:
+        '201':
+          description: Delivery record
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Report not found
+  /reports/{reportId}/deliveries:
+    get:
+      summary: List delivery records for a report
+      operationId: listReportDeliveries
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deliveries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Report not found
+  /projects/{projectId}/report-schedules:
+    get:
+      summary: List report schedules for a project
+      operationId: listReportSchedules
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Schedules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Create a report schedule (cadence weekly/monthly)
+      operationId: createReportSchedule
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - cadence
+              properties:
+                type:
+                  type: string
+                cadence:
+                  type: string
+                channel:
+                  type: string
+                target:
+                  type: string
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/report-schedules/run-due:
+    post:
+      summary: Run all due report schedules (weekly-report automation)
+      operationId: runDueReportSchedules
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Generation result for due schedules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/alert-rules:
+    get:
+      summary: List alert rules for a project
+      operationId: listAlertRules
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Create an alert rule (metric, comparator, threshold)
+      operationId: createAlertRule
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - metric
+                - comparator
+                - threshold
+              properties:
+                metric:
+                  type: string
+                comparator:
+                  type: string
+                threshold:
+                  type: number
+      responses:
+        '201':
+          description: Alert rule created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Invalid metric/comparator/threshold
+        '404':
+          description: Project not found
+  /projects/{projectId}/alert-rules/{ruleId}:
+    delete:
+      summary: Delete an alert rule
+      operationId: deleteAlertRule
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deletion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Alert rule not found
+  /projects/{projectId}/alerts/evaluate:
+    post:
+      summary: Evaluate alert rules against current metrics and record events
+      operationId: evaluateAlerts
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Evaluated alert events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/alert-events:
+    get:
+      summary: List alert events (history) for a project
+      operationId: listAlertEvents
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alert events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/ai-prompts:
+    get:
+      summary: List tracked AI prompts for a project
+      operationId: listAiPrompts
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AI prompts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Track an AI prompt
+      operationId: createAiPrompt
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - prompt
+              properties:
+                prompt:
+                  type: string
+                market:
+                  type: string
+      responses:
+        '201':
+          description: AI prompt created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/ai-prompts/{promptId}/snapshots:
+    get:
+      summary: List AI answer snapshots for a prompt
+      operationId: listAiSnapshots
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: promptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AI answer snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Prompt not found
+    post:
+      summary: Record a deterministic LLM answer snapshot (confidence class E, never evidence)
+      operationId: recordAiSnapshot
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: promptId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Snapshot recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Prompt not found
+  /projects/{projectId}/ai-visibility:
+    get:
+      summary: AI visibility score (cited share across tracked prompts, class E signal)
+      operationId: aiVisibilityScore
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AI visibility score
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /projects/{projectId}/sites/{siteId}/aeo/scan:
+    post:
+      summary: Scan submitted page content for answer-engine readiness (class A)
+      operationId: scanAeo
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+                - content
+              properties:
+                url:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '201':
+          description: AEO assessment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/sites/{siteId}/aeo:
+    get:
+      summary: List latest AEO assessments per URL for a site
+      operationId: listAeoAssessments
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: siteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AEO assessments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Site not found
+  /projects/{projectId}/proposals:
+    get:
+      summary: List review-gated proposals (MCP write-tool artifacts)
+      operationId: listProposals
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Project not found
+    post:
+      summary: Create a review-gated proposal (status proposed; never a direct production change)
+      operationId: createProposal
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - kind
+                - title
+                - body
+              properties:
+                kind:
+                  type: string
+                title:
+                  type: string
+                body:
+                  type: string
+                opportunityId:
+                  type: string
+      responses:
+        '201':
+          description: Proposal created (proposed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Project not found
+  /proposals/{proposalId}/transition:
+    post:
+      summary: Decide a proposal (accepted or rejected; once only)
+      operationId: transitionProposal
+      parameters:
+        - name: proposalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Updated proposal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '409':
+          description: Invalid transition
+        '404':
+          description: Proposal not found
 components:
   securitySchemes:
     bearerAuth:

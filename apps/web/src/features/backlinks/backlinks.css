@@ -1,0 +1,217 @@
+/* UX-4 §H Backlinks styles. Every class is prefixed with `backlinks-`; global
+   classes (.card, .badge, .button, .kicker, .muted, .notice, .badge-row,
+   .table-list, .metric-grid, .content-grid, .action-row, .hero-card) are
+   reused. All colours come from tokens (var(--…)). */
+
+.backlinks-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* --- Hero: TrendChart + ScoreGauge two-column --- */
+.backlinks-hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.25rem;
+}
+
+.backlinks-hero__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.backlinks-gauge-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.backlinks-gauge-foot {
+  text-align: center;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.backlinks-gauge-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* --- Chart wrappers --- */
+.backlinks-chart {
+  margin-top: 1rem;
+}
+
+/* --- Distribution bars (follow/nofollow + anchors) --- */
+.backlinks-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.backlinks-dist-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.backlinks-dist-row__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.backlinks-dist-row__label {
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backlinks-dist-row__value {
+  color: var(--muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.backlinks-bar-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.backlinks-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 2px;
+}
+
+.backlinks-bar-fill--follow {
+  background: var(--success);
+}
+
+.backlinks-bar-fill--nofollow {
+  background: var(--muted);
+}
+
+.backlinks-bar-fill--anchor {
+  background: var(--cat-link, #9a6b4f);
+}
+
+/* --- Referring-domains table --- */
+.backlinks-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.backlinks-table th,
+.backlinks-table td {
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.backlinks-table th {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.backlinks-table td.backlinks-num,
+.backlinks-table th.backlinks-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.backlinks-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.backlinks-domain {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.backlinks-spark-cell {
+  width: 7rem;
+  min-width: 7rem;
+}
+
+/* --- Empty states (charts + sections) --- */
+.backlinks-flow-empty,
+.backlinks-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 12rem;
+  text-align: center;
+  padding: 2rem;
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  background: var(--surface-muted);
+}
+
+.backlinks-flow-empty__title,
+.backlinks-empty__title {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.backlinks-flow-empty__hint,
+.backlinks-empty__hint {
+  color: var(--muted);
+  max-width: 30rem;
+}
+
+/* --- Chart tooltip (flow chart island) — mirrors .card surface --- */
+.backlinks-chart-tooltip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  box-shadow: 0 24px 80px rgba(77, 47, 23, 0.08);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.backlinks-chart-tooltip__date {
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 0.25rem;
+}
+
+.backlinks-chart-tooltip__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.backlinks-chart-tooltip__label {
+  color: var(--muted);
+}
+
+.backlinks-chart-tooltip__value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 860px) {
+  .backlinks-hero {
+    grid-template-columns: 1fr;
+  }
+}

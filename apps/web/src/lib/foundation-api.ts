@@ -93,7 +93,12 @@ export interface CreateFoundationJobInput {
 export async function loadFoundationDashboardData(): Promise<FoundationDashboardData> {
   try {
     const projects = await apiGet<FoundationProject[]>("/projects");
-    const selectedProject = projects[0] ?? null;
+    const { getActiveProjectId } = await import("./active-project");
+    const activeProjectId = await getActiveProjectId();
+    const selectedProject =
+      (activeProjectId ? projects.find((project) => project.id === activeProjectId) : null) ??
+      projects[0] ??
+      null;
     const [sites, integrations, jobs, sourceMap] = await Promise.all([
       selectedProject ? apiGet<FoundationSite[]>(`/projects/${selectedProject.id}/sites`) : Promise.resolve([]),
       apiGet<FoundationIntegration[]>("/integrations"),

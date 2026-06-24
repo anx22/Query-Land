@@ -7,6 +7,7 @@ const pollIntervalMs = Number(process.env.CRAWLER_POLL_INTERVAL_MS ?? 5000);
 const fetchTimeoutMs = Number(process.env.CRAWLER_FETCH_TIMEOUT_MS ?? 10000);
 const fetchMaxAttempts = Number(process.env.CRAWLER_FETCH_MAX_ATTEMPTS ?? 2);
 const runOnce = process.env.CRAWLER_ONCE === "1";
+let shutdownRequested = false;
 
 export class HttpCrawlWorkerApiClient implements CrawlWorkerApiClient {
   constructor(private readonly baseUrl = apiBaseUrl) {}
@@ -67,15 +68,24 @@ export async function runCrawlerWorkerLoop(): Promise<void> {
     const result = await runCrawlWorkerCycle({
       apiClient,
       fetchTimeoutMs,
-      retry: { maxAttempts: fetchMaxAttempts, delayMs: 100 }
+      retry: { maxAttempts: fetchMaxAttempts, delayMs: 100 },
+      maxRedirects: 5
     });
     if (result.claimed) {
       console.log(JSON.stringify({ level: "info", service: "crawler", event: "crawl_worker_cycle", ...result }));
     }
-    if (!runOnce) {
+    if (!runOnce && !shutdownRequested) {
       await sleep(pollIntervalMs);
     }
-  } while (!runOnce);
+  } while (!runOnce && !shutdownRequested);
+  if (shutdownRequested) {
+    console.log(JSON.stringify({ level: "info", service: "crawler", event: "crawl_worker_shutdown_complete" }));
+  }
+}
+
+export function requestCrawlerWorkerShutdown(signal: NodeJS.Signals = "SIGTERM"): void {
+  shutdownRequested = true;
+  console.log(JSON.stringify({ level: "info", service: "crawler", event: "crawl_worker_shutdown_requested", signal }));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -83,6 +93,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 if (process.env.NODE_ENV !== "test") {
+  process.once("SIGTERM", requestCrawlerWorkerShutdown);
+  process.once("SIGINT", requestCrawlerWorkerShutdown);
   runCrawlerWorkerLoop().catch((error: unknown) => {
     console.error(JSON.stringify({ level: "error", service: "crawler", event: "crawl_worker_crash", message: error instanceof Error ? error.message : String(error) }));
     process.exitCode = 1;

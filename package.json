@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "test": "npm run build && NODE_ENV=test node --test packages/domain-model/dist/test/*.test.js apps/api/dist/test/*.test.js services/crawler/dist/test/*.test.js",
+    "test": "npm run build && NODE_ENV=test node --test --test-concurrency=1 packages/domain-model/dist/test/*.test.js apps/api/dist/test/*.test.js services/crawler/dist/test/*.test.js services/mcp/dist/test/*.test.js",
     "typecheck": "tsc -b --pretty false",
     "dev": "node scripts/dev.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",

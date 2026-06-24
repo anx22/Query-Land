@@ -1,60 +1,81 @@
-import { mkdirSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
 import { DomainValidationError, type HealthSnapshot } from "@seo-tool/domain-model";
 import { apiDefaults } from "@seo-tool/shared-config";
+import { createDatabase, type AsyncDatabase } from "./db/index.js";
+import { runMigrations } from "./db/migrate.js";
 import { createAuditLog } from "./stores/audit-log.js";
+import { createAiStore, type AiStore } from "./stores/ai-store.js";
+import { createAlertStore, type AlertStore } from "./stores/alert-store.js";
 import { createAuthStore, type AuthStore, type LoginResult, type RegisterInput } from "./stores/auth-store.js";
+import { createBacklinkStore, type BacklinkStore } from "./stores/backlink-store.js";
 import { createCrawlStore, type CrawlStore, type RecordAuditIssuesScope } from "./stores/crawl-store.js";
 import { createJobStore, type JobStore } from "./stores/job-store.js";
+import { createKeywordStore, type KeywordStore } from "./stores/keyword-store.js";
+import { createLinkGraphStore, type LinkGraphStore } from "./stores/link-graph-store.js";
+import { createOpportunityStore, type OpportunityStore } from "./stores/opportunity-store.js";
 import { createProjectStore, type ProjectStore } from "./stores/project-store.js";
+import { createProposalStore, type ProposalStore } from "./stores/proposal-store.js";
+import { createRankStore, type RankStore } from "./stores/rank-store.js";
+import { createReportStore, type ReportStore } from "./stores/report-store.js";
+import { createSearchPerformanceStore, type SearchPerformanceStore } from "./stores/search-performance-store.js";
 import { createSourceMapStore, type SourceMapStore } from "./stores/source-map-store.js";
 import { RequestError } from "./stores/store-errors.js";
-import type { SQLiteDatabase } from "./stores/sqlite-types.js";
-import { runSQLiteMigrations } from "./sqlite-migrations.js";
 import { seedFoundation } from "./sqlite-seed.js";
-
-const require = createRequire(import.meta.url);
-const { DatabaseSync } = require("node:sqlite") as {
-  DatabaseSync: new (location: string) => SQLiteDatabase;
-};
 
 export interface HealthStore {
   health(): HealthSnapshot;
 }
 
-export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & {
-  close(): void;
+export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore & {
+  close(): Promise<void>;
 };
 
 export type SQLiteStore = BackendStore;
 
 export { RequestError };
-export type { AuthStore, CrawlStore, JobStore, LoginResult, ProjectStore, RecordAuditIssuesScope, RegisterInput, SourceMapStore };
+export type { AiStore, AlertStore, AuthStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, ProposalStore, RankStore, RecordAuditIssuesScope, RegisterInput, ReportStore, SearchPerformanceStore, SourceMapStore };
 
-export function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): BackendStore {
-  const location = sqliteLocation(databaseUrl);
-  if (location !== ":memory:") {
-    mkdirSync(dirname(location), { recursive: true });
-  }
-
-  const db = new DatabaseSync(location);
-  runSQLiteMigrations(db);
-  seedFoundation(db);
+export async function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Promise<BackendStore> {
+  const db = await createDatabase(databaseUrl);
+  await runMigrations(db);
+  await seedFoundation(db);
 
   const audit = createAuditLog(db);
   return composeStores<BackendStore>([
-    createHealthStore(db, location),
+    createHealthStore(db, databaseUrl),
     withDomainValidation(createAuthStore(db, audit)),
     withDomainValidation(createProjectStore(db, audit)),
     createCrawlStore(db, audit),
     createJobStore(db, audit),
-    createSourceMapStore(db),
+    createSourceMapStore(db, audit),
+    createLinkGraphStore(db, audit),
+    withDomainValidation(createOpportunityStore(db, audit)),
+    createKeywordStore(db, audit),
+    createRankStore(db, audit),
+    createSearchPerformanceStore(db, audit),
+    createBacklinkStore(db, audit),
+    createReportStore(db, audit),
+    createAlertStore(db, audit),
+    createAiStore(db, audit),
+    createProposalStore(db, audit),
     { close: () => db.close() }
   ]);
 }
 
-function createHealthStore(_db: SQLiteDatabase, location: string): HealthStore {
+// Never expose credentials in the health payload — /health may be reachable
+// publicly in production. Reduce a connection string to a safe driver/host/db
+// descriptor, stripping any user:password component.
+function redactDatabaseUrl(location: string): string {
+  try {
+    const url = new URL(location);
+    const db = url.pathname.replace(/^\//, "") || "(default)";
+    return `${url.protocol}//${url.host}/${db}`;
+  } catch {
+    // Non-URL locations (e.g. "sqlite::memory:") carry no credentials.
+    return location;
+  }
+}
+
+function createHealthStore(_db: AsyncDatabase, location: string): HealthStore {
   return {
     health(): HealthSnapshot {
       return {
@@ -64,8 +85,8 @@ function createHealthStore(_db: SQLiteDatabase, location: string): HealthStore {
         checkedAt: new Date().toISOString(),
         checks: [
           { name: "http", status: "ok" },
-          { name: "sqlite", status: "ok", details: location },
-          { name: "auth_tables", status: "ok", details: "users and sessions are stored in the embedded backend." },
+          { name: "database", status: "ok", details: redactDatabaseUrl(location) },
+          { name: "auth_tables", status: "ok", details: "users and sessions are stored in the backend database." },
           { name: "raw_normalized_contract", status: "ok", details: "raw_events and normalized_metrics are separate tables." }
         ]
       };
@@ -107,28 +128,18 @@ function withDomainValidation<TStore extends object>(store: TStore): TStore {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver) as unknown;
       if (typeof value !== "function") return value;
-      return (...args: unknown[]) => validateDomainInput(() => value.apply(target, args));
+      // Store methods are async; await the result so a DomainValidationError
+      // surfacing as a rejected promise is translated to a RequestError.
+      return async (...args: unknown[]) => {
+        try {
+          return await (value as (...a: unknown[]) => unknown).apply(target, args);
+        } catch (error) {
+          if (error instanceof DomainValidationError) {
+            throw new RequestError(400, "validation_error", error.message);
+          }
+          throw error;
+        }
+      };
     }
   });
-}
-
-function validateDomainInput<T>(validator: () => T): T {
-  try {
-    return validator();
-  } catch (error) {
-    if (error instanceof DomainValidationError) {
-      throw new RequestError(400, "validation_error", error.message);
-    }
-    throw error;
-  }
-}
-
-export function sqliteLocation(databaseUrl: string): string {
-  if (databaseUrl === "sqlite::memory:" || databaseUrl === ":memory:") {
-    return ":memory:";
-  }
-  if (databaseUrl.startsWith("sqlite:")) {
-    return resolve(databaseUrl.slice("sqlite:".length));
-  }
-  return resolve(databaseUrl);
 }

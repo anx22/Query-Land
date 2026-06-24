@@ -9,7 +9,9 @@
     "start": "next start",
     "build:next": "DATABASE_URL=sqlite::memory: next build",
     "build:deps": "npm --workspace @seo-tool/domain-model run build && npm --workspace @seo-tool/shared-config run build && npm --workspace @seo-tool/api run build",
-    "vercel-build": "npm run build:deps && npm run build:next"
+    "vercel-build": "npm run build:deps && npm run build:next",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@seo-tool/api": "0.1.0",
@@ -17,12 +19,19 @@
     "@seo-tool/shared-config": "0.1.0",
     "next": "^15.3.3",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20.19.11",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "typescript": "^5.9.2"
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.8"
   }
 }

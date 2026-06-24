@@ -1,7 +1,6 @@
 /**
- * Feature boundary for the content-opportunities module.
- *
- * Keep module-specific components, data loaders, hooks, and workflow state in
- * this directory instead of adding them to generic route wrappers.
+ * Feature boundary for the content-opportunities module (Opportunity Board v0).
  */
-export {};
+export * from "./api";
+export { OpportunityBoardClient } from "./opportunity-board-client";
+export { EvidenceChainDrawer } from "./evidence-chain-drawer";

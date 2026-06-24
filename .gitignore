@@ -9,3 +9,6 @@ apps/*/dist/
 services/*/dist/
 packages/*/dist/
 data/
+
+# Claude Code local scaffolding (agent worktrees etc.)
+.claude/

@@ -12,10 +12,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   return (
     <AppShell activePath="/projects">
       <section className="card hero-card">
-        <p className="kicker">Project Control</p>
-        <h1>Projects & Sites aus SQLite/API</h1>
+        <p className="kicker">Projekte</p>
+        <h1>Projekte &amp; Sites</h1>
         <p>
-          Sprint-Fortschritt für Welle 1: Projekte und Site-Scopes werden nicht mehr als Demo-Modul angezeigt, sondern aus der Foundation API gelesen und über minimale Formulare persistiert.
+          Verwalten Sie Projekte, Site-Scopes, Märkte und Business-Werte — die Grundlage für alle Analysen und Optimierungschancen.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.projects.length} Projekte</span>

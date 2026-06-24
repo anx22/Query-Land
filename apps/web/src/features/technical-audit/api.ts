@@ -10,6 +10,13 @@ export interface TechnicalAuditUrlRow {
   latestIndexability: IndexabilityRecord | null;
 }
 
+export interface WebVitalMetric {
+  metric: string;
+  value: number;
+  measuredAt: string;
+  sourceConfidence: string;
+}
+
 export interface TechnicalAuditData extends FoundationDashboardData {
   selectedSite: FoundationSite | null;
   crawlRuns: CrawlRun[];
@@ -21,6 +28,7 @@ export interface TechnicalAuditData extends FoundationDashboardData {
   discoveredUrlsMeta: ListMeta;
   urlExplorerRows: TechnicalAuditUrlRow[];
   urlExplorerMeta: ListMeta;
+  webVitals: WebVitalMetric[];
 }
 
 export interface TechnicalAuditLoadOptions {
@@ -49,12 +57,13 @@ export async function loadTechnicalAuditData(options: TechnicalAuditLoadOptions 
     if (options.issueSeverity && options.issueSeverity !== "all") issueParams.set("severity", options.issueSeverity);
     const urlParams = new URLSearchParams({ limit: "25", offset: String(Math.max(0, Math.trunc(options.urlOffset ?? 0))) });
 
-    const [crawlRunsResponse, healthScores, auditIssuesResponse, discoveredUrlsResponse, urlExplorerResponse] = await Promise.all([
+    const [crawlRunsResponse, healthScores, auditIssuesResponse, discoveredUrlsResponse, urlExplorerResponse, webVitals] = await Promise.all([
       apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=10`),
       apiGet<CrawlHealthScore[]>(`${base}/health-scores`),
       apiGetEnvelope<AuditIssueRecord[]>(`${base}/audit-issues?${issueParams.toString()}`),
       apiGetEnvelope<DiscoveredUrl[]>(`${base}/discovered-urls?limit=25`),
-      apiGetEnvelope<TechnicalAuditUrlRow[]>(`${base}/url-explorer?${urlParams.toString()}`)
+      apiGetEnvelope<TechnicalAuditUrlRow[]>(`${base}/url-explorer?${urlParams.toString()}`),
+      apiGet<WebVitalMetric[]>(`${base}/web-vitals`)
     ]);
 
     return {
@@ -68,7 +77,8 @@ export async function loadTechnicalAuditData(options: TechnicalAuditLoadOptions 
       discoveredUrls: discoveredUrlsResponse.data,
       discoveredUrlsMeta: discoveredUrlsResponse.meta ?? emptyListMeta(discoveredUrlsResponse.data.length),
       urlExplorerRows: urlExplorerResponse.data,
-      urlExplorerMeta: urlExplorerResponse.meta ?? emptyListMeta(urlExplorerResponse.data.length)
+      urlExplorerMeta: urlExplorerResponse.meta ?? emptyListMeta(urlExplorerResponse.data.length),
+      webVitals
     };
   } catch (error) {
     return {
@@ -115,6 +125,7 @@ function emptyTechnicalAuditData(dashboard: FoundationDashboardData, selectedSit
     discoveredUrls: [],
     discoveredUrlsMeta: emptyListMeta(),
     urlExplorerRows: [],
-    urlExplorerMeta: emptyListMeta()
+    urlExplorerMeta: emptyListMeta(),
+    webVitals: []
   };
 }

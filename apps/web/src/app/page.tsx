@@ -1,15 +1,15 @@
 import { AppShell } from "../components/app-shell";
 import { Dashboard } from "../components/dashboard";
-import { loadFoundationDashboardData } from "../lib/foundation-api";
+import { loadOverviewData } from "../lib/overview-api";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const dashboardData = await loadFoundationDashboardData();
+  const overviewData = await loadOverviewData();
 
   return (
     <AppShell activePath="/">
-      <Dashboard data={dashboardData} />
+      <Dashboard data={overviewData} />
     </AppShell>
   );
 }

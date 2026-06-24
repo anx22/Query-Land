@@ -1,7 +1,7 @@
 # Module Spec: Crawl Engine
 
 > Verfeinert: Modul 2 (§5) · Master: `docs/PRODUCT_MASTER_SPEC.md` (bei Konflikt gewinnt der Master)
-> Status: Teilimplementiert — Contracts/Persistenz/API vorhanden; Worker und UI noch offen. Roadmap-Tracking: `../tasks/roadmap-tracking.md`.
+> Status: Teilimplementiert — Contracts/Persistenz/API vorhanden; Worker und UI noch offen. Roadmap: `../tasks/roadmap.md`.
 
 ## Purpose
 
@@ -184,4 +184,4 @@ Welle-2 Gate:
 
 ## Cross-Refs
 
-§5/M2, §4.3, specs/issue-rules.md, specs/source-map.md, tasks/roadmap-tracking.md
+§5/M2, §4.3, specs/issue-rules.md, specs/source-map.md, tasks/roadmap.md

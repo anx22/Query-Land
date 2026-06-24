@@ -1,7 +1,3 @@
-/**
- * Feature boundary for the reports module.
- *
- * Keep module-specific components, data loaders, hooks, and workflow state in
- * this directory instead of adding them to generic route wrappers.
- */
-export {};
+/** Feature boundary for the reports & alerts module (Reporting v0). */
+export * from "./api";
+export * from "./reports-logic";
