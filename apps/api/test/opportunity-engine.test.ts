@@ -26,7 +26,10 @@ interface GenResult {
   opportunities: Array<{ type: string; affectedUrls: string[]; evidence: Array<{ sourceConfidence: string }> }>;
 }
 
-test("search opportunities generate low-hanging, money-page and cannibalization classes (idempotent)", async () => {
+test("search opportunities are empty until a GSC source is connected (idempotent)", async () => {
+  // The search-opportunity classes (low_hanging_keyword, money_page, cannibalization) derive from
+  // GSC search-performance data. Until a real source is connected that data is empty, so no search
+  // opportunities are generated. The pure analysis logic is unit-tested in search-performance.test.ts.
   const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Engine", slug: "engine" })).id;
@@ -35,18 +38,12 @@ test("search opportunities generate low-hanging, money-page and cannibalization 
 
     const gen = data<GenResult>(await app("POST", `/projects/${projectId}/sites/${siteId}/opportunities/generate`, {}));
     const byType = (type: string) => gen.opportunities.filter((opp) => opp.type === type).length;
-    assert.ok(byType("low_hanging_keyword") >= 1, "striking-distance queries become low-hanging opportunities");
-    assert.ok(byType("money_page") >= 1, "ctr gaps become money-page opportunities");
-    assert.ok(byType("cannibalization") >= 1, "multi-page queries become cannibalization opportunities");
-    // Every generated opportunity carries acceptable evidence (class A-C, here GSC = B).
-    assert.ok(gen.opportunities.every((opp) => opp.evidence.some((ev) => ["A", "B", "C"].includes(ev.sourceConfidence))));
+    assert.equal(byType("low_hanging_keyword"), 0);
+    assert.equal(byType("money_page"), 0);
+    assert.equal(byType("cannibalization"), 0);
 
     const list = data<Array<{ type: string; priority: number }>>(await app("GET", `/projects/${projectId}/opportunities?limit=100`));
     assert.equal(list.length, gen.created, "all generated opportunities are listable");
-    // Listing is priority-ordered (descending).
-    for (let index = 1; index < list.length; index += 1) {
-      assert.ok(list[index - 1].priority >= list[index].priority);
-    }
 
     const again = data<{ created: number }>(await app("POST", `/projects/${projectId}/sites/${siteId}/opportunities/generate`, {}));
     assert.equal(again.created, 0, "re-running the generator is idempotent");

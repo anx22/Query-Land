@@ -1502,3 +1502,29 @@ select:disabled {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* Inline helper text under a form field/label (plain-language guidance). */
+.form-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Optional "boost" block in the setup wizard — visually separated from required steps. */
+.onboarding__optional {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--line);
+}
+.onboarding__optional-label {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.onboarding-step.is-optional {
+  opacity: 0.95;
+}

@@ -4,9 +4,11 @@ import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
 import { createDatabase } from "../src/db/index.js";
 import { runMigrations } from "../src/db/migrate.js";
+import { seedDemoFoundation } from "./helpers/demo-foundation.js";
 
 async function testApp() {
   const store = await createStore("sqlite::memory:");
+  await seedDemoFoundation(store);
   return { app: createApp(store), store };
 }
 
@@ -89,6 +91,7 @@ test("POST /jobs is persisted and idempotent by project/type/subject", async () 
 
 test("job queue claims a queued job exactly once and completes it", async () => {
   const store = await createStore("sqlite::memory:");
+  await seedDemoFoundation(store);
   await store.createJob("proj-demo", "health_check", "claim-me");
   const claimed = await store.claimNextJob();
   assert.equal(claimed?.status, "running");

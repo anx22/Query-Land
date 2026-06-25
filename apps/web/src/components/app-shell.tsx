@@ -50,7 +50,7 @@ export async function AppShell({
         </header>
         {activePath === "/" && <OnboardingChecklist readiness={readiness} />}
         <ReadinessBanner unmet={unmet} />
-        {activeRoute ? <DataStatusBanner status={activeRoute.dataStatus} note={activeRoute.dataNote} /> : null}
+        {activeRoute ? <DataStatusBanner status={activeRoute.dataStatus} /> : null}
         {children}
       </main>
     </div>

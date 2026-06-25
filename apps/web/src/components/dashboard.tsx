@@ -289,7 +289,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           {topOpportunities.length === 0 ? (
             <div className="overview-empty-state">
               <p className="overview-empty-state__text">
-                Noch kein Terrain kartiert — starten Sie die Opportunity-Generierung im Technical Audit oder im Content-Chancen-Board.
+                Noch kein Terrain kartiert — starten Sie eine Analyse (Crawl) und lassen Sie daraus im Content-&-Chancen-Board priorisierte Optimierungschancen erzeugen.
               </p>
               <a className="button secondary" style={{ marginTop: "1rem", display: "inline-block" }} href="/content-opportunities">
                 Chancen ansehen
@@ -376,7 +376,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
                   <span>
                     {run.trigger} · {formatDate(run.startedAt)}
                     {run.summary.discoveredUrls > 0 && (
-                      <> · {run.summary.discoveredUrls} URLs</>
+                      <> · {run.summary.discoveredUrls} {run.summary.discoveredUrls === 1 ? "URL" : "URLs"}</>
                     )}
                   </span>
                   <span className={`status ${crawlStatusClass(run.status)}`}>

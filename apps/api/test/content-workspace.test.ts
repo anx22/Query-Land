@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
+import { seedDemoFoundation } from "./helpers/demo-foundation.js";
 
 async function testApp() {
   const store = await createStore("sqlite::memory:");
+  await seedDemoFoundation(store);
   return { app: createApp(store), store };
 }
 
@@ -63,8 +65,21 @@ test("content brief CRUD + lifecycle transitions", async () => {
   await store.close();
 });
 
-test("refresh candidates derived from clicks decay + open issues (deterministic, demo-seeded)", async () => {
+test("refresh candidates derived from clicks decay + open issues (deterministic)", async () => {
   const { app, store } = await testApp();
+
+  // Record a clicks time-series ourselves (production no longer seeds demo metrics): a steeply
+  // decaying guide (refresh candidate) and a growing pricing page (must NOT be a candidate).
+  const captures = ["2026-04-02T00:00:00.000Z", "2026-05-02T00:00:00.000Z", "2026-06-02T00:00:00.000Z"];
+  const series: Array<{ url: string; values: [number, number, number] }> = [
+    { url: "https://example.com/blog/seo-guide", values: [820, 540, 310] },
+    { url: "https://example.com/pricing", values: [400, 420, 450] }
+  ];
+  const metrics = series.flatMap((entry) =>
+    captures.map((capturedAt, i) => ({ url: entry.url, metric: "clicks", value: entry.values[i], capturedAt, sourceConfidence: "B" }))
+  );
+  const seedRes = await app("POST", `/projects/${P}/sites/${S}/page-metrics`, { metrics });
+  assert.equal(seedRes.status, 201);
 
   const res = await app("GET", `/projects/${P}/sites/${S}/refresh-candidates`);
   assert.equal(res.status, 200);

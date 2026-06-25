@@ -38,6 +38,15 @@ export type { AiStore, AlertStore, AuthStore, BacklinkStore, ContentStore, Crawl
 
 /** Create the Postgres-backed store (Neon prod / PGlite local). */
 export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promise<BackendStore> {
+  return (await createStoreWithDatabase(databaseUrl)).store;
+}
+
+/**
+ * Like {@link createStore} but also returns the underlying database handle. Intended for tests
+ * that need to seed low-level baseline rows directly (e.g. a pending integration with empty
+ * credentials) which no public store method produces.
+ */
+export async function createStoreWithDatabase(databaseUrl = apiDefaults.databaseUrl): Promise<{ store: BackendStore; db: AsyncDatabase }> {
   const db = await createDatabase(databaseUrl);
   await runMigrations(db);
   await seedFoundation(db);
@@ -46,7 +55,7 @@ export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promis
   // The content workspace bridges briefs into the proposal/MCP rail, so it needs the
   // proposal store instance directly (not just the composed facade).
   const proposalStore = createProposalStore(db, audit);
-  return composeStores<BackendStore>([
+  const store = composeStores<BackendStore>([
     createHealthStore(db, databaseUrl),
     withDomainValidation(createAuthStore(db, audit)),
     withDomainValidation(createProjectStore(db, audit)),
@@ -66,6 +75,7 @@ export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promis
     createContentStore(db, audit, proposalStore),
     { close: () => db.close() }
   ]);
+  return { store, db };
 }
 
 // Never expose credentials in the health payload — /health may be reachable

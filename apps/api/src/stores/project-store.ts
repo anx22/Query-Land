@@ -98,7 +98,9 @@ class SQLiteProjectStore implements ProjectStore {
       throw new RequestError(400, "missing_field", "baseUrl and scopeType are required");
     }
     const site: Site = {
-      id: `site-${randomUUID()}`,
+      // The public POST /sites route never sends an id (createSiteRequest whitelists fields);
+      // an explicit id is only honored for direct store callers such as test setup helpers.
+      id: input.id ?? `site-${randomUUID()}`,
       projectId,
       baseUrl: input.baseUrl,
       scopeType: input.scopeType,

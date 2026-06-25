@@ -48,10 +48,12 @@ export function computeReadiness(input: ReadinessInput): ReadinessState {
   const hasProject = input.projects.length > 0;
   const hasSite = input.sites.length > 0;
 
-  // A connector stub for the project counts as "data source connected" — real
-  // OAuth is a backend GAP; creating the connector is the user-facing step.
+  // "Connected" means a real, authenticated data source — status "active". A merely prepared
+  // (pending) connector does NOT count, so the optional data-source step stays honest and never
+  // satisfies a gate on a stub. (Real OAuth that flips a connector to "active" is a later phase.)
   const hasIntegration = input.integrations.some(
-    (integration) => projectId === null || integration.projectId === projectId,
+    (integration) =>
+      integration.status === "active" && (projectId === null || integration.projectId === projectId),
   );
 
   // A crawl_seed job existing for the project means a crawl was kicked off.
@@ -82,16 +84,19 @@ export function isMet(prerequisite: Prerequisite, state: ReadinessState): boolea
  * one. Routes that are themselves part of the setup flow (overview, projects,
  * settings) have no prerequisites so they are always fully usable.
  */
+// Gates reflect REAL data dependencies only. A connected data source (GSC/GA4) is an optional
+// booster, never a hard gate — so it does not appear here. The engines that need a crawl gate on
+// it; keyword entry, backlinks (optional source) and reports only need a project.
 export const ROUTE_PREREQUISITES: Record<string, Prerequisite[]> = {
   "/": [],
   "/projects": [],
   "/settings": ["project"],
   "/technical-audit": ["project", "site"],
   "/url-dossier": ["project", "site", "crawl"],
-  "/keywords-rank": ["project", "integration"],
-  "/content-opportunities": ["project", "site", "integration"],
-  "/backlinks": ["project", "integration"],
-  "/reports": ["project", "integration"],
+  "/keywords-rank": ["project"],
+  "/content-opportunities": ["project", "site", "crawl"],
+  "/backlinks": ["project"],
+  "/reports": ["project"],
   "/ai-visibility": ["project", "site"],
 };
 
@@ -126,33 +131,33 @@ export const PREREQUISITE_META: Record<Prerequisite, PrerequisiteMeta> = {
   project: {
     label: "Projekt",
     banner:
-      "Noch kein Projekt angelegt. Ein Projekt ist die Klammer über allen Analysen — lege zuerst eines an.",
+      "Legen Sie zuerst ein Projekt an — es klammert alle Auswertungen einer Website zusammen.",
     reason: "Zuerst ein Projekt anlegen.",
     ctaLabel: "Projekt anlegen",
     ctaHref: "/projects",
   },
   site: {
-    label: "Site",
+    label: "Website",
     banner:
-      "Dieses Projekt hat noch keine Site/URL. Füge eine Site hinzu, damit Crawls und URL-Analysen möglich werden.",
-    reason: "Zuerst eine Site/URL zum Projekt hinzufügen.",
-    ctaLabel: "Site hinzufügen",
+      "Dieses Projekt hat noch keine Website. Tragen Sie die Adresse ein, damit die Analyse loslegen kann.",
+    reason: "Zuerst eine Website zum Projekt hinzufügen.",
+    ctaLabel: "Website hinzufügen",
     ctaHref: "/projects",
   },
   integration: {
-    label: "Datenquelle",
+    label: "Google Search Console",
     banner:
-      "Noch keine Datenquelle verbunden. Verbinde die Google Search Console, damit Keyword-, Content- und Backlink-Daten einfließen.",
-    reason: "Zuerst eine Datenquelle (Google Search Console) verbinden.",
-    ctaLabel: "Datenquelle verbinden",
+      "Optional: Verbinden Sie die Google Search Console, sobald verfügbar — das bringt echte Klick- und Ranking-Daten dazu.",
+    reason: "Optional: Google Search Console verbinden.",
+    ctaLabel: "Verbinden",
     ctaHref: "/settings",
   },
   crawl: {
-    label: "Crawl",
+    label: "Analyse",
     banner:
-      "Noch kein Crawl gestartet. Starte einen Crawl im Technical Audit, um technische Daten und URLs zu sammeln.",
-    reason: "Zuerst einen Crawl im Technical Audit starten.",
-    ctaLabel: "Crawl starten",
+      "Starten Sie die erste Analyse — sie prüft die Website und liefert sofort technische Befunde und gefundene Seiten.",
+    reason: "Zuerst die erste Analyse starten.",
+    ctaLabel: "Analyse starten",
     ctaHref: "/technical-audit#crawl-start",
   },
 };
@@ -162,32 +167,41 @@ export interface OnboardingStep {
   title: string;
   description: string;
   done: boolean;
+  /** Optional steps are a "boost", not required to finish setup (e.g. connect a data source). */
+  optional: boolean;
   ctaLabel: string;
   ctaHref: string;
 }
 
-/** Build the four-step onboarding waterfall with per-step done state. */
+/**
+ * Build the guided setup steps with per-step done state.
+ *
+ * Order follows the real value path: a crawl delivers technical findings immediately, so it comes
+ * right after the site. Connecting a data source is an OPTIONAL boost (real Google login is a later
+ * phase) and is surfaced last, never blocking completion.
+ */
 export function onboardingSteps(state: ReadinessState): OnboardingStep[] {
-  const order: Array<{ prerequisite: Prerequisite; title: string; description: string }> = [
+  const order: Array<{ prerequisite: Prerequisite; title: string; description: string; optional?: boolean }> = [
     {
       prerequisite: "project",
       title: "Projekt anlegen",
-      description: "Lege ein Projekt als Klammer über Sites, Märkte und Business-Werte an.",
+      description: "Geben Sie Ihrem Vorhaben einen Namen — das Projekt klammert alle Auswertungen einer Website.",
     },
     {
       prerequisite: "site",
-      title: "Site / URL hinzufügen",
-      description: "Verknüpfe die Domain oder den URL-Scope, der analysiert werden soll.",
-    },
-    {
-      prerequisite: "integration",
-      title: "Datenquelle verbinden",
-      description: "Verbinde die Google Search Console für Rankings, Klicks und Impressions.",
+      title: "Website hinzufügen",
+      description: "Welche Website soll analysiert werden? Tragen Sie einfach die Adresse ein.",
     },
     {
       prerequisite: "crawl",
-      title: "Ersten Crawl starten",
-      description: "Starte einen Crawl, um technische Gesundheit, Issues und URLs zu erfassen.",
+      title: "Erste Analyse starten",
+      description: "Ein Klick prüft die Website und liefert sofort technische Befunde, Probleme und gefundene Seiten.",
+    },
+    {
+      prerequisite: "integration",
+      title: "Google Search Console verbinden",
+      description: "Optional: Sobald verfügbar, bringt die Verbindung echte Klick- und Ranking-Daten dazu.",
+      optional: true,
     },
   ];
 
@@ -198,20 +212,24 @@ export function onboardingSteps(state: ReadinessState): OnboardingStep[] {
       title: step.title,
       description: step.description,
       done: isMet(step.prerequisite, state),
+      optional: step.optional ?? false,
       ctaLabel: meta.ctaLabel,
       ctaHref: meta.ctaHref,
     };
   });
 }
 
-/** Index of the first incomplete step (for "current" highlighting); -1 = done. */
+/**
+ * Index of the first incomplete REQUIRED step (for "current" highlighting); -1 when every required
+ * step is done. Optional steps never become the highlighted "current" step.
+ */
 export function currentStepIndex(steps: OnboardingStep[]): number {
-  return steps.findIndex((step) => !step.done);
+  return steps.findIndex((step) => !step.done && !step.optional);
 }
 
-/** True when every waterfall step is complete. */
+/** True when every REQUIRED setup step is complete (an optional data source is not required). */
 export function isFullySetUp(state: ReadinessState): boolean {
-  return state.hasProject && state.hasSite && state.hasIntegration && state.hasCrawl;
+  return state.hasProject && state.hasSite && state.hasCrawl;
 }
 
 export interface ActionLock {

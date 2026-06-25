@@ -65,8 +65,8 @@ export interface ContentRecommendation {
   updatedAt: string;
 }
 
-// Deterministic stub time-series point used for decay/refresh detection. source_confidence is
-// marked "demo" until a real connector backfills measured rows.
+// Time-series point used for decay/refresh detection. source_confidence reflects where the
+// measured value came from (e.g. "A"/"B" once a real connector backfills rows).
 export type PageMetricName = "clicks" | "impressions" | "position" | "ctr";
 
 export const PAGE_METRIC_NAMES: readonly PageMetricName[] = ["clicks", "impressions", "position", "ctr"];
@@ -79,8 +79,8 @@ export interface PageMetric {
   metric: PageMetricName;
   value: number;
   capturedAt: string;
-  // "demo" for seeded stub data; real connectors will write "A"/"B" etc.
-  sourceConfidence: SourceConfidence | "demo";
+  // Where the value came from; real connectors write "A"/"B" etc.
+  sourceConfidence: SourceConfidence;
 }
 
 // A URL that looks like it is decaying and is a candidate for a content refresh.

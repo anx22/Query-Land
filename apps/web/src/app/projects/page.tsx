@@ -13,14 +13,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
     <AppShell activePath="/projects">
       <section className="card hero-card">
         <p className="kicker">Projekte</p>
-        <h1>Projekte &amp; Sites</h1>
+        <h1>Projekte &amp; Websites</h1>
         <p>
-          Verwalten Sie Projekte, Site-Scopes, Märkte und Business-Werte — die Grundlage für alle Analysen und Optimierungschancen.
+          Legen Sie ein Projekt an und tragen Sie die Website ein, die Sie verbessern möchten — das ist die Grundlage für alle Auswertungen.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.projects.length} Projekte</span>
-          <span className="badge">{data.projectSites.reduce((sum, item) => sum + item.sites.length, 0)} Sites</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+          <span className="badge">{data.projectSites.reduce((sum, item) => sum + item.sites.length, 0)} Websites</span>
+          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Verbunden" : "Nicht erreichbar"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
@@ -28,26 +28,33 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       <section className="content-grid">
         <form className="card form-card" action={createProjectAction}>
-          <p className="kicker">Projekt anlegen</p>
+          <p className="kicker">Neues Projekt</p>
           <label>
-            Name
-            <input name="name" required placeholder="Owned Web Platform" />
+            Projektname
+            <input name="name" required placeholder="z. B. Firmen-Website" />
           </label>
-          <label>
-            Slug
-            <input name="slug" required pattern="[a-z0-9-]+" placeholder="owned-web-platform" />
-          </label>
-          <label>
-            Default Locale
-            <input name="defaultLocale" defaultValue="de-DE" />
-          </label>
-          <button className="button" type="submit" disabled={!data.connected}>Projekt speichern</button>
+          <p className="muted form-hint">Ein Projekt bündelt alle Auswertungen einer Website. Die Adresse tragen Sie gleich daneben ein.</p>
+          <details className="advanced-section">
+            <summary>
+              <span className="advanced-section__title">Erweitert</span>
+              <span className="advanced-section__hint">Kennung und Sprache — werden sonst automatisch gesetzt.</span>
+            </summary>
+            <label>
+              Kennung (optional)
+              <input name="slug" pattern="[a-z0-9-]+" placeholder="wird aus dem Namen abgeleitet" />
+            </label>
+            <label>
+              Sprache / Region
+              <input name="defaultLocale" defaultValue="de-DE" />
+            </label>
+          </details>
+          <button className="button" type="submit" disabled={!data.connected}>Projekt anlegen</button>
         </form>
 
         <form className="card form-card" action={createSiteAction}>
-          <p className="kicker">Site-Scope anlegen</p>
+          <p className="kicker">Website hinzufügen</p>
           <label>
-            Projekt
+            Zu welchem Projekt?
             <select name="projectId" required disabled={!data.connected || data.projects.length === 0}>
               {data.projects.map((project) => (
                 <option key={project.id} value={project.id}>{project.name}</option>
@@ -55,35 +62,42 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             </select>
           </label>
           <label>
-            Base URL
-            <input name="baseUrl" required type="url" placeholder="https://example.com" />
+            Website-Adresse
+            <input name="baseUrl" required type="url" placeholder="https://ihre-website.de" />
           </label>
-          <label>
-            Scope Type
-            <select name="scopeType" defaultValue="domain">
-              <option value="domain">Domain</option>
-              <option value="subdomain">Subdomain</option>
-              <option value="folder">Folder</option>
-            </select>
-          </label>
-          <label>
-            Crawl Frequency
-            <select name="crawlFrequency" defaultValue="weekly">
-              <option value="manual">Manual</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-            </select>
-          </label>
-          <label>
-            Business Value
-            <input name="businessValue" type="number" min="1" max="100" defaultValue="50" />
-          </label>
-          <button className="button" type="submit" disabled={!data.connected || data.projects.length === 0}>Site speichern</button>
+          <details className="advanced-section">
+            <summary>
+              <span className="advanced-section__title">Erweitert</span>
+              <span className="advanced-section__hint">Umfang, Prüf-Rhythmus und Wichtigkeit — sinnvolle Standards sind gesetzt.</span>
+            </summary>
+            <label>
+              Was soll analysiert werden?
+              <select name="scopeType" defaultValue="domain">
+                <option value="domain">Ganze Domain</option>
+                <option value="subdomain">Nur eine Subdomain</option>
+                <option value="folder">Nur ein Verzeichnis</option>
+              </select>
+            </label>
+            <label>
+              Wie oft prüfen?
+              <select name="crawlFrequency" defaultValue="weekly">
+                <option value="manual">Nur manuell</option>
+                <option value="daily">Täglich</option>
+                <option value="weekly">Wöchentlich</option>
+              </select>
+            </label>
+            <label>
+              Wie wichtig ist diese Website? (1–100)
+              <input name="businessValue" type="number" min="1" max="100" defaultValue="50" />
+              <span className="muted form-hint">Hilft, Probleme auf wichtigen Websites zuerst anzuzeigen.</span>
+            </label>
+          </details>
+          <button className="button" type="submit" disabled={!data.connected || data.projects.length === 0}>Website hinzufügen</button>
         </form>
       </section>
 
       <section className="card">
-        <p className="kicker">Persistierte Project-/Site-Tabelle</p>
+        <p className="kicker">Ihre Projekte &amp; Websites</p>
         {data.projectSites.length > 0 ? (
           <div className="entity-list">
             {data.projectSites.map(({ project, sites }) => (
@@ -94,14 +108,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 </div>
                 <div className="nested-list">
                   {sites.length > 0 ? sites.map((site) => (
-                    <span key={site.id}>{site.baseUrl} · {site.scopeType} · {site.crawlFrequency} · Value {site.businessValue}</span>
-                  )) : <span>Keine Site-Scopes angelegt.</span>}
+                    <span key={site.id}>{site.baseUrl} · {site.scopeType} · {site.crawlFrequency} · Wichtigkeit {site.businessValue}</span>
+                  )) : <span>Noch keine Website hinzugefügt.</span>}
                 </div>
               </article>
             ))}
           </div>
         ) : (
-          <p>Noch keine Projekte aus der API geladen.</p>
+          <p>Noch kein Projekt angelegt — legen Sie oben Ihr erstes Projekt an.</p>
         )}
       </section>
     </AppShell>
@@ -112,7 +126,7 @@ function feedbackMessage(created: string | string[] | undefined, error: string |
   const errorValue = Array.isArray(error) ? error[0] : error;
   if (errorValue) return { kind: "danger", message: errorValue };
   const createdValue = Array.isArray(created) ? created[0] : created;
-  if (createdValue === "project") return { kind: "success", message: "Projekt wurde gespeichert." };
-  if (createdValue === "site") return { kind: "success", message: "Site-Scope wurde gespeichert." };
+  if (createdValue === "project") return { kind: "success", message: "Projekt angelegt und aktiviert. Fügen Sie als Nächstes die Website-Adresse hinzu." };
+  if (createdValue === "site") return { kind: "success", message: "Website hinzugefügt. Starten Sie jetzt die erste Analyse im Technical Audit." };
   return null;
 }

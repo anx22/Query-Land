@@ -44,7 +44,7 @@ describe("computeReadiness", () => {
           { id: "s1", projectId: "p1", baseUrl: "https://x", scopeType: "domain", crawlFrequency: "weekly", businessValue: 50 },
         ],
         integrations: [
-          { id: "i1", projectId: "p1", provider: "gsc", status: "pending", sourceConfidence: "B", freshness: null },
+          { id: "i1", projectId: "p1", provider: "gsc", status: "active", sourceConfidence: "B", freshness: null },
         ],
         jobs: [
           { id: "j1", projectId: "p1", type: "crawl_seed", status: "queued", idempotencyKey: "k", subject: "s", payload: {}, attempts: 0, updatedAt: "" },
@@ -52,6 +52,26 @@ describe("computeReadiness", () => {
       }),
     );
     expect(state).toEqual({ hasProject: true, hasSite: true, hasIntegration: true, hasCrawl: true });
+  });
+
+  it("counts only an active integration as connected, not a pending stub", () => {
+    const pending = computeReadiness(
+      baseInput({
+        projects: [project],
+        selectedProject: project,
+        integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "pending", sourceConfidence: "B", freshness: null }],
+      }),
+    );
+    expect(pending.hasIntegration).toBe(false);
+
+    const active = computeReadiness(
+      baseInput({
+        projects: [project],
+        selectedProject: project,
+        integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "active", sourceConfidence: "B", freshness: null }],
+      }),
+    );
+    expect(active.hasIntegration).toBe(true);
   });
 
   it("scopes integrations and crawl jobs to the selected project", () => {
@@ -124,7 +144,15 @@ describe("firstUnmet / isRouteLocked", () => {
     );
     expect(firstUnmet("/technical-audit", withProjectAndSite)).toBeNull();
     expect(firstUnmet("/url-dossier", withProjectAndSite)).toBe("crawl");
-    expect(firstUnmet("/keywords-rank", withProjectAndSite)).toBe("integration");
+    // Content opportunities are generated from crawl data, so they gate on a crawl, not a source.
+    expect(firstUnmet("/content-opportunities", withProjectAndSite)).toBe("crawl");
+  });
+
+  it("gates the data modules on a project only — a data source is never a hard gate", () => {
+    const withProject = computeReadiness(baseInput({ projects: [project], selectedProject: project }));
+    expect(firstUnmet("/keywords-rank", withProject)).toBeNull();
+    expect(firstUnmet("/backlinks", withProject)).toBeNull();
+    expect(firstUnmet("/reports", withProject)).toBeNull();
   });
 
   it("unlocks everything when fully set up", () => {
@@ -178,7 +206,7 @@ describe("actionLock", () => {
   it("advances the reason as prerequisites are met", () => {
     const lock = actionLock(withProject, ["project", "site"]);
     expect(lock.locked).toBe(true);
-    expect(lock.reason).toMatch(/Site/);
+    expect(lock.reason).toMatch(/Website/);
   });
 
   it("unlocks when all requirements are met", () => {

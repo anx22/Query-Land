@@ -300,7 +300,7 @@ class SQLiteContentStore implements ContentStore {
           throw new RequestError(400, "invalid_field", "metric.value must be a number");
         }
         const capturedAt = requireString(metric.capturedAt, "metric.capturedAt");
-        const sourceConfidence = metric.sourceConfidence ?? "demo";
+        const sourceConfidence = metric.sourceConfidence ?? "E";
         const found = await existing.get(projectId, siteId, url, metric.metric, capturedAt) as { id: string } | undefined;
         if (found) {
           await update.run(metric.value, sourceConfidence, found.id);

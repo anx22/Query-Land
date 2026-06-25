@@ -197,7 +197,7 @@ function feedbackMessage(
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.added)) return { kind: "success", message: "Keywords klassifiziert und gespeichert." };
   if (singleParam(params?.group)) return { kind: "success", message: "Keyword-Cluster angelegt." };
-  if (singleParam(params?.ranked)) return { kind: "success", message: "Ranking-Messung erfasst (Demo-Daten)." };
+  if (singleParam(params?.ranked)) return { kind: "success", message: "Ranking-Messung erfasst. Echte Positionen folgen, sobald eine Ranking-Quelle verbunden ist." };
   if (singleParam(params?.visibility)) return { kind: "success", message: "Visibility-Index neu berechnet." };
   return null;
 }

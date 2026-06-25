@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { createStore } from "../src/store.js";
+import { createStoreWithDatabase } from "../src/store.js";
 import { getConnector, supportedConnectorProviders } from "../src/connectors/index.js";
+import { seedDemoFoundation, seedPendingIntegrations } from "./helpers/demo-foundation.js";
 
 // T5 "Connector-Verträge": beweist den typisierten describe()-Vertrag (authStatus/quota/
 // freshness/capabilities) je Connector inkl. des neu registrierten Lighthouse-Stubs, das
@@ -15,7 +16,12 @@ import { getConnector, supportedConnectorProviders } from "../src/connectors/ind
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createStore("sqlite::memory:");
+  const { store, db } = await createStoreWithDatabase("sqlite::memory:");
+  // Recreate the baseline the missing-credentials test relies on: proj-demo + two pending
+  // integrations (int-gsc-demo/int-ga4-demo) with empty auth_config. Other tests here mint
+  // their own projects/integrations, so this extra baseline is harmless to them.
+  await seedDemoFoundation(store);
+  await seedPendingIntegrations(db);
   return { app: createApp(store), store };
 }
 

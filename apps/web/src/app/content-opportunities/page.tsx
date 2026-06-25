@@ -32,16 +32,16 @@ export default async function Page({
   const quickWins = opportunities.filter((o) => o.expectedImpact >= 4 && o.effort <= 2).length;
   const topPriority = [...opportunities].sort((a, b) => b.priority - a.priority)[0] ?? null;
 
-  // Action gating: both hero actions need a project + site (real prerequisites
-  // for generating opportunities / syncing performance). Use the same readiness
-  // helper that drives nav locks + banners so the disabled reason is consistent.
+  // Action gating: opportunities are generated from crawl data, so the hero actions need a
+  // project + site + crawl. Use the same readiness helper that drives nav locks + banners so the
+  // disabled reason is consistent. (Data-source connection is an optional booster, not a gate.)
   const readiness: ReadinessState = {
     hasProject: Boolean(data.selectedProject),
     hasSite: Boolean(data.selectedSite),
-    hasIntegration: data.connected,
-    hasCrawl: false,
+    hasIntegration: false,
+    hasCrawl: data.hasCrawl,
   };
-  const heroLock = actionLock(readiness, ["project", "site"]);
+  const heroLock = actionLock(readiness, ["project", "site", "crawl"]);
   const lockReason = !data.connected ? "API nicht erreichbar." : heroLock.reason;
   const heroDisabled = !data.connected || heroLock.locked;
 
@@ -122,7 +122,7 @@ function feedbackMessage(
     return { kind: "success", message: "Optimierungschancen erzeugt." };
   }
   if (singleParam(params?.synced)) {
-    return { kind: "success", message: "Such-Performance aktualisiert (Demo-Daten)." };
+    return { kind: "success", message: "Such-Performance abgeglichen. Echte Klick- und Ranking-Daten folgen, sobald die Google Search Console verbunden ist." };
   }
   if (singleParam(params?.revalidated)) {
     return { kind: "success", message: "Opportunity re-validiert (validated oder reopened)." };
