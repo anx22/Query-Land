@@ -108,7 +108,12 @@ class SQLiteProjectStore implements ProjectStore {
     try {
       await this.db.prepare(`INSERT INTO sites (id, project_id, scope_type, base_url, crawl_frequency, business_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(site.id, site.projectId, site.scopeType, site.baseUrl, site.crawlFrequency, site.businessValue, new Date().toISOString());
     } catch (error) {
-      throw sqliteConstraintError(error, "site_write_failed", "Site could not be stored");
+      throw sqliteConstraintError(
+        error,
+        "site_write_failed",
+        "Site could not be stored",
+        `Diese Site-URL ist in diesem Projekt bereits angelegt (${site.baseUrl}). Bitte eine andere URL verwenden oder die bestehende Site nutzen.`
+      );
     }
     await this.audit("system", "site.create", "site", site.id, { projectId, baseUrl: site.baseUrl });
     return site;

@@ -193,14 +193,6 @@ select {
   margin-bottom: 2rem;
 }
 
-.search {
-  width: min(24rem, 100%);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.75);
-  padding: 0.8rem 1rem;
-}
-
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18rem;

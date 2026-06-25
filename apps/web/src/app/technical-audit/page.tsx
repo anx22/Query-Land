@@ -104,7 +104,15 @@ export default async function Page({
       ? data.latestHealthScore.score - data.previousHealthScore.score
       : null;
 
-  const runningRun = data.recentCrawlRuns.find((run) => run.status === "running") ?? null;
+  // A run only blocks the start button while it is *actively* running. A run
+  // stuck in "running" (worker died / drain timed out) must not lock the button
+  // forever — treat anything older than STALE_RUN_MS as no longer in flight.
+  const STALE_RUN_MS = 15 * 60 * 1000;
+  const now = Date.now();
+  const runningRun =
+    data.recentCrawlRuns.find(
+      (run) => run.status === "running" && now - new Date(run.startedAt).getTime() < STALE_RUN_MS
+    ) ?? null;
   const crawlLock = actionLock(data.readiness, ["project", "site"]);
   const feedback = feedbackMessage(params);
 
