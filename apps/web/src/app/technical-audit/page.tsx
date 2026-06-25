@@ -20,6 +20,15 @@ import {
   URL_EXPLORER_PAGE_SIZE,
 } from "../../features/technical-audit/url-explorer";
 import { isDefaultIssueFilter, loadTechnicalAuditOverview, RUN_PAGE_SIZE } from "../../lib/audit-api";
+import { resolveActionBanner } from "../../features/technical-audit/action-banner";
+import {
+  isDefaultUrlExplorerFilter,
+  URL_SOURCE_FILTERS,
+  URL_STATUS_FILTERS,
+  urlFilterHref,
+  urlSourceFilterLabel,
+  urlStatusFilterLabel,
+} from "../../features/technical-audit/url-explorer";
 import {
   diffRuleLabel,
   formatDelta,
@@ -275,10 +284,18 @@ export default async function Page({
   const data = await loadTechnicalAuditOverview({
     issueStatus: firstParam(params.status),
     issueSeverity: firstParam(params.severity),
+    issueRule: firstParam(params.issueRule),
+    urlStatus: firstParam(params.urlStatus),
+    urlSource: firstParam(params.urlSource),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
     diffBase: firstParam(params.diffBase),
     diffCompare: firstParam(params.diffCompare),
+  });
+
+  const actionBanner = resolveActionBanner({
+    error: firstParam(params.error),
+    started: firstParam(params.started),
   });
 
   // Flatten the current searchParams to a single-value map for href building,
@@ -286,6 +303,9 @@ export default async function Page({
   const currentParams: Record<string, string | undefined> = {
     status: firstParam(params.status),
     severity: firstParam(params.severity),
+    issueRule: firstParam(params.issueRule),
+    urlStatus: firstParam(params.urlStatus),
+    urlSource: firstParam(params.urlSource),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
     diffBase: firstParam(params.diffBase),
@@ -303,6 +323,12 @@ export default async function Page({
 
   return (
     <AppShell activePath="/technical-audit">
+      {actionBanner ? (
+        <p className={`notice ${actionBanner.tone}`} role={actionBanner.role}>
+          {actionBanner.message}
+        </p>
+      ) : null}
+
       <section className="card hero-card">
         <p className="kicker">Technical Audit</p>
         <h1>
@@ -429,6 +455,43 @@ export default async function Page({
             : ""}{" "}
           <ConfidenceBadge level="A" />
         </p>
+        <div className="issue-filter-bar">
+          <div className="badge-row" role="group" aria-label="URLs nach Fetch-Status filtern">
+            <span className="muted issue-filter-bar__label">Status</span>
+            {URL_STATUS_FILTERS.map((status) => {
+              const selected = status === data.activeUrlFilter.status;
+              return (
+                <a
+                  key={status}
+                  href={urlFilterHref(currentParams, { ...data.activeUrlFilter, status })}
+                  className={selected ? "badge primary" : "badge"}
+                  aria-current={selected ? "true" : undefined}
+                >
+                  {urlStatusFilterLabel(status)}
+                </a>
+              );
+            })}
+          </div>
+          <div className="badge-row" role="group" aria-label="URLs nach Quelle filtern">
+            <span className="muted issue-filter-bar__label">Quelle</span>
+            {URL_SOURCE_FILTERS.map((source) => {
+              const selected = source === data.activeUrlFilter.source;
+              return (
+                <a
+                  key={source}
+                  href={urlFilterHref(currentParams, { ...data.activeUrlFilter, source })}
+                  className={selected ? "badge primary" : "badge"}
+                  aria-current={selected ? "true" : undefined}
+                >
+                  {urlSourceFilterLabel(source)}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+        {data.urlExplorerRows.length === 0 && !isDefaultUrlExplorerFilter(data.activeUrlFilter) ? (
+          <p className="muted">Keine URLs für den aktiven Filter.</p>
+        ) : null}
         <UrlExplorerTable rows={data.urlExplorerRows} />
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
       </section>

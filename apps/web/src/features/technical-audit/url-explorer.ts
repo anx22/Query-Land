@@ -26,6 +26,91 @@ export interface UrlExplorerRow {
 export const URL_EXPLORER_PAGE_SIZE = 25;
 
 // ---------------------------------------------------------------------------
+// URL-Explorer server-side filter (fetch status class + discovery source)
+// ---------------------------------------------------------------------------
+
+export type UrlStatusFilter = "all" | FetchStatusClass;
+export type UrlSourceFilter = "all" | "seed" | "sitemap" | "link";
+
+export interface UrlExplorerFilter {
+  status: UrlStatusFilter;
+  source: UrlSourceFilter;
+}
+
+export const URL_STATUS_FILTERS: UrlStatusFilter[] = [
+  "all",
+  "success",
+  "redirect",
+  "client_error",
+  "server_error",
+  "network_error",
+];
+export const URL_SOURCE_FILTERS: UrlSourceFilter[] = ["all", "seed", "sitemap", "link"];
+
+const URL_STATUS_FILTER_LABEL: Record<UrlStatusFilter, string> = {
+  all: "Alle",
+  success: "Erfolg",
+  redirect: "Weiterleitung",
+  client_error: "Client-Fehler",
+  server_error: "Server-Fehler",
+  network_error: "Netzwerkfehler",
+};
+
+const URL_SOURCE_FILTER_LABEL: Record<UrlSourceFilter, string> = {
+  all: "Alle",
+  seed: "Seed",
+  sitemap: "Sitemap",
+  link: "Link",
+};
+
+/** Label for a URL-Explorer status filter value (German). */
+export function urlStatusFilterLabel(value: UrlStatusFilter): string {
+  return URL_STATUS_FILTER_LABEL[value] ?? value;
+}
+
+/** Label for a URL-Explorer source filter value (German). */
+export function urlSourceFilterLabel(value: UrlSourceFilter): string {
+  return URL_SOURCE_FILTER_LABEL[value] ?? value;
+}
+
+/** Normalize raw query input into a valid URL-Explorer filter (default = all/all). */
+export function resolveUrlExplorerFilter(
+  input: { urlStatus?: string; urlSource?: string } = {}
+): UrlExplorerFilter {
+  const status = URL_STATUS_FILTERS.includes(input.urlStatus as UrlStatusFilter)
+    ? (input.urlStatus as UrlStatusFilter)
+    : "all";
+  const source = URL_SOURCE_FILTERS.includes(input.urlSource as UrlSourceFilter)
+    ? (input.urlSource as UrlSourceFilter)
+    : "all";
+  return { status, source };
+}
+
+export function isDefaultUrlExplorerFilter(filter: UrlExplorerFilter): boolean {
+  return filter.status === "all" && filter.source === "all";
+}
+
+/**
+ * Build a /technical-audit href that overrides a single URL-Explorer filter
+ * dimension, omitting default ("all") values and ALWAYS resetting urlOffset to 0
+ * (a filter change invalidates the current page). Preserves other params.
+ */
+export function urlFilterHref(
+  current: Record<string, string | undefined>,
+  filter: UrlExplorerFilter
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(current)) {
+    if (key === "urlStatus" || key === "urlSource" || key === "urlOffset") continue;
+    if (value != null && value !== "") params.set(key, value);
+  }
+  if (filter.status !== "all") params.set("urlStatus", filter.status);
+  if (filter.source !== "all") params.set("urlSource", filter.source);
+  const qs = params.toString();
+  return qs ? `/technical-audit?${qs}` : "/technical-audit";
+}
+
+// ---------------------------------------------------------------------------
 // Pagination math + href building
 // ---------------------------------------------------------------------------
 

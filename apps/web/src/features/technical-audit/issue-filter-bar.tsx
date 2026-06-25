@@ -1,10 +1,13 @@
 import {
+  ISSUE_RULE_FILTERS,
   ISSUE_SEVERITY_FILTERS,
   ISSUE_STATUS_FILTERS,
   type IssueFilter,
+  type IssueRuleFilter,
   type IssueSeverityFilter,
   type IssueStatusFilter,
 } from "../../lib/audit-api";
+import { ruleLabel } from "./issue-groups";
 
 const STATUS_LABEL: Record<IssueStatusFilter, string> = { open: "Offen", resolved: "Gelöst", all: "Alle" };
 const SEVERITY_LABEL: Record<IssueSeverityFilter, string> = {
@@ -15,11 +18,17 @@ const SEVERITY_LABEL: Record<IssueSeverityFilter, string> = {
   low: "Niedrig",
 };
 
+/** Label for a rule filter value: "Alle" for the default, else the German rule label. */
+function ruleFilterLabel(rule: IssueRuleFilter): string {
+  return rule === "all" ? "Alle" : ruleLabel(rule);
+}
+
 /** Build the technical-audit URL for a filter (omitting default values). */
 export function issueFilterHref(filter: IssueFilter): string {
   const params = new URLSearchParams();
   if (filter.status !== "open") params.set("status", filter.status);
   if (filter.severity !== "all") params.set("severity", filter.severity);
+  if (filter.rule !== "all") params.set("issueRule", filter.rule);
   const qs = params.toString();
   return qs ? `/technical-audit?${qs}` : "/technical-audit";
 }
@@ -55,6 +64,22 @@ export function IssueFilterBar({ active }: { active: IssueFilter }) {
               aria-current={selected ? "true" : undefined}
             >
               {SEVERITY_LABEL[severity]}
+            </a>
+          );
+        })}
+      </div>
+      <div className="badge-row" role="group" aria-label="Issues nach Regel filtern">
+        <span className="muted issue-filter-bar__label">Regel</span>
+        {ISSUE_RULE_FILTERS.map((rule) => {
+          const selected = rule === active.rule;
+          return (
+            <a
+              key={rule}
+              href={issueFilterHref({ ...active, rule })}
+              className={selected ? "badge primary" : "badge"}
+              aria-current={selected ? "true" : undefined}
+            >
+              {ruleFilterLabel(rule)}
             </a>
           );
         })}

@@ -13,9 +13,63 @@ import {
   paginationHref,
   redirectTarget,
   resolveOffset,
+  resolveUrlExplorerFilter,
+  isDefaultUrlExplorerFilter,
+  urlFilterHref,
   URL_EXPLORER_PAGE_SIZE,
   type UrlExplorerRow,
 } from "./url-explorer";
+
+// --- URL-Explorer filter (fetch status class + source) ---
+
+describe("resolveUrlExplorerFilter", () => {
+  it("defaults to all/all", () => {
+    expect(resolveUrlExplorerFilter()).toEqual({ status: "all", source: "all" });
+    expect(resolveUrlExplorerFilter({ urlStatus: "bogus", urlSource: "nope" })).toEqual({
+      status: "all",
+      source: "all",
+    });
+  });
+
+  it("accepts valid status and source values", () => {
+    expect(resolveUrlExplorerFilter({ urlStatus: "server_error", urlSource: "sitemap" })).toEqual({
+      status: "server_error",
+      source: "sitemap",
+    });
+  });
+});
+
+describe("isDefaultUrlExplorerFilter", () => {
+  it("is true only for all/all", () => {
+    expect(isDefaultUrlExplorerFilter({ status: "all", source: "all" })).toBe(true);
+    expect(isDefaultUrlExplorerFilter({ status: "redirect", source: "all" })).toBe(false);
+    expect(isDefaultUrlExplorerFilter({ status: "all", source: "link" })).toBe(false);
+  });
+});
+
+describe("urlFilterHref", () => {
+  it("omits default values and resets urlOffset", () => {
+    expect(urlFilterHref({ urlOffset: "50" }, { status: "all", source: "all" })).toBe(
+      "/technical-audit"
+    );
+  });
+
+  it("sets non-default filter params and drops the old urlOffset", () => {
+    const href = urlFilterHref(
+      { urlOffset: "50", urlStatus: "success" },
+      { status: "redirect", source: "sitemap" }
+    );
+    expect(href).toContain("urlStatus=redirect");
+    expect(href).toContain("urlSource=sitemap");
+    expect(href).not.toContain("urlOffset");
+  });
+
+  it("preserves unrelated params (e.g. issue filters)", () => {
+    const href = urlFilterHref({ status: "resolved" }, { status: "client_error", source: "all" });
+    expect(href).toContain("status=resolved");
+    expect(href).toContain("urlStatus=client_error");
+  });
+});
 
 // --- pagination math ---
 
