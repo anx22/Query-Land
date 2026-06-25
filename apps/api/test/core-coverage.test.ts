@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-0.7 (Teil: Testabdeckung Kernlogik). Die Inventur fand nur ~20% der Routen getestet.
 // Diese Suite deckt die bisher ungetesteten Kernpfade ab: Project/Site-CRUD inkl. Duplicate,
@@ -13,7 +13,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 

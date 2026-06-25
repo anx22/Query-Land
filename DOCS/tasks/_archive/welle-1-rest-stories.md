@@ -1,3 +1,5 @@
+> ⚠️ **Archiviert (2026-06-25).** Superseded durch [`../roadmap.md`](../roadmap.md) + [`../parallel-execution-plan.md`](../parallel-execution-plan.md). Historischer Stand — nicht mehr pflegen.
+
 # Welle-1 Reststories — Gate schließen
 
 > Status nach Bestandsaufnahme 2026-06-03: Backend-Fundamente sind weitgehend vorhanden, aber das Welle-1-Gate ist erst geschlossen, wenn die UI echte SQLite/API-Daten nutzt. Details: `next-session-handoff.md`.

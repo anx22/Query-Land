@@ -1,5 +1,5 @@
 import type { ApiResponse } from "../http.js";
-import type { AiStore, AlertStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, OpportunityStore, ProjectStore, ProposalStore, RankStore, ReportStore, SearchPerformanceStore, SourceMapStore } from "../sqlite-store.js";
+import type { AiStore, AlertStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, OpportunityStore, ProjectStore, ProposalStore, RankStore, ReportStore, SearchPerformanceStore, SourceMapStore } from "../store.js";
 
 // Store-Slice, den alle ressourcenspezifischen Routen-Module gemeinsam erwarten.
 export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore;

@@ -1,5 +1,7 @@
 # SQLite ↔ Postgres Migration Strategy
 
+> ✅ Abgeschlossen (2026-06): Migration zu Neon Postgres durchgeführt (siehe DOCS/tasks/roadmap.md). Dieses Dokument ist historisch.
+
 ## Decision
 
 SQLite is the default local/Codex backend because it is embedded and fully inspectable in this environment. Postgres remains the production and scale-out target from the master spec.

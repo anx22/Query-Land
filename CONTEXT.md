@@ -5,7 +5,7 @@ Dieses Dokument hält die Domain-Sprache und die Architektur-Erkenntnisse fest, 
 ## Domain glossary
 
 ### Foundation
-Der lokale, eingebettete Kern aus API, SQLite, Auth, Projects, Sites, Integrations, Jobs und Source Map. Foundation ist der Welle-1-Kontext, auf dem alle späteren Module aufbauen.
+Der Kern aus API, Datenbank (Postgres — Neon in Produktion, embedded PGlite lokal), Auth, Projects, Sites, Integrations, Jobs und Source Map. Foundation ist der Welle-1-Kontext, auf dem alle späteren Module aufbauen.
 
 ### Project
 Eine eigene Webplattform oder Property, für die SEO-Daten gesammelt, bewertet und in Arbeit übersetzt werden.
@@ -41,7 +41,7 @@ Die Produkt-Seam für URL → Template/Komponente → Repo-Pfad. Ziel ist Source
 Der Next Route Adapter unter `/api/backend`. Er muss Pfad und Query-String unverändert an die interne API weitergeben, damit Browser-, Proxy- und direkte interne Calls dieselbe Interface-Semantik haben.
 
 ### Production Smoke Target
-Für manuelle interne Logs, Browser Tests und Smoke Checks steht `https://queryland-inky.vercel.app/` als Test-URL zur Verfügung.
+Für manuelle interne Logs, Browser Tests und Smoke Checks steht `https://queryland-mikadesign.vercel.app/` als Test-URL zur Verfügung.
 
 ## Architecture notes
 

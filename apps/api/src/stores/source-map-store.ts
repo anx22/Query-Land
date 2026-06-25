@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SourceMapEntry } from "@seo-tool/domain-model";
-import { mapSourceMapEntry } from "../sqlite-mappers.js";
+import { mapSourceMapEntry } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";

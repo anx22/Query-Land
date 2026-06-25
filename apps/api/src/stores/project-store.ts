@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sourceConfidenceForProvider, validateBusinessValue, type IntegrationAccount, type IntegrationProvider, type Project, type Site } from "@seo-tool/domain-model";
 import { getConnector } from "../connectors/index.js";
-import { mapIntegration, mapProject, mapSite } from "../sqlite-mappers.js";
+import { mapIntegration, mapProject, mapSite } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";

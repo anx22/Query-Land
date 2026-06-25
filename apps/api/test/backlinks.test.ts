@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { aggregateReferringDomains, diffBacklinks, summarizeAuthority, type BacklinkLike } from "@seo-tool/domain-model";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-4.1/4.2/4.3: Authority / Backlinks (Welle 5). Deterministischer GSC-Links-Stub (Klasse B,
 // DEC-002) der je Snapshot-Runde mutiert, plus reine Diff/Authority-Funktionen.
@@ -13,7 +13,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 

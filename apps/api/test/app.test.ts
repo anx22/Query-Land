@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 import { createDatabase } from "../src/db/index.js";
 import { runMigrations } from "../src/db/migrate.js";
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
@@ -86,7 +86,7 @@ test("POST /jobs is persisted and idempotent by project/type/subject", async () 
 });
 
 test("job queue claims a queued job exactly once and completes it", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   await store.createJob("proj-demo", "health_check", "claim-me");
   const claimed = await store.claimNextJob();
   assert.equal(claimed?.status, "running");

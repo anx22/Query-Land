@@ -155,11 +155,11 @@ test("maps minimum issue rules and health-score penalties", () => {
   assert.equal(calculateHealthScore([]), 100);
 });
 
-import { createApp, createSQLiteStore, type SQLiteStore } from "@seo-tool/api";
+import { createApp, createStore, type Store } from "@seo-tool/api";
 import type { CrawlWorkerApiClient } from "../src/index.js";
 import { runCrawlWorkerCycle } from "../src/index.js";
 
-function apiClientForStore(store: SQLiteStore): CrawlWorkerApiClient {
+function apiClientForStore(store: Store): CrawlWorkerApiClient {
   const app = createApp(store);
   const post = async <T>(path: string, body?: unknown): Promise<T> => {
     const response = await app("POST", path, body);
@@ -180,7 +180,7 @@ function apiClientForStore(store: SQLiteStore): CrawlWorkerApiClient {
 }
 
 test("crawl worker creates a crawl run when legacy crawl_seed payload has no crawlRunId", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   await app("POST", "/jobs", {
     projectId: "proj-demo",
@@ -210,7 +210,7 @@ test("crawl worker creates a crawl run when legacy crawl_seed payload has no cra
 });
 
 test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {
@@ -251,7 +251,7 @@ test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end
 });
 
 test("crawl worker checks limited in-scope outgoing links and records broken_link issues", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {
@@ -290,7 +290,7 @@ test("crawl worker checks limited in-scope outgoing links and records broken_lin
 });
 
 test("crawl worker accepts a valid sitemap that only contains the seed URL", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {
@@ -326,7 +326,7 @@ test("crawl worker accepts a valid sitemap that only contains the seed URL", asy
 
 
 test("crawl worker marks invalid successful sitemap jobs as failed", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {
@@ -351,7 +351,7 @@ test("crawl worker marks invalid successful sitemap jobs as failed", async () =>
 
 
 test("crawl worker resolves in-scope sitemap indexes into persisted page URLs", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {
@@ -387,7 +387,7 @@ test("crawl worker resolves in-scope sitemap indexes into persisted page URLs", 
 });
 
 test("crawl worker keeps out-of-scope sitemap URLs out of the persisted crawl", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {
@@ -418,7 +418,7 @@ test("crawl worker keeps out-of-scope sitemap URLs out of the persisted crawl", 
 });
 
 test("crawl worker persists network-error fetches and keeps the run explainable", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {
@@ -456,7 +456,7 @@ test("crawl worker persists network-error fetches and keeps the run explainable"
 
 
 test("crawl worker records robots-blocked URLs as non-indexable without fetching the page", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
   const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
   await app("POST", "/jobs", {

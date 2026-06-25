@@ -5,32 +5,33 @@ Source of Truth für die Nachbauprogrammierung. Einstieg: `docs/PRODUCT_MASTER_S
 ## Struktur
 
 ```
-docs/    PRODUCT_MASTER_SPEC.md   ← oberste Wahrheitsebene (inkl. KPIs, Referenz-Anker, UX-Navigation)
+docs/    PRODUCT_MASTER_SPEC.md   ← oberste Wahrheitsebene (KPIs, Referenz-Anker, UX-Navigation)
          MONOREPO_CONVENTIONS.md  ← Workspace-Regeln, Import/Export, Pre-Sprint-Checks
-         MIGRATION_STRATEGY.md    ← SQLite→Postgres-Policy
+         MIGRATION_STRATEGY.md    ← (historisch) SQLite→Postgres; Migration abgeschlossen
 specs/   14 Child-Specs           ← verfeinern Module/Querschichten; Master gewinnt bei Konflikt
-prompts/ codex-prompts.md         ← Basis-Prompt-Muster + Wellen-Übersicht (Wellen 1–7)
-openapi/ internal-api.yaml        ← API-Vertrag; UI + Agent/MCP teilen den Kern
+architecture/ ai-layer-aeo · authority-backlinks · reporting-alerts ← tiefe, implementierte Modul-Docs
+prompts/ codex-prompts.md         ← Basis-Prompt-Muster + Wellen-Übersicht
+openapi/ internal-api.yaml        ← API-Vertrag (~66 Pfade); UI + Agent/MCP teilen den Kern
 design/  DESIGN.md                ← Brand-System (Farben, Typo, Layout)
          ux-ui-sprint.md          ← UX-Sprint-Spec (UX-0–UX-9, DoD, Komponenten)
-tasks/   roadmap.md               ← Phase-2-Roadmap (aktiv)
-         next-session-handoff.md  ← aktueller Sprint-Status + Empfehlungen
+tasks/   roadmap.md               ← ★ aktive, konsolidierte Planungsquelle (Status + GAPs)
+         parallel-execution-plan.md ← ★ paralleler Umsetzungsplan der offenen Punkte
          decisions-backlog.md     ← DEC-001–007 Produktentscheidungen
-         welle-1-rest-stories.md  ← Welle-1-Reststories (aktiv)
-         welle-2-audit-core-stories.md ← Welle-2-Story-Seeds (aktiv)
          sprint-conventions.md    ← Story-Template + Testing-Matrix
-         preparation-hardening-backlog.md ← Härtungs-Checkliste (Phase 1, alle erledigt)
-         worker-smoke.md          ← WP-0.3 Smoke-Anleitung
-         _archive/                ← Phase-1-Abschluss, Persistenz-Skizze
-deployment/ vercel-single-deployment.md ← Vercel-Konfiguration
-_Konzepte/  einschetzung.txt      ← strategischer Nord-Stern
+         worker-smoke.md          ← Crawl-Worker-Smoke-Anleitung
+         _archive/                ← Historie: Phase-1-Abschluss, Handoff, Welle-Stories, Prep-Backlog
+deployment/ serverless-crawl-worker.md ← ★ Cron-Worker (/api/cron/crawl, CRON_SECRET)
+            vercel-database-switch.md   ← DATABASE_URL umstellen (neondb → queryland)
+            vercel-single-deployment.md ← Vercel-Projekt-/Build-Konfiguration
+_Konzepte/  einschetzung.txt      ← strategischer Nord-Stern (16→7-Module-Ära)
             LLM_council_analyse.txt ← Entscheidungs-Druck-Test (16→7 Module)
 ```
 
 ## Lesereihenfolge für Implementierung
 
-Master §1 → §2 → §6 → §7 → §10 → zuständige Child-Spec → Codex-Prompt für die Welle.
+Master §1 → §2 → §6 → §7 → §10 → zuständige `architecture/`- oder Child-Spec → `tasks/roadmap.md` + `tasks/parallel-execution-plan.md`.
 
 ## Aktueller Stand
 
-Phase 2 aktiv. Sprint-Status: `tasks/next-session-handoff.md`. Roadmap: `tasks/roadmap.md`.
+Phase 2 aktiv. **Planung & Status:** `tasks/roadmap.md`. **Parallele Umsetzung:** `tasks/parallel-execution-plan.md`.
+Fundament (Neon Postgres, Serverless-Cron-Worker, Connector-Sync) steht und ist in Production verifiziert.

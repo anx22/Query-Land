@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { apiError, bearerToken, json, logRequest, type ApiResponse, type RequestContext } from "./http.js";
 import { authRequest, createProjectRequest } from "./request-validators.js";
 import { routeProjectChildren } from "./routes.js";
-import { createSQLiteStore, type AuthStore, type HealthStore, type ProjectStore } from "./sqlite-store.js";
+import { createStore, type AuthStore, type HealthStore, type ProjectStore } from "./store.js";
 import { RequestError } from "./stores/store-errors.js";
 import type { ProjectChildStore } from "./routes.js";
 
@@ -14,12 +14,12 @@ export function createApp(store: AppStore) {
   };
 }
 
-// Lazily create the default (embedded) store once. createSQLiteStore is async
+// Lazily create the default (embedded) store once. createStore is async
 // (it connects + migrates), so the default handler resolves it on first use.
 let defaultStorePromise: Promise<AppStore> | null = null;
 
 export async function handleRequest(method: string, pathname: string, body?: unknown, context: RequestContext = {}): Promise<ApiResponse> {
-  defaultStorePromise ??= createSQLiteStore();
+  defaultStorePromise ??= createStore();
   const store = await defaultStorePromise;
   return routeRequest(store, method, pathname, body, context);
 }

@@ -1,3 +1,5 @@
+> ⚠️ **Archiviert (2026-06-25).** Superseded durch [`../roadmap.md`](../roadmap.md) + [`../parallel-execution-plan.md`](../parallel-execution-plan.md). Historischer Stand — nicht mehr pflegen.
+
 # Preparation Hardening Backlog — offene Vorbereitungen nach Sprint 0 / Welle 1
 
 > Ziel: Nur die noch offenen Schärfungs- und Präzisierungsarbeiten erfassen. Bereits vorhandene Foundation-Bestandteile werden nicht erneut eingeplant, sondern unten unter „Nicht erneut planen / bereits erledigt“ ausdrücklich übersprungen.

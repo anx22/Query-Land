@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-0.6: interner Linkgraph (API-seitig). Beweist Kanten-Persistenz (Upsert),
 // Inlinks/Outlinks-Abfrage und Orphan-Erkennung. Crawler-Befuellung + UI = Follow-up.
@@ -12,7 +12,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
