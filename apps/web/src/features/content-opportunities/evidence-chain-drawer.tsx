@@ -35,6 +35,14 @@ function formatValue(value: number | string): string {
   return value;
 }
 
+/** Build the Content-Workspace drill-down href for an opportunity (url + id context). */
+function workspaceDrillHref(opportunity: Opportunity): string {
+  const params = new URLSearchParams({ opportunityId: opportunity.id });
+  const url = opportunity.affectedUrls[0];
+  if (url) params.set("url", url);
+  return `/content-workspace?${params.toString()}`;
+}
+
 export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawerProps) {
   useEffect(() => {
     if (!opportunity) return;
@@ -125,6 +133,13 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
             <div className="board-chain__body">
               <p className="board-chain__label">Empfohlene Maßnahme</p>
               <p className="board-chain__text">{opportunity.recommendedAction || "Keine Maßnahme definiert."}</p>
+              {/* Drill-down into the Content Workspace, carrying the affected URL +
+                  opportunity id so a brief can be created in context. */}
+              <p className="board-chain__text">
+                <a className="button compact secondary" href={workspaceDrillHref(opportunity)}>
+                  Im Content Workspace bearbeiten →
+                </a>
+              </p>
             </div>
           </li>
 

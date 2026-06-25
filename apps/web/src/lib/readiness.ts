@@ -90,6 +90,7 @@ export const ROUTE_PREREQUISITES: Record<string, Prerequisite[]> = {
   "/url-dossier": ["project", "site", "crawl"],
   "/keywords-rank": ["project", "integration"],
   "/content-opportunities": ["project", "site", "integration"],
+  "/content-workspace": ["project", "site"],
   "/backlinks": ["project", "integration"],
   "/reports": ["project", "integration"],
   "/ai-visibility": ["project", "site"],
