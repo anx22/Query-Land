@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { drainCrawlJobs } from "../../lib/crawl-cron";
 import { callInternalApi } from "../../lib/server-api";
-import { computeCrawlHealthScore, dismissAuditIssue, reopenAuditIssue, resolveAuditIssue, scheduleCrawlSeedRun } from "./api";
+import type { AuditIssueHistoryEntry } from "@seo-tool/domain-model";
+import { computeCrawlHealthScore, dismissAuditIssue, loadAuditIssueHistory, reopenAuditIssue, resolveAuditIssue, scheduleCrawlSeedRun } from "./api";
 
 export async function startCrawlAction(formData: FormData) {
   try {
@@ -61,7 +62,7 @@ async function updateIssueAction(formData: FormData, action: "resolve" | "dismis
     if (action === "resolve") {
       await resolveAuditIssue(projectId, siteId, issueId);
     } else if (action === "dismiss") {
-      await dismissAuditIssue(projectId, siteId, issueId);
+      await dismissAuditIssue(projectId, siteId, issueId, optionalString(formData, "reason"));
     } else {
       await reopenAuditIssue(projectId, siteId, issueId);
     }
@@ -74,10 +75,27 @@ async function updateIssueAction(formData: FormData, action: "resolve" | "dismis
   redirect(`/technical-audit?issue=${action}&issueStatus=${action === "reopen" ? "resolved" : "open"}`);
 }
 
+/** Server action: load an issue's lifecycle history for the detail drawer. */
+export async function loadIssueHistoryAction(projectId: string, siteId: string, issueId: string): Promise<AuditIssueHistoryEntry[]> {
+  try {
+    return await loadAuditIssueHistory(projectId, siteId, issueId);
+  } catch {
+    // The drawer degrades gracefully to "no history" rather than crashing.
+    return [];
+  }
+}
+
 function revalidateTechnicalAuditViews(): void {
   revalidatePath("/");
   revalidatePath("/technical-audit");
   revalidatePath("/api/foundation");
+}
+
+function optionalString(formData: FormData, key: string): string | undefined {
+  const value = formData.get(key);
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
 }
 
 function requiredString(formData: FormData, key: string): string {

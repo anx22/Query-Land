@@ -98,7 +98,14 @@ test("audit issue filtering and resolve/dismiss/reopen state transitions", async
 
     const dismissed = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-cov/dismiss");
     assert.equal(dismissed.status, 200);
-    assert.notEqual(data<{ resolvedAt: string | null }>(dismissed).resolvedAt, null);
+    // Dismiss is a distinct state: dismissed_at set, resolved_at stays null, but
+    // the issue leaves the open set (and appears under the resolved/closed filter).
+    assert.equal(data<{ resolvedAt: string | null }>(dismissed).resolvedAt, null);
+    assert.notEqual(data<{ dismissedAt: string | null }>(dismissed).dismissedAt, null);
+    const afterDismissOpen = data<Array<{ id: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues?status=open&limit=20"));
+    assert.ok(!afterDismissOpen.some((i) => i.id === "issue-cov"));
+    const afterDismissClosed = data<Array<{ id: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues?status=resolved&limit=20"));
+    assert.ok(afterDismissClosed.some((i) => i.id === "issue-cov"));
   } finally {
     await store.close();
   }

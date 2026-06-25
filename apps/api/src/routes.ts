@@ -1,4 +1,4 @@
-import { apiError, type ApiResponse } from "./http.js";
+import { apiError, type ApiResponse, type RequestContext } from "./http.js";
 import { routeAi } from "./routes/ai.js";
 import { routeAlerts } from "./routes/alerts.js";
 import { routeAuditIssues } from "./routes/audit-issues.js";
@@ -46,9 +46,9 @@ const resourceRoutes: ResourceRoute[] = [
   routeSourceMap
 ];
 
-export async function routeProjectChildren(store: ProjectChildStore, method: string, pathname: string, searchParams: URLSearchParams, body: unknown, requestId: string): Promise<ApiResponse> {
+export async function routeProjectChildren(store: ProjectChildStore, method: string, pathname: string, searchParams: URLSearchParams, body: unknown, requestId: string, context: RequestContext = {}): Promise<ApiResponse> {
   for (const route of resourceRoutes) {
-    const response = await route(store, method, pathname, searchParams, body);
+    const response = await route(store, method, pathname, searchParams, body, context);
     if (response) return response;
   }
   return apiError(404, "not_found", "Route not found", requestId);

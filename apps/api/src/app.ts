@@ -85,5 +85,5 @@ async function routeTopLevel(store: AppStore, method: string, pathname: string, 
     return json(201, { data: await store.createProject(createProjectRequest(body)) });
   }
 
-  return routeProjectChildren(store, method, pathname, searchParams, body, requestId);
+  return routeProjectChildren(store, method, pathname, searchParams, body, requestId, context);
 }

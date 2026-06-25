@@ -1,4 +1,4 @@
-import type { AuditIssueRecord, AuthUser, CrawlHealthScore, CrawlRun, DiscoveredUrl, FoundationJob, IndexabilityRecord, IntegrationAccount, IntegrationProvider, Project, Site, SourceMapEntry, UrlFetchRecord, UserRole } from "@seo-tool/domain-model";
+import type { AuditIssueHistoryEntry, AuditIssueRecord, AuthUser, CrawlHealthScore, CrawlRun, DiscoveredUrl, FoundationJob, IndexabilityRecord, IntegrationAccount, IntegrationProvider, Project, Site, SourceMapEntry, UrlFetchRecord, UserRole } from "@seo-tool/domain-model";
 
 export function mapUser(row: Record<string, unknown>): AuthUser {
   return {
@@ -112,7 +112,23 @@ export function mapAuditIssueRecord(row: Record<string, unknown>): AuditIssueRec
     severity: row.severity as AuditIssueRecord["severity"],
     message: String(row.message),
     detectedAt: String(row.detected_at),
-    resolvedAt: row.resolved_at === null ? null : String(row.resolved_at)
+    resolvedAt: row.resolved_at === null ? null : String(row.resolved_at),
+    dismissedAt: row.dismissed_at === null || row.dismissed_at === undefined ? null : String(row.dismissed_at),
+    dismissReason: row.dismiss_reason === null || row.dismiss_reason === undefined ? null : String(row.dismiss_reason),
+    lastActor: row.last_actor === null || row.last_actor === undefined ? null : String(row.last_actor)
+  };
+}
+
+export function mapAuditIssueHistoryEntry(row: Record<string, unknown>): AuditIssueHistoryEntry {
+  return {
+    id: String(row.id),
+    projectId: String(row.project_id),
+    siteId: String(row.site_id),
+    issueId: String(row.issue_id),
+    action: row.action as AuditIssueHistoryEntry["action"],
+    actor: String(row.actor),
+    reason: row.reason === null || row.reason === undefined ? null : String(row.reason),
+    createdAt: String(row.created_at)
   };
 }
 

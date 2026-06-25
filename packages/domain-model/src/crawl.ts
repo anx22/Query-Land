@@ -60,12 +60,32 @@ export interface AuditIssue {
   message: string;
 }
 
+export type AuditIssueLifecycleAction = "resolve" | "dismiss" | "reopen";
+
 export interface AuditIssueRecord extends AuditIssue {
   projectId: string;
   siteId: string;
   discoveredUrlId: string | null;
   detectedAt: string;
   resolvedAt: string | null;
+  /** Set when the issue was explicitly dismissed (distinct from resolved). */
+  dismissedAt?: string | null;
+  /** Free-text reason captured at dismiss time. */
+  dismissReason?: string | null;
+  /** Actor (userId or "system") who last changed this issue's lifecycle. */
+  lastActor?: string | null;
+}
+
+/** A single lifecycle transition for an audit issue (queryable per-issue history). */
+export interface AuditIssueHistoryEntry {
+  id: string;
+  projectId: string;
+  siteId: string;
+  issueId: string;
+  action: AuditIssueLifecycleAction;
+  actor: string;
+  reason: string | null;
+  createdAt: string;
 }
 
 export interface CrawlRun {

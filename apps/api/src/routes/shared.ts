@@ -1,4 +1,4 @@
-import type { ApiResponse } from "../http.js";
+import type { ApiResponse, RequestContext } from "../http.js";
 import type { AiStore, AlertStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, OpportunityStore, ProjectStore, ProposalStore, RankStore, ReportStore, SearchPerformanceStore, SourceMapStore } from "../store.js";
 
 // Store-Slice, den alle ressourcenspezifischen Routen-Module gemeinsam erwarten.
@@ -6,13 +6,20 @@ export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMap
 
 // Einheitliche Signatur jedes Ressourcen-Routers: liefert eine ApiResponse, wenn er den
 // Pfad bedient, sonst null (der Aggregator probiert dann den nächsten Router).
+// `context` carries the authenticated actor (when the auth gate populated it).
 export type ResourceRoute = (
   store: ProjectChildStore,
   method: string,
   pathname: string,
   searchParams: URLSearchParams,
-  body: unknown
+  body: unknown,
+  context: RequestContext
 ) => Promise<ApiResponse | null>;
+
+/** Resolve the acting userId from the request context, falling back to "system". */
+export function actorId(context: RequestContext): string {
+  return context.actor?.userId ?? "system";
+}
 
 export interface RoutePage<T> {
   data: T[];
