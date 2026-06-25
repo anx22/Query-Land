@@ -29,6 +29,7 @@ import type {
 } from "@seo-tool/domain-model";
 import { apiGet, apiGetEnvelope, emptyListMeta, type ListMeta } from "./api-client";
 import { loadFoundationDashboardData, type FoundationProject, type FoundationSite } from "./foundation-api";
+import { computeReadiness, type ReadinessState } from "./readiness";
 import {
   resolveOffset,
   URL_EXPLORER_PAGE_SIZE,
@@ -237,6 +238,8 @@ export interface TechnicalAuditOverviewData {
 
   project: FoundationProject | null;
   site: FoundationSite | null;
+  /** Setup-waterfall state, so the crawl-start control can lock/unlock. */
+  readiness: ReadinessState;
 
   /** Indexability funnel stages (some values may be null → empty-state). */
   funnelStages: FunnelStage[];
@@ -280,7 +283,7 @@ export const RUN_PAGE_SIZE = 5;
 function emptyData(
   project: FoundationProject | null,
   site: FoundationSite | null,
-  opts: { connected: boolean; errorMessage?: string; apiBaseUrl: string }
+  opts: { connected: boolean; errorMessage?: string; apiBaseUrl: string; readiness: ReadinessState }
 ): TechnicalAuditOverviewData {
   return {
     ...opts,
@@ -351,9 +354,16 @@ export async function loadTechnicalAuditOverview(
 ): Promise<TechnicalAuditOverviewData> {
   const dashboard = await loadFoundationDashboardData();
   const project = dashboard.selectedProject;
-  const site = dashboard.sites[0] ?? null;
+  const site = dashboard.selectedSite ?? dashboard.sites[0] ?? null;
   const apiBaseUrl = dashboard.apiBaseUrl;
   const activeIssueFilter = resolveIssueFilter(options);
+  const readiness = computeReadiness({
+    projects: dashboard.projects,
+    selectedProject: dashboard.selectedProject,
+    sites: dashboard.sites,
+    integrations: dashboard.integrations,
+    jobs: dashboard.jobs,
+  });
 
   if (!dashboard.connected || !project || !site) {
     return {
@@ -361,6 +371,7 @@ export async function loadTechnicalAuditOverview(
         connected: dashboard.connected,
         errorMessage: dashboard.errorMessage,
         apiBaseUrl,
+        readiness,
       }),
       activeIssueFilter,
     };
@@ -471,6 +482,7 @@ export async function loadTechnicalAuditOverview(
     apiBaseUrl,
     project,
     site,
+    readiness,
     funnelStages,
     funnelEmpty,
     sections,

@@ -46,7 +46,19 @@ export function Navigation({ activePath, projects, activeProjectId, readiness }:
                         <Icon name={route.icon} />
                       </span>
                       <span className="nav-item__label">{route.label}</span>
-                      {route.tier === "advanced" && !locked && (
+                      {route.dataStatus !== "live" && !locked && (
+                        <span
+                          className="nav-item__data-tag"
+                          title={
+                            route.dataStatus === "demo"
+                              ? "Demo-Daten — echte Datenquelle folgt"
+                              : "Noch nicht aktiv"
+                          }
+                        >
+                          {route.dataStatus === "demo" ? "Demo" : "Bald"}
+                        </span>
+                      )}
+                      {route.tier === "advanced" && route.dataStatus === "live" && !locked && (
                         <span className="nav-item__tier" title="Fortgeschrittene Funktion">
                           Erweitert
                         </span>

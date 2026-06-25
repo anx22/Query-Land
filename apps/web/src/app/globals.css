@@ -1346,3 +1346,123 @@ select:disabled {
 .glossar-link:hover {
   text-decoration-color: var(--primary);
 }
+
+/* ------------------------------------------------------------------------- */
+/* Topbar context bar + site switcher (global active scope)                  */
+/* ------------------------------------------------------------------------- */
+
+.topbar__controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.context-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.context-bar__crumb {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 22rem;
+}
+
+.context-bar__project {
+  color: var(--ink);
+}
+
+.context-bar__site {
+  color: var(--muted);
+}
+
+.context-bar__sep {
+  color: var(--muted);
+}
+
+.context-bar__empty {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.site-switcher {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.site-switcher[data-pending] {
+  opacity: var(--inactive-opacity);
+}
+
+.site-switcher__label {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.site-switcher__select {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 0.5rem 0.9rem;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  max-width: 18rem;
+}
+
+.site-switcher--empty .site-switcher__cta {
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Data-status (Demo) signals: banner + nav tag                              */
+/* ------------------------------------------------------------------------- */
+
+.notice.warning {
+  border-color: color-mix(in srgb, var(--warning) 40%, var(--line));
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: var(--warning);
+}
+
+.data-status-banner {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+
+.nav-item__data-tag {
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--line));
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Crawl-start panel (Technical Audit primary action)                        */
+/* ------------------------------------------------------------------------- */
+
+.crawl-start__head {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.crawl-start__scope {
+  margin-top: 0.2rem;
+}

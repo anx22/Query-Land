@@ -45,7 +45,6 @@ export default async function Page({
           sind die günstigsten Hebel — ein paar Plätze entscheiden über Sichtbarkeit.
         </WhyItMatters>
         <div className="badge-row">
-          <span className="badge primary">{data.project?.name ?? "kein Projekt"}</span>
           <span className="badge">{data.groups.length} Cluster</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
             {data.connected ? "API verbunden" : "API offline"}

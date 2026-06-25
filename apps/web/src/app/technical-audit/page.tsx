@@ -14,6 +14,8 @@ import { GlossarLink } from "../../components/glossar-link";
 import { IssueGroups } from "../../features/technical-audit/issue-groups";
 import { IssueFilterBar } from "../../features/technical-audit/issue-filter-bar";
 import { UrlExplorerTable } from "../../features/technical-audit/url-explorer-table";
+import { CrawlStartPanel } from "../../features/technical-audit/crawl-start";
+import { actionLock } from "../../lib/readiness";
 import {
   computePageInfo,
   paginationHref,
@@ -102,6 +104,10 @@ export default async function Page({
       ? data.latestHealthScore.score - data.previousHealthScore.score
       : null;
 
+  const runningRun = data.recentCrawlRuns.find((run) => run.status === "running") ?? null;
+  const crawlLock = actionLock(data.readiness, ["project", "site"]);
+  const feedback = feedbackMessage(params);
+
   return (
     <AppShell activePath="/technical-audit">
       <section className="card hero-card">
@@ -115,12 +121,11 @@ export default async function Page({
           Wirkung.
         </p>
         <div className="badge-row">
-          <span className="badge primary">{data.project?.name ?? "kein Projekt"}</span>
-          <span className="badge">{data.site?.baseUrl ?? "keine Site"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
             {data.connected ? "API verbunden" : "API offline"}
           </span>
         </div>
+        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? (
           <p className="notice danger">
             {data.errorMessage ?? "Audit-Daten konnten nicht geladen werden."} · Erwartete API:{" "}
@@ -128,6 +133,15 @@ export default async function Page({
           </p>
         ) : null}
       </section>
+
+      {/* Primary action: start a crawl (the entry point of the whole loop) */}
+      <CrawlStartPanel
+        project={data.project}
+        site={data.site}
+        lock={crawlLock}
+        connected={data.connected}
+        runningRun={runningRun}
+      />
 
       {/* Help zone — layout-separated from the productive panels below */}
       <HelpPanel title="So liest du das Technical Audit">
@@ -274,4 +288,21 @@ export default async function Page({
       </section>
     </AppShell>
   );
+}
+
+function feedbackMessage(
+  params: Record<string, string | string[] | undefined>
+): { kind: "success" | "danger"; message: string } | null {
+  const error = firstParam(params.error);
+  if (error) return { kind: "danger", message: error };
+  if (firstParam(params.started)) {
+    return { kind: "success", message: "Crawl gestartet — die Ergebnisse erscheinen unten." };
+  }
+  if (firstParam(params.health)) {
+    return { kind: "success", message: "Health Score neu berechnet." };
+  }
+  if (firstParam(params.issue)) {
+    return { kind: "success", message: "Issue-Status aktualisiert." };
+  }
+  return null;
 }
