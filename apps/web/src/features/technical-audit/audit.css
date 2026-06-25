@@ -311,3 +311,69 @@
 .issue-filter-bar a.badge {
   text-decoration: none;
 }
+
+/* Issue rows are now buttons that open the detail drawer */
+.audit-issue-group__item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+  font: inherit;
+}
+.audit-issue-group__item:hover .audit-issue-group__url {
+  text-decoration: underline;
+}
+.audit-issue-group__item--active {
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+}
+
+/* Issue detail drawer (inline detail panel) */
+.issue-drawer {
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--primary, #2563eb);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--surface-2, rgba(0, 0, 0, 0.02));
+}
+.issue-drawer__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.issue-drawer__title {
+  font-weight: 600;
+}
+.issue-drawer__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+}
+.issue-drawer__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+}
+.issue-drawer__facts dt {
+  color: var(--muted);
+}
+.issue-drawer__facts dd {
+  margin: 0;
+}
+.issue-drawer__url {
+  word-break: break-all;
+}
+.issue-drawer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
