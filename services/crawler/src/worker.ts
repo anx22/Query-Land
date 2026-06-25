@@ -6,6 +6,7 @@ const apiBaseUrl = process.env.SEO_API_BASE_URL ?? `http://localhost:${apiDefaul
 const pollIntervalMs = Number(process.env.CRAWLER_POLL_INTERVAL_MS ?? 5000);
 const fetchTimeoutMs = Number(process.env.CRAWLER_FETCH_TIMEOUT_MS ?? 10000);
 const fetchMaxAttempts = Number(process.env.CRAWLER_FETCH_MAX_ATTEMPTS ?? 2);
+const userAgent = process.env.CRAWLER_USER_AGENT || undefined;
 const runOnce = process.env.CRAWLER_ONCE === "1";
 let shutdownRequested = false;
 
@@ -69,7 +70,8 @@ export async function runCrawlerWorkerLoop(): Promise<void> {
       apiClient,
       fetchTimeoutMs,
       retry: { maxAttempts: fetchMaxAttempts, delayMs: 100 },
-      maxRedirects: 5
+      maxRedirects: 5,
+      userAgent
     });
     if (result.claimed) {
       console.log(JSON.stringify({ level: "info", service: "crawler", event: "crawl_worker_cycle", ...result }));

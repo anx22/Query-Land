@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assessIndexability, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
+import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
   const urls = discoverUrlsFromSitemap({
@@ -120,6 +120,106 @@ test("parses robots.txt allow and disallow rules by longest path", () => {
   assert.equal(isRobotsAllowed("https://example.com/private/page", policy), false);
   assert.equal(isRobotsAllowed("https://example.com/private/public/page", policy), true);
   assert.equal(isRobotsAllowed("https://example.com/open", policy), true);
+});
+
+test("robots groups accumulate consecutive user-agent lines into shared rules", () => {
+  // Two consecutive user-agent lines must SHARE the following rules, not
+  // overwrite each other.
+  const rules = parseRobotsTxt("User-agent: SeoToolBot\nUser-agent: GoogleBot\nDisallow: /shared\n");
+  const seo = rules.filter((rule) => rule.userAgent === "seotoolbot");
+  const google = rules.filter((rule) => rule.userAgent === "googlebot");
+
+  assert.equal(seo.length, 1);
+  assert.equal(google.length, 1);
+  assert.equal(seo[0]?.path, "/shared");
+  assert.equal(google[0]?.path, "/shared");
+
+  // A new user-agent line after a rule starts a fresh group.
+  const multi = parseRobotsTxt("User-agent: a\nDisallow: /one\nUser-agent: b\nDisallow: /two\n");
+  assert.deepEqual(multi.filter((r) => r.userAgent === "a").map((r) => r.path), ["/one"]);
+  assert.deepEqual(multi.filter((r) => r.userAgent === "b").map((r) => r.path), ["/two"]);
+});
+
+test("robots selects the most specific matching agent group and falls back to *", () => {
+  const policy = {
+    fetchedUrl: "https://example.com/robots.txt",
+    rules: parseRobotsTxt("User-agent: *\nDisallow: /\nUser-agent: SeoToolBot\nAllow: /\nDisallow: /admin\n")
+  };
+
+  // Specific SeoToolBot group wins over the wildcard for our UA.
+  assert.equal(isRobotsAllowed("https://example.com/page", policy, "SeoToolBot/1.0"), true);
+  assert.equal(isRobotsAllowed("https://example.com/admin/x", policy, "SeoToolBot/1.0"), false);
+  // An unrelated UA falls back to the wildcard group (disallow all).
+  assert.equal(isRobotsAllowed("https://example.com/page", policy, "OtherBot/9"), false);
+  // The default crawler UA matches the SeoToolBot group via prefix.
+  assert.equal(DEFAULT_CRAWLER_USER_AGENT.toLowerCase().startsWith("seotoolbot"), true);
+  assert.equal(isRobotsAllowed("https://example.com/page", policy), true);
+});
+
+test("backoffDelayMs produces a capped exponential sequence", () => {
+  assert.deepEqual([1, 2, 3, 4, 5].map((attempt) => backoffDelayMs(attempt, 100, 5000)), [100, 200, 400, 800, 1600]);
+  // Cap applies.
+  assert.equal(backoffDelayMs(10, 100, 5000), 5000);
+  // Zero base disables sleeping entirely.
+  assert.equal(backoffDelayMs(3, 0, 5000), 0);
+});
+
+test("fetchUrl applies capped exponential backoff between retries with an injected clock", async () => {
+  const delays: number[] = [];
+  let attempts = 0;
+  const result = await fetchUrl({
+    url: "https://example.com/flaky",
+    retry: {
+      maxAttempts: 4,
+      delayMs: 100,
+      maxDelayMs: 5000,
+      sleep: async (ms: number) => {
+        delays.push(ms);
+      }
+    },
+    fetchImpl: async () => {
+      attempts += 1;
+      throw new Error("socket timeout");
+    }
+  });
+
+  assert.equal(attempts, 4);
+  // 3 waits between 4 attempts, exponential and deterministic — no real timers.
+  assert.deepEqual(delays, [100, 200, 400]);
+  assert.equal(result.statusClass, "network_error");
+  assert.match(result.errorMessage ?? "", /after 4 attempts/);
+});
+
+test("fetchUrl sends the configured User-Agent header (and a default otherwise)", async () => {
+  let sentDefault: string | null = null;
+  await fetchUrl({
+    url: "https://example.com/",
+    fetchImpl: async (_url, init) => {
+      sentDefault = new Headers(init?.headers).get("user-agent");
+      return new Response("ok", { status: 200 });
+    }
+  });
+  assert.equal(sentDefault, DEFAULT_CRAWLER_USER_AGENT);
+
+  let sentCustom: string | null = null;
+  await fetchUrl({
+    url: "https://example.com/",
+    userAgent: "CustomBot/2.0",
+    fetchImpl: async (_url, init) => {
+      sentCustom = new Headers(init?.headers).get("user-agent");
+      return new Response("ok", { status: 200 });
+    }
+  });
+  assert.equal(sentCustom, "CustomBot/2.0");
+});
+
+test("fetchUrl on garbage/invalid sitemap content still classifies without throwing", async () => {
+  const result = await fetchUrl({
+    url: "https://example.com/sitemap.xml",
+    fetchImpl: async () => new Response("<<<not xml>>>", { status: 200 })
+  });
+  assert.equal(result.statusClass, "success");
+  assert.equal(result.responseBody, "<<<not xml>>>");
 });
 
 

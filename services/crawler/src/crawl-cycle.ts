@@ -1,4 +1,5 @@
 import { validateCrawlSeedJobPayload, type DiscoveredUrl, type FetchResult } from "@seo-tool/domain-model";
+import { DEFAULT_CRAWLER_USER_AGENT } from "./config.js";
 import { assessIndexability } from "./indexability.js";
 import { evaluateAuditIssues } from "./audit-rules.js";
 import { fetchUrl } from "./fetch-url.js";
@@ -38,8 +39,9 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     }
 
     const now = options.now ?? (() => new Date().toISOString());
-    const robotsPolicy = await loadRobotsPolicy({ baseUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
-    const sitemapFetch = await fetchUrl({ url: sitemapUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry });
+    const userAgent = options.userAgent ?? DEFAULT_CRAWLER_USER_AGENT;
+    const robotsPolicy = await loadRobotsPolicy({ baseUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, userAgent });
+    const sitemapFetch = await fetchUrl({ url: sitemapUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, userAgent });
     const sitemapXml = sitemapFetch.responseBody ?? "";
     const discovered = sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300
       ? await discoverUrlsFromSitemapIndex({
@@ -71,7 +73,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
 
     for (const discoveredUrl of storedUrls) {
       checkedDiscoveredUrlIds.push(discoveredUrl.id);
-      if (!isRobotsAllowed(discoveredUrl.normalizedUrl, robotsPolicy)) {
+      if (!isRobotsAllowed(discoveredUrl.normalizedUrl, robotsPolicy, userAgent)) {
         await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, discoveredUrl.id, {
           url: discoveredUrl.normalizedUrl,
           state: "blocked_by_robots",
@@ -84,7 +86,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
         continue;
       }
 
-      const fetchResult = await fetchUrl({ url: discoveredUrl.normalizedUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5 });
+      const fetchResult = await fetchUrl({ url: discoveredUrl.normalizedUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent });
       fetchesByUrl.set(discoveredUrl.normalizedUrl, fetchResult);
       const storedFetch = await options.apiClient.recordFetchResult(job.projectId, siteId, discoveredUrl.id, fetchResult);
       const page: AuditPageInput = {
@@ -105,7 +107,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
       fetchedUrls += 1;
     }
 
-    await populateOutgoingLinkStatuses({ pages, baseUrl, robotsPolicy, fetchesByUrl, options, now });
+    await populateOutgoingLinkStatuses({ pages, baseUrl, robotsPolicy, fetchesByUrl, options, now, userAgent });
 
     const discoveredByUrl = new Map(storedUrls.map((url) => [url.normalizedUrl, url]));
     const issues = evaluateAuditIssues(pages).map((auditIssue) => ({
@@ -139,6 +141,7 @@ async function populateOutgoingLinkStatuses(input: {
   fetchesByUrl: Map<string, FetchResult>;
   options: CrawlWorkerCycleOptions;
   now: () => string;
+  userAgent: string;
 }): Promise<void> {
   const remainingChecks = new Set<string>();
   const limit = Math.max(0, input.options.maxOutgoingLinkChecks ?? DEFAULT_MAX_OUTGOING_LINK_CHECKS);
@@ -146,7 +149,7 @@ async function populateOutgoingLinkStatuses(input: {
   for (const page of input.pages) {
     const links = extractOutgoingLinks(page.html ?? "", page.finalUrl ?? page.url)
       .filter((link) => isInCrawlScope(link, input.baseUrl))
-      .filter((link) => isRobotsAllowed(link, input.robotsPolicy));
+      .filter((link) => isRobotsAllowed(link, input.robotsPolicy, input.userAgent));
 
     page.outgoingLinks = links.map((link) => {
       const existingFetch = input.fetchesByUrl.get(link);
@@ -159,7 +162,7 @@ async function populateOutgoingLinkStatuses(input: {
 
   for (const link of remainingChecks) {
     if (input.fetchesByUrl.has(link)) continue;
-    const result = await fetchUrl({ url: link, fetchImpl: input.options.fetchImpl, fetchedAt: input.now(), timeoutMs: input.options.fetchTimeoutMs, retry: input.options.retry, maxRedirects: input.options.maxRedirects ?? 5 });
+    const result = await fetchUrl({ url: link, fetchImpl: input.options.fetchImpl, fetchedAt: input.now(), timeoutMs: input.options.fetchTimeoutMs, retry: input.options.retry, maxRedirects: input.options.maxRedirects ?? 5, userAgent: input.userAgent });
     input.fetchesByUrl.set(link, result);
   }
 
