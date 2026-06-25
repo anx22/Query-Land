@@ -3,6 +3,7 @@ export * from "./aeo.js";
 export * from "./ai-visibility.js";
 export * from "./alerts.js";
 export * from "./backlinks.js";
+export * from "./content.js";
 export * from "./crawl.js";
 export * from "./errors.js";
 export * from "./integrations.js";

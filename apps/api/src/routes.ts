@@ -3,6 +3,7 @@ import { routeAi } from "./routes/ai.js";
 import { routeAlerts } from "./routes/alerts.js";
 import { routeAuditIssues } from "./routes/audit-issues.js";
 import { routeBacklinks } from "./routes/backlinks.js";
+import { routeContent } from "./routes/content.js";
 import { routeCrawlRuns } from "./routes/crawl-runs.js";
 import { routeDiscoveredUrls } from "./routes/discovered-urls.js";
 import { routeHealthScores } from "./routes/health-scores.js";
@@ -41,6 +42,7 @@ const resourceRoutes: ResourceRoute[] = [
   routeAlerts,
   routeAi,
   routeProposals,
+  routeContent,
   routeIntegrations,
   routeJobs,
   routeSourceMap

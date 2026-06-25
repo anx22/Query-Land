@@ -15,4 +15,21 @@ export async function seedFoundation(db: AsyncDatabase): Promise<void> {
   await db.prepare(`INSERT INTO templates (id, source_repo_id, name, component, repo_path) VALUES (?, ?, ?, ?, ?)`).run("tpl-home-demo", "repo-demo", "home-page", "HomePage", "apps/web/app/page.tsx");
   await db.prepare(`INSERT INTO url_template_map (id, project_id, url_pattern, template_id, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run("srcmap-home-demo", "proj-demo", "/", "tpl-home-demo", "exact", now);
   await db.prepare(`INSERT INTO feature_flags (key, enabled, description) VALUES (?, ?, ?)`).run("auth.email_password", 1, "Enable local backend-owned email/password sessions.");
+
+  // UX7-W1 Content Workspace demo data: a small, deterministic clicks time-series so the refresh
+  // board has decay signals out of the box. Tagged source_confidence='demo' — these are STUBS,
+  // not measured data; real GSC clicks will replace them via the connector contract.
+  const metricSeed: Array<{ url: string; values: [number, number, number] }> = [
+    { url: "https://example.com/blog/seo-guide", values: [820, 540, 310] },  // steep decay -> top candidate
+    { url: "https://example.com/blog/keyword-research", values: [200, 180, 140] }, // mild decay
+    { url: "https://example.com/pricing", values: [400, 420, 450] }  // growing -> not a candidate
+  ];
+  const captures = ["2026-04-02T00:00:00.000Z", "2026-05-02T00:00:00.000Z", "2026-06-02T00:00:00.000Z"];
+  let seq = 0;
+  for (const entry of metricSeed) {
+    for (let i = 0; i < captures.length; i += 1) {
+      seq += 1;
+      await db.prepare(`INSERT INTO page_metrics (id, project_id, site_id, url, metric, value, captured_at, source_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(`pm-demo-${seq}`, "proj-demo", "site-demo", entry.url, "clicks", entry.values[i], captures[i], "demo");
+    }
+  }
 }

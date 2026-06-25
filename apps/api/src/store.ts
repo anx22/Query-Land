@@ -7,6 +7,7 @@ import { createAiStore, type AiStore } from "./stores/ai-store.js";
 import { createAlertStore, type AlertStore } from "./stores/alert-store.js";
 import { createAuthStore, type AuthStore, type LoginResult, type RegisterInput } from "./stores/auth-store.js";
 import { createBacklinkStore, type BacklinkStore } from "./stores/backlink-store.js";
+import { createContentStore, type ContentStore } from "./stores/content-store.js";
 import { createCrawlStore, type CrawlStore, type RecordAuditIssuesScope } from "./stores/crawl-store.js";
 import { createJobStore, type JobStore } from "./stores/job-store.js";
 import { createKeywordStore, type KeywordStore } from "./stores/keyword-store.js";
@@ -25,7 +26,7 @@ export interface HealthStore {
   health(): HealthSnapshot;
 }
 
-export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore & {
+export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore & ContentStore & {
   close(): Promise<void>;
 };
 
@@ -33,7 +34,7 @@ export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore &
 export type Store = BackendStore;
 
 export { RequestError };
-export type { AiStore, AlertStore, AuthStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, ProposalStore, RankStore, RecordAuditIssuesScope, RegisterInput, ReportStore, SearchPerformanceStore, SourceMapStore };
+export type { AiStore, AlertStore, AuthStore, BacklinkStore, ContentStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, ProposalStore, RankStore, RecordAuditIssuesScope, RegisterInput, ReportStore, SearchPerformanceStore, SourceMapStore };
 
 /** Create the Postgres-backed store (Neon prod / PGlite local). */
 export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promise<BackendStore> {
@@ -42,6 +43,9 @@ export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promis
   await seedFoundation(db);
 
   const audit = createAuditLog(db);
+  // The content workspace bridges briefs into the proposal/MCP rail, so it needs the
+  // proposal store instance directly (not just the composed facade).
+  const proposalStore = createProposalStore(db, audit);
   return composeStores<BackendStore>([
     createHealthStore(db, databaseUrl),
     withDomainValidation(createAuthStore(db, audit)),
@@ -58,7 +62,8 @@ export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promis
     createReportStore(db, audit),
     createAlertStore(db, audit),
     createAiStore(db, audit),
-    createProposalStore(db, audit),
+    proposalStore,
+    createContentStore(db, audit, proposalStore),
     { close: () => db.close() }
   ]);
 }
