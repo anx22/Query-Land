@@ -2,17 +2,32 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { drainCrawlJobs } from "../../lib/crawl-cron";
+import { callInternalApi } from "../../lib/server-api";
 import { computeCrawlHealthScore, dismissAuditIssue, reopenAuditIssue, resolveAuditIssue, scheduleCrawlSeedRun } from "./api";
 
 export async function startCrawlAction(formData: FormData) {
   try {
     await scheduleCrawlSeedRun(requiredString(formData, "projectId"), requiredString(formData, "siteId"), requiredString(formData, "baseUrl"));
+    // Process the just-queued crawl immediately. On the Hobby plan the cron only
+    // runs daily, so without this the user would wait up to 24h for results.
+    // Best-effort: if it times out, the job stays claimable (stale-reclaim) and
+    // the scheduled worker picks it up later.
+    await processQueuedCrawlInline();
   } catch (error) {
     redirect(`/technical-audit?error=${encodeURIComponent(messageFor(error))}`);
   }
 
   revalidateTechnicalAuditViews();
   redirect("/technical-audit?started=1");
+}
+
+async function processQueuedCrawlInline(): Promise<void> {
+  try {
+    await drainCrawlJobs({ call: (method, path, body) => callInternalApi(method, path, body), maxJobs: 1 });
+  } catch {
+    // Swallow: the crawl is queued and the scheduled/stale-reclaim path is the backstop.
+  }
 }
 
 export async function computeHealthAction(formData: FormData) {
