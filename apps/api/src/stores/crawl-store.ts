@@ -46,6 +46,7 @@ export interface UrlExplorerRow {
 export interface CrawlStore {
   listCrawlRuns(projectId: string, siteId: string): Promise<CrawlRun[]>;
   listCrawlRunsPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: CrawlRunListFilters): Promise<ListPage<CrawlRun>>;
+  getCrawlRun(projectId: string, siteId: string, runId: string): Promise<CrawlRun | null>;
   createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): Promise<CrawlRun>;
   completeCrawlRun(projectId: string, siteId: string, runId: string, status: Extract<CrawlRun["status"], "succeeded" | "failed">, errorMessage?: string): Promise<CrawlRun>;
   listHealthScores(projectId: string, siteId: string): Promise<CrawlHealthScore[]>;
@@ -178,6 +179,11 @@ class SQLiteCrawlStore implements CrawlStore {
       LIMIT ? OFFSET ?
     `).all(...params, limit, offset)).map(mapCrawlRun);
     return createListPage(data, limit, offset, total);
+  }
+
+  async getCrawlRun(projectId: string, siteId: string, runId: string): Promise<CrawlRun | null> {
+    const row = await this.db.prepare(`SELECT * FROM crawl_runs WHERE id = ? AND project_id = ? AND site_id = ?`).get(runId, projectId, siteId);
+    return row ? mapCrawlRun(row) : null;
   }
 
   async createCrawlRun(projectId: string, siteId: string, trigger: CrawlRun["trigger"]): Promise<CrawlRun> {

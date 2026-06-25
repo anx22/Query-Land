@@ -1,9 +1,37 @@
-import { createCrawlSeedJobInput } from "@seo-tool/domain-model";
+import { computeCrawlRunDiff, createCrawlSeedJobInput } from "@seo-tool/domain-model";
 import { json } from "../http.js";
+import { RequestError } from "../stores/store-errors.js";
 import { completeCrawlRunRequest, createCrawlRunRequest, scheduleCrawlSeedRequest } from "../request-validators.js";
 import { enumQuery, pageMeta, paginationOptions, type ResourceRoute } from "./shared.js";
 
 export const routeCrawlRuns: ResourceRoute = async (store, method, pathname, searchParams, body) => {
+  // Literal `/crawl-runs/diff` is matched before any `/crawl-runs/:id`-style routes so it is
+  // never shadowed by them.
+  const diffMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/diff$/);
+  if (method === "GET" && diffMatch) {
+    const [, projectId, siteId] = diffMatch;
+    const baseId = searchParams.get("base");
+    const compareId = searchParams.get("compare");
+    if (!baseId || !compareId) {
+      throw new RequestError(400, "crawl_diff_params_required", "Both base and compare query parameters are required", { base: baseId, compare: compareId });
+    }
+    const [baseRun, compareRun] = await Promise.all([
+      store.getCrawlRun(projectId, siteId, baseId),
+      store.getCrawlRun(projectId, siteId, compareId)
+    ]);
+    if (!baseRun) {
+      throw new RequestError(404, "crawl_run_not_found", "Base crawl run not found", { projectId, siteId, runId: baseId });
+    }
+    if (!compareRun) {
+      throw new RequestError(404, "crawl_run_not_found", "Compare crawl run not found", { projectId, siteId, runId: compareId });
+    }
+    const [issues, urls] = await Promise.all([
+      store.listAuditIssues(projectId, siteId),
+      store.listDiscoveredUrls(projectId, siteId)
+    ]);
+    return json(200, { data: computeCrawlRunDiff(baseRun, compareRun, issues, urls) });
+  }
+
   const crawlRunsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs$/);
   if (crawlRunsMatch) {
     if (method === "GET") {
