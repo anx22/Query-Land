@@ -92,18 +92,18 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <form action={generateReportAction}>
             <input type="hidden" name="projectId" value={projectId} />
             <label>
-              Report-Typ
+              Berichtstyp
               <select name="type" defaultValue="weekly_summary">
                 {REPORT_TYPES.map((t) => (
                   <option key={t} value={t}>{labelForReportType(t)}</option>
                 ))}
               </select>
             </label>
-            <button className="button" type="submit" disabled={disabled}>Report generieren</button>
+            <button className="button" type="submit" disabled={disabled}>Bericht erstellen</button>
           </form>
           <form action={runDueAction}>
             <input type="hidden" name="projectId" value={projectId} />
-            <button className="button secondary" type="submit" disabled={disabled}>Fällige Schedules ausführen</button>
+            <button className="button secondary" type="submit" disabled={disabled}>Fällige Lieferungen ausführen</button>
           </form>
           {disabled ? (
             <span className="locked-action__reason">
@@ -117,28 +117,28 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       {/* Metric grid */}
       <section className="metric-grid">
         <MetricCard
-          label="Reports"
+          label="Berichte"
           value={String(data.reports.length)}
-          info={<>Feste Snapshots aus Health, Chancen, Sichtbarkeit und Authority. Siehe <GlossarLink term="Report / Alert">Report</GlossarLink>.</>}
-          note="generierte Snapshots"
+          info={<>Feste Momentaufnahmen aus Health, Chancen, Sichtbarkeit und Backlinks. Siehe <GlossarLink term="Report / Alert">Report</GlossarLink>.</>}
+          note="erstellte Berichte"
         />
         <MetricCard
-          label="Schedules"
+          label="Lieferungen"
           value={String(data.schedules.length)}
-          info="Automatische Lieferungen in fester Kadenz (z. B. wöchentlich) an einen Kanal."
-          note="geplante Lieferungen"
+          info="Automatische Lieferungen in festem Rhythmus (z. B. wöchentlich) an einen Empfänger."
+          note="automatisch geplant"
         />
         <MetricCard
-          label="Alert-Regeln"
+          label="Warn-Regeln"
           value={String(data.alertRules.length)}
-          info={<>Schwellwerte auf Kennzahlen, die einen <GlossarLink term="Report / Alert">Alarm</GlossarLink> auslösen, wenn sie über-/unterschritten werden.</>}
-          note="definierte Schwellwerte"
+          info={<>Schwellen auf Kennzahlen, die eine <GlossarLink term="Report / Alert">Warnung</GlossarLink> auslösen, wenn sie über- oder unterschritten werden.</>}
+          note="festgelegte Schwellen"
         />
         <MetricCard
-          label="Ausgelöste Alarme"
+          label="Ausgelöste Warnungen"
           value={String(triggeredCount)}
-          info="Events, bei denen eine Kennzahl die definierte Schwelle verletzt hat."
-          note={`von ${data.alertEvents.length} ausgewerteten Events`}
+          info="Fälle, in denen eine Kennzahl die festgelegte Schwelle verletzt hat."
+          note={`von ${data.alertEvents.length} geprüften Messungen`}
         />
       </section>
 
@@ -190,7 +190,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <div className="reports-empty">
             <span className="reports-empty__glyph" aria-hidden="true">🗺️</span>
             <strong className="reports-empty__title">Noch kein Report vorhanden</strong>
-            <span>Erzeugen Sie oben den ersten Snapshot, um den Stand Ihrer Sichtbarkeit festzuhalten.</span>
+            <span>Erstellen Sie oben den ersten Bericht, um den Stand Ihrer Sichtbarkeit festzuhalten.</span>
           </div>
         )}
 
@@ -265,16 +265,16 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             </div>
           ) : (
             <div className="reports-empty">
-              <strong className="reports-empty__title">Noch keine Schedules angelegt</strong>
-              <span>Legen Sie unten eine Kadenz fest, damit Reports automatisch erzeugt werden.</span>
+              <strong className="reports-empty__title">Noch keine Lieferungen geplant</strong>
+              <span>Legen Sie unten einen Rhythmus fest, damit Berichte automatisch erstellt werden.</span>
             </div>
           )}
 
-          <h3>Schedule anlegen</h3>
+          <h3>Lieferung planen</h3>
           <form action={createScheduleAction}>
             <input type="hidden" name="projectId" value={projectId} />
             <label>
-              Report-Typ
+              Berichtstyp
               <select name="type" defaultValue="weekly_summary">
                 {REPORT_TYPES.map((t) => (
                   <option key={t} value={t}>{labelForReportType(t)}</option>
@@ -282,7 +282,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               </select>
             </label>
             <label>
-              Kadenz
+              Rhythmus
               <select name="cadence" defaultValue="weekly">
                 {REPORT_CADENCES.map((c) => (
                   <option key={c} value={c}>{labelForCadence(c)}</option>
@@ -302,17 +302,17 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               Ziel (optional)
               <input type="text" name="target" placeholder="z. B. team@example.com" />
             </label>
-            <button className="button" type="submit" disabled={disabled}>Schedule anlegen</button>
+            <button className="button" type="submit" disabled={disabled}>Lieferung planen</button>
           </form>
         </div>
 
         {/* Alerts */}
         <div className="card">
-          <p className="kicker">Alarme</p>
+          <p className="kicker">Warnungen</p>
           <h2>
-            <TermTooltip term="alert">Alarm</TermTooltip>-Regeln &amp; Events
+            <TermTooltip term="alert">Warn</TermTooltip>-Regeln &amp; Auslösungen
           </h2>
-          <WhyItMatters>Schwellwert-Alarme melden Einbrüche, bevor sie unbemerkt Traffic kosten.</WhyItMatters>
+          <WhyItMatters>Schwellen-Warnungen melden Einbrüche, bevor sie unbemerkt Traffic kosten.</WhyItMatters>
 
           {/* Metric vs. threshold — gauge / mini-trend where data allows */}
           {alertModels.length > 0 ? (
@@ -352,8 +352,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             </div>
           ) : (
             <div className="reports-empty">
-              <strong className="reports-empty__title">Noch keine Alarm-Regeln</strong>
-              <span>Definieren Sie unten einen Schwellwert auf eine Kennzahl, um Einbrüche automatisch zu erkennen.</span>
+              <strong className="reports-empty__title">Noch keine Warn-Regeln</strong>
+              <span>Definieren Sie unten eine Schwelle auf eine Kennzahl, um Einbrüche automatisch zu erkennen.</span>
             </div>
           )}
 
@@ -377,7 +377,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               </select>
             </label>
             <label>
-              Schwellwert
+              Schwelle
               <input type="number" name="threshold" step="any" placeholder="z. B. 50" required />
             </label>
             <button className="button" type="submit" disabled={disabled}>Regel anlegen</button>
@@ -385,11 +385,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
           <form action={evaluateAlertsAction} className="action-row">
             <input type="hidden" name="projectId" value={projectId} />
-            <button className="button secondary" type="submit" disabled={disabled}>Alarme auswerten</button>
+            <button className="button secondary" type="submit" disabled={disabled}>Warnungen prüfen</button>
           </form>
 
           {/* Recent alert events — factual list with severity */}
-          <h3>Letzte Alarm-Events</h3>
+          <h3>Letzte Auslösungen</h3>
           {recentEvents.length > 0 ? (
             <div className="table-list">
               {recentEvents.map((event) => {
@@ -408,7 +408,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               })}
             </div>
           ) : (
-            <p className="muted">Noch keine Events. Klicken Sie „Alarme auswerten", um Regeln gegen aktuelle Kennzahlen zu prüfen.</p>
+            <p className="muted">Noch keine Auslösungen. Klicken Sie „Warnungen prüfen", um die Regeln gegen die aktuellen Kennzahlen zu prüfen.</p>
           )}
         </div>
       </section>
@@ -419,13 +419,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
-  if (singleParam(params?.generated)) return { kind: "success", message: "Report erfolgreich generiert." };
-  if (singleParam(params?.delivered)) return { kind: "success", message: "Report erfolgreich versendet." };
-  if (singleParam(params?.schedule)) return { kind: "success", message: "Schedule angelegt." };
+  if (singleParam(params?.generated)) return { kind: "success", message: "Bericht erfolgreich erstellt." };
+  if (singleParam(params?.delivered)) return { kind: "success", message: "Bericht erfolgreich versendet." };
+  if (singleParam(params?.schedule)) return { kind: "success", message: "Lieferung geplant." };
   const due = singleParam(params?.due);
-  if (due !== undefined) return { kind: "success", message: `Fällige Schedules ausgeführt — ${due} Report(s) generiert.` };
-  if (singleParam(params?.alertrule)) return { kind: "success", message: "Alarm-Regel angelegt." };
-  if (singleParam(params?.evaluated)) return { kind: "success", message: "Alarme ausgewertet." };
+  if (due !== undefined) return { kind: "success", message: `Fällige Lieferungen ausgeführt — ${due} Bericht(e) erstellt.` };
+  if (singleParam(params?.alertrule)) return { kind: "success", message: "Warn-Regel angelegt." };
+  if (singleParam(params?.evaluated)) return { kind: "success", message: "Warnungen ausgewertet." };
   return null;
 }
 
