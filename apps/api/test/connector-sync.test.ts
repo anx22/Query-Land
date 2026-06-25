@@ -104,3 +104,38 @@ test("connector sync on unknown integration id returns 404", async () => {
     await store.close();
   }
 });
+
+test("scheduling a connector sync enqueues an idempotent connector_sync job the worker can claim", async () => {
+  const { app, store } = await testApp();
+  try {
+    const projectId = await freshProject(app, "sched-sync");
+    const integration = data<{ id: string }>(await app("POST", "/integrations", { projectId, provider: "gsc" }));
+
+    const first = await app("POST", `/integrations/${integration.id}/sync/schedule`);
+    assert.equal(first.status, 201);
+    const job = data<{ id: string; type: string; payload: Record<string, unknown> }>(first);
+    assert.equal(job.type, "connector_sync");
+    assert.equal(job.payload.integrationId, integration.id);
+
+    // Same integration, same day -> idempotent (no duplicate jobs piling up).
+    const second = await app("POST", `/integrations/${integration.id}/sync/schedule`);
+    assert.equal(second.status, 200);
+    assert.equal(data<{ id: string }>(second).id, job.id);
+
+    const claimed = data<{ id: string } | null>(await app("POST", "/jobs/claim", { type: "connector_sync" }));
+    assert.equal(claimed?.id, job.id);
+  } finally {
+    await store.close();
+  }
+});
+
+test("scheduling a connector sync for an unknown integration returns 404", async () => {
+  const { app, store } = await testApp();
+  try {
+    const res = await app("POST", "/integrations/int-missing/sync/schedule");
+    assert.equal(res.status, 404);
+    assert.equal((res.body as { error: { code: string } }).error.code, "unknown_integration");
+  } finally {
+    await store.close();
+  }
+});

@@ -54,8 +54,7 @@ export function makeCrawlSeedJobSubject(baseUrl: string, crawlRunId: string): st
   return `${normalizedBaseUrl}:run:${normalizedCrawlRunId}`;
 }
 
-export function validateCrawlSeedJobPayload(input: unknown): CrawlSeedJobPayload {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
+export function validateCrawlSeedJobPayload(input: unknown): CrawlSeedJobPayload {  if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new DomainValidationError("crawl_seed payload must be an object");
   }
   const value = input as Record<string, unknown>;
@@ -70,6 +69,42 @@ export function validateCrawlSeedJobPayload(input: unknown): CrawlSeedJobPayload
     payload.sitemapUrl = normalizeRequiredUrl(value.sitemapUrl, "sitemapUrl");
   }
   return payload;
+}
+
+export interface ConnectorSyncJobPayload {
+  integrationId: string;
+  siteId?: string;
+}
+
+export function validateConnectorSyncJobPayload(input: unknown): ConnectorSyncJobPayload {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new DomainValidationError("connector_sync payload must be an object");
+  }
+  const value = input as Record<string, unknown>;
+  const payload: ConnectorSyncJobPayload = {
+    integrationId: connectorRequiredString(value.integrationId, "integrationId")
+  };
+  if (value.siteId !== undefined && value.siteId !== null) {
+    payload.siteId = connectorRequiredString(value.siteId, "siteId");
+  }
+  return payload;
+}
+
+/**
+ * Subject is idempotency-bearing: one connector sync per integration (+ optional
+ * site) per day, so re-enqueuing on every cron tick collapses to a single job.
+ */
+export function makeConnectorSyncJobSubject(integrationId: string, dayIso: string, siteId?: string): string {
+  const id = connectorRequiredString(integrationId, "integrationId");
+  const day = connectorRequiredString(dayIso, "dayIso");
+  return siteId ? `${id}:${day}:${siteId}` : `${id}:${day}`;
+}
+
+function connectorRequiredString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new DomainValidationError(`connector_sync ${field} is required`);
+  }
+  return value.trim();
 }
 
 function requiredString(value: unknown, field: string): string {
