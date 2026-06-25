@@ -23,13 +23,15 @@ Go/No-Go-Gate dieser Welle: siehe Master §10.
 
 | Welle | Name | Primäre Specs | Status |
 |-------|------|---------------|--------|
-| 1 | Foundation | `specs/project-control.md`, `specs/integrations.md`, `specs/observability-sre.md`, `specs/security-privacy.md` | ✅ abgeschlossen |
-| 2 | Crawl Core | `specs/crawl-engine.md`, `specs/issue-rules.md` | Welle-2-Contract done, Worker/UI in Arbeit |
-| 3 | Keyword Core | `specs/keyword-intelligence.md`, `specs/rank-tracking.md`, `specs/visibility-index.md` | Welle-3-Planung |
-| 4 | Opportunity Engine | `specs/content-opportunities.md`, `specs/source-map.md` | Welle-4-Planung |
-| 5 | Authority Layer | `specs/backlink-intelligence.md` | Welle-5-Planung |
-| 6 | Reporting Layer | `specs/reporting-alerting.md` | Welle-6-Planung |
-| 7 | AI Layer | `specs/ai-visibility.md` | Welle-7-Planung |
+| 1 | Foundation | `specs/project-control.md`, `specs/integrations.md`, `specs/observability-sre.md`, `specs/security-privacy.md` | ✅ implementiert |
+| 2 | Crawl Core | `specs/crawl-engine.md`, `specs/issue-rules.md` | ✅ implementiert |
+| 3 | Keyword Core | `specs/keyword-intelligence.md`, `specs/rank-tracking.md`, `specs/visibility-index.md` | ✅ implementiert |
+| 4 | Opportunity Engine | `specs/content-opportunities.md`, `specs/source-map.md` | ✅ implementiert |
+| 5 | Authority Layer | `specs/backlink-intelligence.md` | ✅ implementiert |
+| 6 | Reporting Layer | `specs/reporting-alerting.md` | ✅ implementiert |
+| 7 | AI Layer | `specs/ai-visibility.md` | ✅ implementiert |
+
+> Alle 7 Wellen/Module sind implementiert. Verbleibendes *Hardening* (Worker-Robustheit, AuthZ, Tiefe der Technical-Audit-UI, echte Provider-Adapter) wird in `DOCS/tasks/roadmap.md` getrackt.
 
 ## Welle 1 — Foundation
 

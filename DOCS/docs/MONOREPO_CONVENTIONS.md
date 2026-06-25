@@ -30,9 +30,9 @@
 
 ## Database and migrations
 
-- Local/Codex execution uses SQLite by default.
-- Production/scale-out target remains Postgres.
-- Add schema changes to both `infra/db/sqlite` and `infra/db/init` or document why the change is local-only.
+- Postgres is the default and production datastore (Neon in production); local development and tests use embedded PGlite (Postgres dialect, no separate DB server).
+- The driver is selected from the `DATABASE_URL` scheme in `apps/api/src/db/index.ts`.
+- Add schema changes as a new versioned migration under `infra/db/postgres`.
 
 ## Required checks before a sprint PR
 

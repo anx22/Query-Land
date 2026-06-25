@@ -1,3 +1,5 @@
+> ⚠️ **Archiviert (2026-06-25).** Superseded durch [`../roadmap.md`](../roadmap.md) + [`../parallel-execution-plan.md`](../parallel-execution-plan.md). Historischer Stand — nicht mehr pflegen.
+
 # Welle-2 Audit-Core Story Seeds
 
 > Status nach Bestandsaufnahme 2026-06-03: Domain/API/SQLite/OpenAPI/Test-Contracts sind für die Minimum-Slices weitgehend vorhanden. Das Welle-2-Gate ist aber erst erreicht, wenn ein Worker die Pipeline end-to-end ausführt und die Technical-Audit-UI die Ergebnisse sichtbar macht. Details: `next-session-handoff.md`.

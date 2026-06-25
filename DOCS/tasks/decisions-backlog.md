@@ -2,7 +2,7 @@
 
 ## DEC-001 — Plattform-Typen im Scope
 
-- **Status:** ready for decision
+- **Status:** akzeptiert
 - **Options:** Content first; Shop first; SaaS first; mixed from day one.
 - **Recommendation:** Content + SaaS first, because crawl/audit and source-map assumptions stay simpler.
 - **Impact:** Affects Welle-2 crawl fixtures and Welle-4 opportunity classes.
@@ -18,7 +18,7 @@
 
 ## DEC-003 — Märkte zuerst
 
-- **Status:** ready for decision
+- **Status:** akzeptiert
 - **Options:** DACH first; DACH + one reference market; international from day one.
 - **Recommendation:** DACH first.
 - **Impact:** Simplifies language, SERP and reporting assumptions.
@@ -26,7 +26,7 @@
 
 ## DEC-004 — Agent-Mandat
 
-- **Status:** ready for decision
+- **Status:** akzeptiert
 - **Options:** read-only; create tickets; propose PRs; CMS writes.
 - **Recommendation:** read-only + create tickets for Welle 1-3; PR proposals only after Source Map validation in Welle 4.
 - **Impact:** Affects security roles and MCP tools.
@@ -50,6 +50,6 @@
 ## DEC-007 — Production Smoke Target
 
 - **Status:** accepted for manual test usage
-- **Decision:** Use `https://queryland-inky.vercel.app/` for manual browser checks, internal logs and deployment smoke tests until a dedicated staging URL exists.
+- **Decision:** Use `https://queryland-mikadesign.vercel.app/` for manual browser checks, internal logs and deployment smoke tests until a dedicated staging URL exists.
 - **Reason:** Gives agents and humans a shared, stable URL for Vercel/runtime validation.
 - **Impact:** Future handoffs and QA notes should cite this target when asking for browser or runtime smoke validation.

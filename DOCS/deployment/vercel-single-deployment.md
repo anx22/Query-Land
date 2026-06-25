@@ -32,59 +32,37 @@ If a deployment log shows `workspace @seo-tool/api` or `Missing script: "vercel-
 
 Because the build runs inside the `apps/web` workspace, the TypeScript compiler must be installed there: `typescript` and `@types/node` are listed in `apps/web` devDependencies (not only at the repository root) so `tsc -b` is available when `build:deps` compiles the sibling workspaces. Without this, the build fails with `tsc: command not found` (exit 127).
 
-The web `build:next` script sets `DATABASE_URL=sqlite::memory:` during `next build` so static generation does not create competing file-backed SQLite handles. Runtime behavior is unchanged: when `DATABASE_URL` is omitted on Vercel, shared config still falls back to `sqlite:/tmp/seo-os.sqlite`.
+The web `build:next` script sets `DATABASE_URL=sqlite::memory:` during `next build` so static generation does not open a real database connection. Runtime persistence is provided by Neon Postgres via `DATABASE_URL` (see the database section below).
 
 ## Environment variables
 
 For the single-deployment mode, do **not** set `SEO_API_BASE_URL`. When it is absent, the web app calls the embedded API handler directly and also exposes the same backend under `/api/backend/*`.
 
-Optional runtime value:
+Required runtime value:
 
 ```env
-DATABASE_URL=sqlite:/tmp/seo-os.sqlite
+DATABASE_URL=postgresql://<user>:<password>@<neon-host>/<db>?sslmode=require
 ```
 
-When `DATABASE_URL` is omitted on Vercel, the shared config falls back to `sqlite:/tmp/seo-os.sqlite` so the SQLite database is written to Vercel's writable temporary directory instead of the read-only deployment bundle.
+## Database
+
+Production persistence is **Neon Postgres**, configured via `DATABASE_URL`. Set `DATABASE_URL` on the Vercel project to the Neon connection string so the API and crawler share a durable database across cold starts and function instances.
+
+Local development uses an **embedded PGlite** database (no external server required), so a local checkout works without provisioning Postgres. The `sqlite::memory:` value is only used during `next build` to avoid opening a real connection during static generation.
 
 ## Crawler execution
 
-The selected operating mode is a **separate crawler worker instance** outside the Vercel web deployment, for example on a VPS, Fly.io, Render, or Railway.
+The crawler runs **in-process on Vercel** via the cron route `/api/cron/crawl`. The cron schedule (`0 3 * * *`, daily at 03:00 UTC) is declared in `apps/web/vercel.json`, and the route is gated by `CRON_SECRET` so only authenticated cron invocations can trigger a crawl cycle. There is **no separate external worker instance** (VPS, Fly.io, Render, Railway).
 
-This keeps the crawler as a long-running worker process and avoids coupling crawl duration, polling, retries, and network fetches to Vercel server-function limits. Vercel remains responsible for the web app and the embedded API under `/api/backend/*`; the external worker calls that API over HTTPS.
-
-Configure the worker runtime with these environment variables:
+Each cron invocation runs one crawl cycle inside the Vercel function and then returns; it does not start an infinite polling loop. Set `CRON_SECRET` on the Vercel project to enable the schedule.
 
 ```env
-SEO_API_BASE_URL=https://<vercel-project-domain>/api/backend
-CRAWLER_ONCE=0
-CRAWLER_POLL_INTERVAL_MS=5000
-CRAWLER_FETCH_TIMEOUT_MS=10000
+CRON_SECRET=<random-secret>
 ```
 
-- `SEO_API_BASE_URL` must point to the deployed Vercel backend proxy, including `/api/backend`.
-- `CRAWLER_ONCE=0` or an omitted value runs the normal polling loop. Set `CRAWLER_ONCE=1` only for one-shot execution, smoke tests, or scheduler-driven jobs.
-- `CRAWLER_POLL_INTERVAL_MS` controls how long the worker waits between claim attempts when no one-shot mode is active.
-- `CRAWLER_FETCH_TIMEOUT_MS` limits outbound page fetches performed by the crawler.
-
-Expected start commands:
-
-```bash
-npm --workspace @seo-tool/crawler run start
-```
-
-Use the one-shot variant only for smoke checks or when a scheduler intentionally starts exactly one cycle:
-
-```bash
-npm --workspace @seo-tool/crawler run start:once
-```
-
-### Alternatives considered
-
-- **Vercel Cron:** deferred. A future cron mode should add a minimal protected API trigger that runs exactly one worker cycle, behaves like `start:once`, and rejects unauthenticated requests via a dedicated secret header or bearer token. That endpoint must not start an infinite polling loop inside a Vercel function.
-- **Queue-based external runner:** deferred until the job queue is backed by a durable queue service. At that point the external runner can replace polling with queue consumption while keeping the same crawler cycle contract.
+> **Details:** See [`serverless-crawl-worker.md`](./serverless-crawl-worker.md) for the full in-process cron crawl design, the request contract, and the `CRON_SECRET` gating.
 
 ## Limitations
 
-- The embedded API runs as Vercel/Next.js server functions, not as a permanent background process.
-- SQLite in `/tmp` is suitable for preview/demo operation but is not durable across cold starts or new function instances. Move `DATABASE_URL` to a durable database adapter when production persistence is required.
-- The crawler worker loop is still a worker process and is not started by Vercel. It does not run permanently inside the Vercel single deployment; schedule/worker execution still needs a separate scheduler/worker outside the web deployment or a future cron/function integration. API endpoints remain available under `/api/backend/*`.
+- The embedded API and the cron crawl route run as Vercel/Next.js server functions, not as a permanent background process.
+- Crawl execution is bounded by Vercel server-function limits per cron invocation; very large crawls may need to be split across cycles. See [`serverless-crawl-worker.md`](./serverless-crawl-worker.md).

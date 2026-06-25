@@ -1,3 +1,5 @@
+> ⛔ **Superseded (2026-06-25).** Es wurde **Neon Postgres** gewählt, nicht Turso/libSQL. Persistenz nutzt `DATABASE_URL` (`@neondatabase/serverless`), keine `TURSO_*`-Variablen. Siehe `../roadmap.md` §0. Dieses Dokument ist nur noch Entscheidungs-Historie.
+
 # Serverless-Persistenz: Migration von eingebettetem SQLite zu Turso/libSQL
 
 > **Status: GEPLANT — ganz späteres Vorhaben (nicht im aktuellen Sprint).**

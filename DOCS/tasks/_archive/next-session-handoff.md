@@ -1,3 +1,5 @@
+> ⚠️ **Archiviert (2026-06-25).** Superseded durch [`../roadmap.md`](../roadmap.md) + [`../parallel-execution-plan.md`](../parallel-execution-plan.md). Historischer Stand — nicht mehr pflegen.
+
 # Übergabe für die nächste Sprint-Session
 
 Stand: 2026-06-07 (Backend-Abschnitte 1–5 weiterhin Stand 2026-06-06)
