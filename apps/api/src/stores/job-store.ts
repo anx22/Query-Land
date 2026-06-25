@@ -12,12 +12,31 @@ export interface JobStore {
   completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): Promise<FoundationJob>;
 }
 
-export function createJobStore(db: AsyncDatabase, audit: AuditLog): JobStore {
-  return new SQLiteJobStore(db, audit);
+export interface JobStoreOptions {
+  /** A 'running' job older than this is treated as abandoned and re-claimable. */
+  staleRunningMs?: number;
+  /** Attempts after which an abandoned job is dead-lettered (status 'failed'). */
+  maxAttempts?: number;
+  now?: () => Date;
+}
+
+const DEFAULT_STALE_RUNNING_MS = 10 * 60 * 1000;
+const DEFAULT_MAX_ATTEMPTS = 3;
+
+export function createJobStore(db: AsyncDatabase, audit: AuditLog, options: JobStoreOptions = {}): JobStore {
+  return new SQLiteJobStore(db, audit, options);
 }
 
 class SQLiteJobStore implements JobStore {
-  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog) {}
+  private readonly staleRunningMs: number;
+  private readonly maxAttempts: number;
+  private readonly now: () => Date;
+
+  constructor(private readonly db: AsyncDatabase, private readonly audit: AuditLog, options: JobStoreOptions = {}) {
+    this.staleRunningMs = options.staleRunningMs ?? DEFAULT_STALE_RUNNING_MS;
+    this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    this.now = options.now ?? (() => new Date());
+  }
 
   async listJobs(): Promise<FoundationJob[]> {
     return (await this.db.prepare(`SELECT * FROM job_queue ORDER BY created_at ASC`).all()).map(mapJob);
@@ -52,12 +71,33 @@ class SQLiteJobStore implements JobStore {
   }
 
   async claimNextJob(type?: FoundationJob["type"]): Promise<FoundationJob | null> {
+    const nowDate = this.now();
+    const now = nowDate.toISOString();
+    const staleThreshold = new Date(nowDate.getTime() - this.staleRunningMs).toISOString();
+
+    // Dead-letter jobs that were claimed but never finished (worker crash or
+    // serverless timeout) and have already exhausted their attempts, so they
+    // stop blocking the queue instead of sitting in 'running' forever.
+    await this.db
+      .prepare(`UPDATE job_queue SET status = 'failed', finished_at = ?, updated_at = ?, last_error = ? WHERE status = 'running' AND started_at IS NOT NULL AND started_at < ? AND attempts >= ?`)
+      .run(now, now, "abandoned: max attempts exceeded after timeout", staleThreshold, this.maxAttempts);
+
+    // Claimable = queued, or a stale 'running' job still under the attempt cap
+    // (re-claim after a crash/timeout instead of stranding it).
+    const claimable = `(status = 'queued' OR (status = 'running' AND started_at IS NOT NULL AND started_at < ? AND attempts < ?))`;
     const row = type
-      ? await this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' AND job_type = ? ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get(type)
-      : await this.db.prepare(`SELECT * FROM job_queue WHERE status = 'queued' ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get();
+      ? await this.db.prepare(`SELECT * FROM job_queue WHERE job_type = ? AND ${claimable} ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get(type, staleThreshold, this.maxAttempts)
+      : await this.db.prepare(`SELECT * FROM job_queue WHERE ${claimable} ORDER BY scheduled_at ASC, created_at ASC LIMIT 1`).get(staleThreshold, this.maxAttempts);
     if (!row) return null;
-    const now = new Date().toISOString();
-    await this.db.prepare(`UPDATE job_queue SET status = 'running', attempts = attempts + 1, started_at = ?, updated_at = ? WHERE id = ? AND status = 'queued'`).run(now, now, String(row.id));
+
+    // Optimistic claim: only succeed if the row is unchanged since we read it,
+    // so two concurrent workers can never claim the same job.
+    const result = await this.db
+      .prepare(`UPDATE job_queue SET status = 'running', attempts = attempts + 1, started_at = ?, updated_at = ? WHERE id = ? AND updated_at = ?`)
+      .run(now, now, String(row.id), String(row.updated_at));
+    if (result.changes === 0) {
+      return null; // lost the race; the next poll picks it up
+    }
     const claimed = await this.db.prepare(`SELECT * FROM job_queue WHERE id = ?`).get(String(row.id));
     return claimed ? mapJob(claimed) : null;
   }
