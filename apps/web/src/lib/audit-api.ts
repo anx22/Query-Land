@@ -27,8 +27,13 @@ import type {
   CrawlRun,
   DiscoveredUrl,
 } from "@seo-tool/domain-model";
-import { apiGet, apiGetEnvelope } from "./api-client";
+import { apiGet, apiGetEnvelope, emptyListMeta, type ListMeta } from "./api-client";
 import { loadFoundationDashboardData, type FoundationProject, type FoundationSite } from "./foundation-api";
+import {
+  resolveOffset,
+  URL_EXPLORER_PAGE_SIZE,
+  type UrlExplorerRow,
+} from "../features/technical-audit/url-explorer";
 
 // ---------------------------------------------------------------------------
 // Funnel
@@ -254,11 +259,23 @@ export interface TechnicalAuditOverviewData {
   /** Total issues matching the active filter (from list meta). */
   displayedIssueTotal: number;
 
-  /** Recent crawl runs (latest first). */
+  /** Recent crawl runs (latest first), for the active run page. */
   recentCrawlRuns: CrawlRun[];
+  /** Active offset for the recent-runs pagination. */
+  runOffset: number;
+  /** Total number of crawl runs (from list meta). */
+  runTotal: number;
   /** Total discovered URLs (from list meta). */
   discoveredUrlTotal: number;
+
+  /** URL-Explorer rows for the active URL page. */
+  urlExplorerRows: UrlExplorerRow[];
+  /** Pagination meta for the URL-Explorer table. */
+  urlExplorerMeta: ListMeta;
 }
+
+/** Page size for the recent crawl-runs list. */
+export const RUN_PAGE_SIZE = 5;
 
 function emptyData(
   project: FoundationProject | null,
@@ -279,7 +296,11 @@ function emptyData(
     activeIssueFilter: { status: "open", severity: "all" },
     displayedIssueTotal: 0,
     recentCrawlRuns: [],
+    runOffset: 0,
+    runTotal: 0,
     discoveredUrlTotal: 0,
+    urlExplorerRows: [],
+    urlExplorerMeta: emptyListMeta(0),
   };
 }
 
@@ -326,7 +347,7 @@ const URL_SAMPLE_LIMIT = 200;
 const ISSUE_SAMPLE_LIMIT = 200;
 
 export async function loadTechnicalAuditOverview(
-  options: { issueStatus?: string; issueSeverity?: string } = {}
+  options: { issueStatus?: string; issueSeverity?: string; urlOffset?: string; runOffset?: string } = {}
 ): Promise<TechnicalAuditOverviewData> {
   const dashboard = await loadFoundationDashboardData();
   const project = dashboard.selectedProject;
@@ -347,10 +368,16 @@ export async function loadTechnicalAuditOverview(
 
   const base = `/projects/${project.id}/sites/${site.id}`;
 
-  const [crawlRuns, healthScores, issuesEnv, urlsEnv] = await Promise.all([
-    apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=5`)
-      .then((env) => env.data)
-      .catch(() => [] as CrawlRun[]),
+  // Resolve the requested run page offset (URL offset is resolved after we know
+  // the total, below). These paginate the runs/URL lists only — never the
+  // overview aggregates (funnel/sections/health/issues stay stable).
+  const runOffset = resolveOffset(options.runOffset, RUN_PAGE_SIZE);
+  const requestedUrlOffset = resolveOffset(options.urlOffset, URL_EXPLORER_PAGE_SIZE);
+
+  const [runsEnv, healthScores, issuesEnv, urlsEnv, urlExplorerEnv] = await Promise.all([
+    apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=${RUN_PAGE_SIZE}&offset=${runOffset}`)
+      .then((env) => env)
+      .catch(() => ({ data: [] as CrawlRun[], meta: undefined })),
     apiGet<CrawlHealthScore[]>(`${base}/health-scores`).catch(() => [] as CrawlHealthScore[]),
     apiGetEnvelope<AuditIssueRecord[]>(`${base}/audit-issues?status=open&limit=${ISSUE_SAMPLE_LIMIT}`)
       .then((env) => env)
@@ -358,13 +385,27 @@ export async function loadTechnicalAuditOverview(
     apiGetEnvelope<DiscoveredUrl[]>(`${base}/discovered-urls?limit=${URL_SAMPLE_LIMIT}`)
       .then((env) => env)
       .catch(() => ({ data: [] as DiscoveredUrl[], meta: undefined })),
+    apiGetEnvelope<UrlExplorerRow[]>(
+      `${base}/url-explorer?limit=${URL_EXPLORER_PAGE_SIZE}&offset=${requestedUrlOffset}`
+    )
+      .then((env) => env)
+      .catch(() => ({ data: [] as UrlExplorerRow[], meta: undefined })),
   ]);
 
-  // --- Crawl runs (latest first) ---
+  // --- Crawl runs (active page, latest first) ---
+  const crawlRuns = runsEnv.data;
   const sortedRuns = [...(Array.isArray(crawlRuns) ? crawlRuns : [])].sort((a, b) =>
     b.startedAt.localeCompare(a.startedAt)
   );
-  const latestRun = sortedRuns[0] ?? null;
+  const runTotal = "meta" in runsEnv && runsEnv.meta ? runsEnv.meta.total : sortedRuns.length;
+  // The funnel needs the single newest run regardless of the active run page.
+  // It is the page-0 first run; fetch it cheaply only when paging away from 0.
+  let latestRun = runOffset === 0 ? (sortedRuns[0] ?? null) : null;
+  if (runOffset > 0) {
+    latestRun = await apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=1`)
+      .then((env) => env.data?.[0] ?? null)
+      .catch(() => null);
+  }
 
   // --- Health scores ---
   const sortedHealth = [...(Array.isArray(healthScores) ? healthScores : [])].sort((a, b) =>
@@ -404,6 +445,13 @@ export async function loadTechnicalAuditOverview(
   const discoveredUrlTotal =
     "meta" in urlsEnv && urlsEnv.meta ? urlsEnv.meta.total : urls.length;
 
+  // --- URL-Explorer (paginated rows for the table island) ---
+  const urlExplorerRows = Array.isArray(urlExplorerEnv.data) ? urlExplorerEnv.data : [];
+  const urlExplorerMeta =
+    "meta" in urlExplorerEnv && urlExplorerEnv.meta
+      ? urlExplorerEnv.meta
+      : { limit: URL_EXPLORER_PAGE_SIZE, offset: requestedUrlOffset, total: urlExplorerRows.length, nextCursor: null };
+
   // --- Funnel ---
   // Stage counts come from the latest crawl-run summary (authoritative aggregate).
   // "indexable" derived from summary.indexabilityAssessments is the count of
@@ -433,6 +481,10 @@ export async function loadTechnicalAuditOverview(
     activeIssueFilter,
     displayedIssueTotal,
     recentCrawlRuns: sortedRuns,
+    runOffset,
+    runTotal,
     discoveredUrlTotal,
+    urlExplorerRows,
+    urlExplorerMeta,
   };
 }

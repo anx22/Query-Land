@@ -13,7 +13,13 @@ import { HelpPanel } from "../../components/help-panel";
 import { GlossarLink } from "../../components/glossar-link";
 import { IssueGroups } from "../../features/technical-audit/issue-groups";
 import { IssueFilterBar } from "../../features/technical-audit/issue-filter-bar";
-import { isDefaultIssueFilter, loadTechnicalAuditOverview } from "../../lib/audit-api";
+import { UrlExplorerTable } from "../../features/technical-audit/url-explorer-table";
+import {
+  computePageInfo,
+  paginationHref,
+  URL_EXPLORER_PAGE_SIZE,
+} from "../../features/technical-audit/url-explorer";
+import { isDefaultIssueFilter, loadTechnicalAuditOverview, RUN_PAGE_SIZE } from "../../lib/audit-api";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +33,44 @@ const RUN_STATUS_LABEL: Record<string, string> = {
   failed: "fehlgeschlagen",
 };
 
+/** Server-rendered Zurück/Weiter pagination links (no client fetching). */
+function Pagination({
+  page,
+  currentParams,
+  param,
+}: {
+  page: ReturnType<typeof computePageInfo>;
+  currentParams: Record<string, string | undefined>;
+  param: string;
+}) {
+  if (page.pageCount <= 1) return null;
+  return (
+    <nav className="audit-pagination" aria-label="Seitennavigation">
+      {page.hasPrev ? (
+        <a className="button compact" href={paginationHref(currentParams, param, page.prevOffset)} rel="prev">
+          ← Zurück
+        </a>
+      ) : (
+        <span className="button compact" aria-disabled="true">
+          ← Zurück
+        </span>
+      )}
+      <span className="audit-pagination__status">
+        Seite {page.page} von {page.pageCount}
+      </span>
+      {page.hasNext ? (
+        <a className="button compact" href={paginationHref(currentParams, param, page.nextOffset)} rel="next">
+          Weiter →
+        </a>
+      ) : (
+        <span className="button compact" aria-disabled="true">
+          Weiter →
+        </span>
+      )}
+    </nav>
+  );
+}
+
 export default async function Page({
   searchParams,
 }: {
@@ -36,7 +80,21 @@ export default async function Page({
   const data = await loadTechnicalAuditOverview({
     issueStatus: firstParam(params.status),
     issueSeverity: firstParam(params.severity),
+    urlOffset: firstParam(params.urlOffset),
+    runOffset: firstParam(params.runOffset),
   });
+
+  // Flatten the current searchParams to a single-value map for href building,
+  // so pagination links preserve filters and the other offset param.
+  const currentParams: Record<string, string | undefined> = {
+    status: firstParam(params.status),
+    severity: firstParam(params.severity),
+    urlOffset: firstParam(params.urlOffset),
+    runOffset: firstParam(params.runOffset),
+  };
+
+  const urlPage = computePageInfo(data.urlExplorerMeta.offset, URL_EXPLORER_PAGE_SIZE, data.urlExplorerMeta.total);
+  const runPage = computePageInfo(data.runOffset, RUN_PAGE_SIZE, data.runTotal);
 
   const healthValue = data.latestHealthScore?.score ?? null;
   const healthDelta =
@@ -161,6 +219,21 @@ export default async function Page({
         <IssueGroups groups={data.issueGroups} />
       </section>
 
+      {/* URL-Explorer */}
+      <section className="card">
+        <p className="kicker">URL-Explorer</p>
+        <p className="muted">
+          Entdeckte URLs mit HTTP-Status und Indexierbarkeit aus dem letzten Crawl. Auf eine Zeile
+          klicken, um Abruf-, Indexierbarkeits- und Crawl-Kontext zu sehen.
+          {data.urlExplorerMeta.total > 0
+            ? ` ${data.urlExplorerMeta.total.toLocaleString("de-DE")} URLs insgesamt.`
+            : ""}{" "}
+          <ConfidenceBadge level="A" />
+        </p>
+        <UrlExplorerTable rows={data.urlExplorerRows} />
+        <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
+      </section>
+
       {/* Recent crawl runs */}
       <section className="card">
         <p className="kicker">Letzte Crawl-Läufe</p>
@@ -197,6 +270,7 @@ export default async function Page({
             Noch kein Crawl-Lauf. Starten Sie einen Crawl, um Indexierbarkeit und Issues zu erfassen.
           </p>
         )}
+        <Pagination page={runPage} currentParams={currentParams} param="runOffset" />
       </section>
     </AppShell>
   );

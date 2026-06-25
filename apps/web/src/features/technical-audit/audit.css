@@ -377,3 +377,115 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+/* --- URL-Explorer table --- */
+.url-explorer {
+  margin-top: 0.5rem;
+  overflow-x: auto;
+}
+.url-explorer__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.url-explorer__table th,
+.url-explorer__table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.url-explorer__table th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.url-explorer__row--active {
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+}
+.url-explorer__url-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  word-break: break-all;
+}
+.url-explorer__url-button:hover {
+  text-decoration: underline;
+}
+.url-explorer__when {
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+/* --- Pagination (Zurück/Weiter) --- */
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.audit-pagination__status {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.audit-pagination .button[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* --- Loading skeleton --- */
+.audit-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.audit-skeleton__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.audit-skeleton__line,
+.audit-skeleton__block {
+  background: var(--line);
+  border-radius: 0.5rem;
+  opacity: 0.6;
+}
+.audit-skeleton__line {
+  height: 0.9rem;
+  margin: 0.4rem 0;
+  width: 100%;
+}
+.audit-skeleton__line--kicker {
+  width: 30%;
+  height: 0.75rem;
+}
+.audit-skeleton__line--title {
+  width: 70%;
+  height: 1.6rem;
+}
+.audit-skeleton__block {
+  height: 8rem;
+  margin-top: 0.5rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .audit-skeleton__line,
+  .audit-skeleton__block {
+    animation: audit-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+}
+@keyframes audit-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
