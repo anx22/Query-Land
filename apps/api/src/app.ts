@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { apiError, bearerToken, json, logRequest, type ApiResponse, type RequestContext } from "./http.js";
+import { authorizeRequest } from "./auth-gate.js";
 import { authRequest, createProjectRequest } from "./request-validators.js";
 import { routeProjectChildren } from "./routes.js";
 import { createStore, type AuthStore, type HealthStore, type ProjectStore } from "./store.js";
@@ -43,6 +44,12 @@ async function routeRequest(store: AppStore, method: string, requestPath: string
 }
 
 async function routeTopLevel(store: AppStore, method: string, pathname: string, searchParams: URLSearchParams, body: unknown, context: RequestContext, requestId: string): Promise<ApiResponse> {
+  // Auth gate (WP-Z.1): reject non-public routes without a valid session when
+  // AUTH_GATE_ENABLED. On success the actor is attached to the request context.
+  const auth = await authorizeRequest(store, method, pathname, context, requestId);
+  if (auth.denied) return auth.denied;
+  if (auth.actor) context.actor = auth.actor;
+
   if (method === "GET" && pathname === "/health") {
     return json(200, store.health());
   }
