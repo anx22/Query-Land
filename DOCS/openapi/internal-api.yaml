@@ -1133,11 +1133,11 @@ paths:
           description: Project not found
   /integrations:
     get:
-      summary: List integration accounts
+      summary: List integration accounts with their connector contract/status
       operationId: listIntegrations
       responses:
         '200':
-          description: Integration list
+          description: Integration status list (auth/quota/freshness/capabilities per connector)
           content:
             application/json:
               schema:
@@ -1146,7 +1146,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: '#/components/schemas/IntegrationAccount'
+                      $ref: '#/components/schemas/IntegrationStatusView'
     post:
       summary: Create integration account placeholder
       operationId: createIntegration
@@ -1166,6 +1166,28 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/IntegrationAccount'
+  /integrations/{integrationId}:
+    get:
+      summary: Read a single integration's connector contract/status
+      operationId: getIntegration
+      parameters:
+        - name: integrationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Integration status (auth/quota/freshness/capabilities + last sync evidence)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/IntegrationStatusView'
+        '404':
+          description: Integration not found
   /integrations/{integrationId}/sync:
     post:
       summary: Run a connector sync (fetch -> validate -> normalize) storing raw and normalized data separately
@@ -1178,23 +1200,60 @@ paths:
             type: string
       responses:
         '200':
-          description: Connector sync result
+          description: >-
+            Connector sync result. outcome="ok" persists raw + normalized data; failure modes
+            (missing_credentials, quota_exceeded, expired, degraded) surface a degraded status
+            instead of throwing, with rawEventId=null.
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    type: object
-                    properties:
-                      integration:
-                        $ref: '#/components/schemas/IntegrationAccount'
-                      rawEventId:
-                        type: string
-                      normalizedMetricsInserted:
-                        type: integer
+                    $ref: '#/components/schemas/ConnectorSyncResult'
         '400':
           description: Provider has no implemented connector
+        '404':
+          description: Integration not found
+  /integrations/{integrationId}/sync/schedule:
+    post:
+      summary: Schedule an idempotent daily connector_sync job for an integration
+      operationId: scheduleConnectorSync
+      parameters:
+        - name: integrationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                siteId: { type: string }
+      responses:
+        '201':
+          description: connector_sync job scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FoundationJob'
+                  idempotent: { type: boolean }
+        '200':
+          description: Existing connector_sync job returned (idempotent for the same integration + day)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FoundationJob'
+                  idempotent: { type: boolean }
         '404':
           description: Integration not found
   /jobs:
@@ -2582,6 +2641,55 @@ components:
         sourceConfidence: { type: string, enum: [A, B, C, D, E] }
         quotaRemaining: { type: integer, nullable: true }
         freshness: { type: string, format: date-time, nullable: true }
+    ConnectorContract:
+      type: object
+      required: [provider, sourceType, sourceConfidence, authStatus, quota, freshness, capabilities]
+      properties:
+        provider: { type: string }
+        sourceType: { type: string }
+        sourceConfidence: { type: string, enum: [A, B, C, D, E] }
+        authStatus: { type: string, enum: [connected, missing_credentials, expired, degraded] }
+        quota:
+          nullable: true
+          type: object
+          required: [used, limit]
+          properties:
+            used: { type: integer }
+            limit: { type: integer }
+            resetsAt: { type: string, format: date-time }
+        freshness:
+          type: object
+          required: [lastSyncedAt, lastEvidenceAt]
+          properties:
+            lastSyncedAt: { type: string, format: date-time, nullable: true }
+            lastEvidenceAt: { type: string, format: date-time, nullable: true }
+        capabilities:
+          type: array
+          items: { type: string }
+    IntegrationStatusView:
+      allOf:
+        - $ref: '#/components/schemas/IntegrationAccount'
+        - type: object
+          required: [contract, lastSyncedAt, lastEvidenceAt]
+          properties:
+            contract:
+              nullable: true
+              allOf:
+                - $ref: '#/components/schemas/ConnectorContract'
+            lastSyncedAt: { type: string, format: date-time, nullable: true }
+            lastEvidenceAt: { type: string, format: date-time, nullable: true }
+    ConnectorSyncResult:
+      type: object
+      required: [integration, outcome, rawEventId, normalizedMetricsInserted, contract]
+      properties:
+        integration:
+          $ref: '#/components/schemas/IntegrationAccount'
+        outcome: { type: string, enum: [ok, missing_credentials, quota_exceeded, expired, degraded] }
+        rawEventId: { type: string, nullable: true }
+        normalizedMetricsInserted: { type: integer }
+        contract:
+          $ref: '#/components/schemas/ConnectorContract'
+        reason: { type: string }
     CreateIntegrationRequest:
       type: object
       required: [projectId, provider]
