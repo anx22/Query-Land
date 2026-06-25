@@ -21,59 +21,63 @@
 | Connector-Sync planbar | ✅ `connector_sync`, tagesidempotent (3-fach) | `packages/domain-model/src/jobs.ts`, `apps/web/src/lib/connector-sync-cron.ts` |
 | Technical-Audit-Filter | ✅ Status + Severity serverseitig + UI | PR #35 |
 | Issue-Detail-Drawer | ✅ Issue-Drawer + Resolve/Dismiss/Reopen | PR #36 |
-| Tests | ✅ **134 node + 215 web**, grün | `npm run check`, `@seo-tool/web test` |
+| Code-Hygiene (Rename) | ✅ Legacy-SQLite-Namen → `store`/`Store` | PR #38 (T0) |
+| AuthZ-Gate | ✅ implementiert, `AUTH_GATE_ENABLED` (default OFF) | PR #39 (T1) |
+| URL-Explorer + Pagination + URL-Drawer | ✅ | PR #40 (T3) |
+| Worker-Härtung (Robots/UA/Backoff/Korrelation) | ✅ | PR #41 (T2) |
+| Connector-Contract + Lighthouse + Failure-Modes | ✅ (credential-gated) | PR #42 (T5) |
+| Issue-Lifecycle (distinct Dismiss/Actor/Historie) | ✅ | PR #43 (T4) |
+| Tests | ✅ **154 node + 246 web**, grün | `npm run check`, `@seo-tool/web test` |
 | Produktion | ✅ live, Health ok | `queryland-mikadesign.vercel.app` |
 
-**Damit geschlossen:** GAP-PERSIST-001 (Neon statt Turso), die „Sync-Store"-Strukturblockade, GAP-REPORT-003-Cron-Trigger (Mechanik vorhanden).
+**Damit geschlossen:** GAP-PERSIST-001 (Neon statt Turso), die „Sync-Store"-Strukturblockade, GAP-REPORT-003-Cron-Trigger (Mechanik vorhanden), und mit Welle 0+1 der Großteil von WP-Z.1 (AuthZ) sowie Sprint A/B/C (siehe unten).
 
 ---
 
 ## 1. Production-Blocker (P0)
 
-### WP-Z.1 — AuthZ Session-Gate  · **OFFEN (nur geplant)**
-Validiert: kein Gate im Code, `AUTH_GATE_ENABLED` existiert nur in Docs, `cleanupExpiredSessions` ist **tote Funktion** (`apps/api/src/stores/auth-store.ts:89`).
-- Session-Gate für alle Nicht-`/auth`/`/health`-Routen, per `AUTH_GATE_ENABLED` schaltbar.
-- Audit-Log für abgelehnte Zugriffe; `cleanupExpiredSessions` verdrahten (Cron).
-- Gate: ohne Token → 401, mit Token → wie bisher; `npm run check` grün; Tests zuerst.
-
-> **Reihenfolge-Hinweis:** Das Gate legt die *Session-Kontext-Seam* (Actor) in die API-Eingangsschicht. Es sollte **früh** landen, weil mehrere Folgepunkte (Issue-Actor/Historie) den echten Actor daraus konsumieren.
+### WP-Z.1 — AuthZ Session-Gate  · **IMPLEMENTIERT (default OFF)** (PR #39)
+- ✅ Session-Gate für alle Nicht-`/auth`/`/health`-Routen, per `AUTH_GATE_ENABLED` schaltbar (default OFF → bestehende Deployments unberührt).
+- ✅ Strukturiertes Log für abgelehnte Zugriffe; `cleanupExpiredSessions` verdrahtet (war tote Funktion).
+- ✅ Actor-Seam: Gate legt `{userId, role}` in den Request-Context, durchgereicht bis in die Routes (von T4 konsumiert).
+- **Verbleibend zum Scharfschalten:** Web-Layer leitet das User-Session-Token bei serverseitigen API-Calls weiter → dann `AUTH_GATE_ENABLED=true` in Production. Erst danach ist der Actor echt (statt `"system"`).
 
 ---
 
-## 2. Sprint A — Worker/Crawler härten  · **TEILWEISE**
+## 2. Sprint A — Worker/Crawler härten  · **WEITGEHEND ERLEDIGT** (PR #41)
 
 | # | Punkt | Status | Befund |
 |---|---|---|---|
 | A1 | Fixture-Smoke automatisiert | ✅ | `services/crawler/test/crawler.test.ts` (end-to-end) |
-| A2 | Echte Test-Site als Smoke-Ziel + Kriterien | ❌ | nur Platzhalter-Prozedur in `worker-smoke.md` |
-| A3 | Retry/Timeout/Failure-Modes (Network/Sitemap/Robots) | 🟡 | Crawl- + Job-Ebene vorhanden; **kein Exponential-Backoff** |
-| A4 | Robots/Sitemap-Details | 🟡 | Sitemap-Index ✅; **Bug `robots.ts:35`** (UA-Gruppen werden überschrieben statt akkumuliert); kein UA-Header |
-| A5 | Betriebsmodus/Logs/Run-Job-Korrelation | 🟡 | Modi + JSON-Logs ✅; Serverless-Drain loggt **pro Zyklus nichts**, keine Korrelations-ID |
+| A2 | Echte Test-Site als Smoke-Ziel + Kriterien | 🟡 | `worker-smoke.md` aktualisiert mit Ziel + Kriterien + Befehlen; **manueller** Real-Site-Run noch ausstehend (kein CI-Test, bewusst deterministisch) |
+| A3 | Retry/Timeout/Failure-Modes (Network/Sitemap/Robots) | ✅ | + Capped **Exponential-Backoff** (injizierbares Timing) |
+| A4 | Robots/Sitemap-Details | ✅ | Sitemap-Index ✅; Robots-UA-Gruppen-Bug gefixt (akkumulieren + spezifischste Gruppe); echter `User-Agent`-Header |
+| A5 | Betriebsmodus/Logs/Run-Job-Korrelation | ✅ | Per-Zyklus-Log (`crawl_drain_cycle`) mit `jobId`+`crawlRunId` im Serverless-Drain |
 
 ---
 
-## 3. Sprint B — Connector-Verträge & echte Provider  · **TEILWEISE (credential-gated)**
+## 3. Sprint B — Connector-Verträge & echte Provider  · **CONTRACT-EBENE ERLEDIGT** (PR #42)
 
 | # | Punkt | Status | Befund |
 |---|---|---|---|
 | B1 | `connector_sync` planbar + idempotent | ✅ | erledigt (PR #34) |
-| B2 | Provider-Contract (Auth-Status, Quota, Freshness, Sync-Evidenz) dokumentieren | ❌ | offen |
-| B3 | GSC/PSI/Lighthouse als echte API/Store-Integration | ❌ | alles Stubs in `apps/api/src/connectors/index.ts`; **Lighthouse nicht registriert** |
-| B4 | Failure-Modes (fehlende Creds, Quota, degradiert) sichtbar | ❌ | offen |
+| B2 | Provider-Contract (Auth-Status, Quota, Freshness, Sync-Evidenz) | ✅ | `describe()` pro Connector + `GET /integrations/:id` + `connector-contract.md` |
+| B3 | GSC/PSI/Lighthouse als echte API/Store-Integration | 🟡 | typisierte Schnittstelle steht, **Lighthouse registriert**; bleibt Stub — nur echtes `fetch()` fehlt (credential-gated) |
+| B4 | Failure-Modes (fehlende Creds, Quota, degradiert) sichtbar | ✅ | typisiert + über Status-Endpoint abfragbar (kein Crash) |
 
-> Blockiert auf echte Credentials (DEC-002). Contract + Failure-Mode-Gerüst sind **jetzt** baubar; echtes `fetch()` ersetzen, sobald Creds da sind.
+> Verbleibend: echtes `fetch()` pro Provider + Credentials (DEC-002). Alles andre steht.
 
 ---
 
-## 4. Sprint C — Technical-Audit-UI operativ  · **TEILWEISE**
+## 4. Sprint C — Technical-Audit-UI operativ  · **WEITGEHEND ERLEDIGT** (PR #40, #43)
 
 | # | Punkt | Status | Befund |
 |---|---|---|---|
-| C1 | Pagination/Limits (Crawl-Runs, URL-Explorer, Issues) | 🟡 | API durchgängig paginiert; **UI ohne Controls**; **URL-Explorer-UI fehlt ganz** |
-| C2 | Detail-Drawer mit Fetch/Indexability/Rule/Run-Kontext | 🟡 | Issue-Drawer ✅, aber **ohne** Fetch/Indexability/Run; **kein URL-Drawer** |
-| C3 | Serverseitige Filter (Status/Severity/Rule/URL/Run) | 🟡 | Status+Severity (mit UI) ✅; Rule server-seitig ohne UI; URL/Run offen |
-| C4 | Issue-Aktionen: Dismiss-Grund, Actor, Historie | 🟡 | Resolve/Dismiss/Reopen da, aber **resolve==dismiss funktional identisch**; Actor hart `"system"` (`crawl-store.ts:371`); keine Grund/Historie |
-| C5 | Empty/Error/Loading-States | 🟡 | Empty ✅; Error grob; **kein Loading-State** |
+| C1 | Pagination/Limits (Crawl-Runs, URL-Explorer, Issues) | ✅ | URL-Explorer-Screen + serverseitige Pagination (URLs + Crawl-Runs); Issue-Liste bleibt gruppiert |
+| C2 | Detail-Drawer mit Fetch/Indexability/Rule/Run-Kontext | ✅ | URL-Drawer (Fetch/Indexability/Discovery) + Issue-Drawer (Rule/Historie) |
+| C3 | Serverseitige Filter (Status/Severity/Rule/URL/Run) | 🟡 | Status+Severity (mit UI) ✅; Rule server-seitig ohne UI; URL/Run-Filter-UI offen |
+| C4 | Issue-Aktionen: Dismiss-Grund, Actor, Historie | ✅ | distinkter Dismiss + Grund + Actor + Lifecycle-Historie (PR #43) |
+| C5 | Empty/Error/Loading-States | 🟡 | Empty + **Loading** (`loading.tsx`) ✅; Action-`?error=`-Rendering noch offen |
 
 ---
 
@@ -86,9 +90,9 @@ Validiert: kein Gate im Code, `AUTH_GATE_ENABLED` existiert nur in Docs, `cleanu
 
 ## 6. Hygiene & Querschnitt
 
-- **GAP-SEC-001** — Next/PostCSS Dependency-Audit (moderate Findings) bewusst entscheiden.
-- **Code-Hygiene:** `sqlite-store.ts`/`SQLiteStore`/`migrate-sqlite.ts` sind Legacy-Namen für den Postgres-Pfad → umbenennen reduziert Verwirrung (rein kosmetisch, breiter Rename → früh oder spät einplanen).
-- **Doku-Hygiene:** abgeschlossen in dieser Session (URL-Drift, SQLite-Default-Sprache, Wave-Status, Handoff→Roadmap).
+- **GAP-SEC-001** — Next/PostCSS Dependency-Audit (moderate Findings) bewusst entscheiden. *(offen)*
+- **Code-Hygiene:** ✅ Legacy-SQLite-Namen umbenannt (PR #38). Rest-Notiz: `stackDecision.database`-String in `packages/shared-config` nennt noch „SQLite embedded".
+- **Doku-Hygiene:** ✅ abgeschlossen (URL-Drift, SQLite-Default-Sprache, Wave-Status, Handoff→Roadmap).
 
 ---
 
@@ -98,7 +102,7 @@ Validiert: kein Gate im Code, `AUTH_GATE_ENABLED` existiert nur in Docs, `cleanu
 |---|---|---|
 | GAP-PERSIST-001 | Persistenz | ✅ **geschlossen** (Neon + async) |
 | GAP-REPORT-003 | Cron-Trigger | ✅ Mechanik vorhanden — `run-due`-Verdrahtung noch prüfen |
-| GAP-AUTHZ-001 / WP-Z.1 | Security | ⛔ **offen** (P0-Blocker) |
+| GAP-AUTHZ-001 / WP-Z.1 | Security | ✅ implementiert (default OFF); Scharfschalten = Web-Token-Forwarding |
 | GAP-SEC-001 | Security | offen (Dependency-Audit-Entscheidung) |
 | GAP-REPORT-002 | Delivery | offen (SMTP/Slack-Creds) |
 | GAP-AUTH-001/-004 | Provider | offen (GSC-OAuth-Creds, DEC-002) |
