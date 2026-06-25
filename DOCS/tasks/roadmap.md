@@ -27,7 +27,8 @@
 | Worker-Härtung (Robots/UA/Backoff/Korrelation) | ✅ | PR #41 (T2) |
 | Connector-Contract + Lighthouse + Failure-Modes | ✅ (credential-gated) | PR #42 (T5) |
 | Issue-Lifecycle (distinct Dismiss/Actor/Historie) | ✅ | PR #43 (T4) |
-| Tests | ✅ **154 node + 246 web**, grün | `npm run check`, `@seo-tool/web test` |
+| Crawl-Diff (As-of-Lifecycle-Diff + Vergleichs-UI) | ✅ | PR #45/#46 (UX-6b) |
+| Tests | ✅ **164 node + 267 web**, grün | `npm run check`, `@seo-tool/web test` |
 | Produktion | ✅ live, Health ok | `queryland-mikadesign.vercel.app` |
 
 **Damit geschlossen:** GAP-PERSIST-001 (Neon statt Turso), die „Sync-Store"-Strukturblockade, GAP-REPORT-003-Cron-Trigger (Mechanik vorhanden), und mit Welle 0+1 der Großteil von WP-Z.1 (AuthZ) sowie Sprint A/B/C (siehe unten).
@@ -83,7 +84,7 @@
 
 ## 5. UX/Backend-Tiefe (Roadmap-Reste)  →  [`../design/ux-ui-sprint.md`](../design/ux-ui-sprint.md)
 
-- **UX-6b Crawl-Diff** (neues Backend) — offen.
+- **UX-6b Crawl-Diff** (neues Backend) — ✅ **erledigt** (PR #45 Backend, #46 UI). As-of-Lifecycle-Diff zweier Runs + Vergleichs-UI. *(Bewusste Lücke: „entfernte URLs" nicht ableitbar ohne Per-Run-Snapshot.)*
 - **UX-7 Content Workspace** (net-new, Scope-Entscheidung) — offen.
 
 ---
