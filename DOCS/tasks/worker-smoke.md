@@ -1,14 +1,23 @@
-# Worker Smoke — WP-0.3
+# Worker Smoke — Crawler
 
-Stand: 2026-06-06
+Stand: 2026-06-25
 
 ## Ziel
 
-Dieses Dokument macht den `crawl_seed`-Worker-Smoke reproduzierbar. Der Smoke belegt für WP-0.3, dass der Worker Jobs claimt, Crawl-Artefakte persistiert, Crawl Runs abschließt und bei Sitemap-Index-/Redirect-Edge-Cases erklärbar bleibt.
+Dieses Dokument macht den `crawl_seed`-Worker-Smoke reproduzierbar. Der Smoke belegt, dass der Worker Jobs claimt, Crawl-Artefakte persistiert, Crawl Runs abschließt und bei Sitemap-Index-/Redirect-/Robots-Edge-Cases erklärbar bleibt.
 
-## Automatisierter Fixture-Smoke
+## Aktuelles Betriebsmodell
 
-Der Fixture-Smoke ist Teil von `npm test` und läuft komplett lokal mit `sqlite::memory:` und einem deterministischen `fetchImpl`.
+Es gibt **keinen** langlaufenden lokalen SQLite-Daemon (`start:once`) mehr. Produktiv läuft der Crawler als **in-process Vercel-Cron-Route** (`GET /api/cron/crawl`) gegen die **Neon-Postgres**-Datenbank:
+
+- Vercel ruft die Route per Cron (siehe `vercel.json`) auf.
+- Die Route ruft `drainCrawlJobs()` (`apps/web/src/lib/crawl-cron.ts`), das die `crawl_seed`-Queue innerhalb eines Job-/Zeit-Budgets leert.
+- Jeder gedrainte Zyklus loggt eine strukturierte JSON-Zeile (`event: "crawl_drain_cycle"`) mit `jobId` + `crawlRunId` + Outcome zur Korrelation in den Vercel-Logs. Logs sind unter `NODE_ENV=test` unterdrückt.
+- Auth: `CRON_SECRET` (`Authorization: Bearer <CRON_SECRET>`); ohne Secret ist die Route auf Vercel inert (503).
+
+## Automatisierter Fixture-Smoke (deterministisch, CI)
+
+Der Fixture-Smoke ist Teil von `npm run check` / `npm test` und läuft komplett lokal mit `sqlite::memory:` und einem deterministischen `fetchImpl` (kein Netzwerk).
 
 ```bash
 npm test -- --test-name-pattern "crawl worker claims crawl_seed job and persists crawl artifacts end-to-end"
@@ -22,55 +31,96 @@ Er prüft:
 4. Crawl Run wird mit Summary abgeschlossen.
 5. Job endet `succeeded`.
 
-Zusätzliche WP-0.3-Härtungs-Smokes:
+Zusätzliche Härtungs-Smokes (alle deterministisch, kein Netzwerk):
 
 ```bash
-npm test -- --test-name-pattern "sitemap index|redirect loops"
+npm test -- --test-name-pattern "sitemap index|redirect loop|network-error|robots-blocked|backoff|user-agent|robots groups"
 ```
 
-Diese prüfen:
+Diese prüfen u. a.:
 
-- Sitemap-Index-Auflösung nur für in-scope Sitemap-Dateien.
-- Persistenz der aus einem Sitemap-Index entdeckten Seiten.
-- Redirect-Loop-Erkennung, bevor der Crawler unbegrenzt weiterläuft.
+- Sitemap-Index-Auflösung nur für in-scope Sitemap-Dateien + Persistenz.
+- Redirect-Loop-Erkennung vor Endloslauf (als `network_error`).
+- Netzwerkfehler-Fetches bleiben erklärbar, der Run/Job wird ohne unhandled-Throw abgeschlossen.
+- Robots-blockierte URLs werden ohne Page-Fetch als non-indexable erfasst.
+- Robots multi-user-agent Gruppen-Akkumulation + spezifischste Gruppen-Selektion mit `*`-Fallback.
+- Capped exponential Backoff (injizierte Clock, deterministische Delay-Sequenz).
+- Gesendeter `User-Agent`-Header (Default + Override).
 
-## Lokaler Smoke gegen eine echte eigene Content/SaaS-Site
+## Manueller Smoke gegen eine echte Test-Site
 
-Voraussetzungen:
+> Kein netzwerkabhängiger automatisierter Test — CI bleibt deterministisch. Diesen Smoke nur manuell ausführen.
 
-1. API mit persistenter lokaler SQLite-Datei starten.
-2. Projekt und Site über API/UI anlegen.
-3. `crawl_seed`-Job mit `siteId`, `baseUrl` und optional `sitemapUrl` erzeugen.
-4. Worker einmalig ausführen.
+### TARGET (Platzhalter)
 
-Beispielablauf:
+Eine eigene, crawlbare Site mit gültiger `robots.txt` und `sitemap.xml` setzen:
 
 ```bash
-npm --workspace @seo-tool/api start
-npm --workspace @seo-tool/crawler run start:once
+export SMOKE_BASE_URL="https://deine-test-site.example/"
+export SMOKE_SITEMAP_URL="https://deine-test-site.example/sitemap.xml"
+export SMOKE_PROJECT_ID="proj-smoke"
+export SMOKE_SITE_ID="site-smoke"
 ```
 
-Für den Job-Payload gilt:
+Empfehlung: eine kleine eigene Content-/Marketing-Site (wenige Dutzend URLs), bei der ihr Crawl-Berechtigung habt. Niemals fremde Sites ohne Erlaubnis crawlen — der Crawler sendet den User-Agent `SeoToolBot/1.0 (+https://github.com/seo-tool)` (überschreibbar via `CRAWLER_USER_AGENT`) und respektiert `robots.txt`.
+
+### Voraussetzungen
+
+1. Neon-Postgres erreichbar; `DATABASE_URL` / Neon-Connection-String gesetzt.
+2. `CRON_SECRET` gesetzt (für die Cron-Route).
+3. Web-App lokal gebaut/gestartet.
+
+### Befehle (manuell)
+
+```bash
+# 1. Build
+npm run build
+
+# 2. Web-App lokal starten (lädt .env mit DATABASE_URL + CRON_SECRET)
+npm run build:web && npm --workspace @seo-tool/web run start &
+
+# 3. crawl_seed-Job über die interne API anlegen (Payload siehe unten)
+curl -sS -X POST "http://localhost:3000/api/internal/jobs" \
+  -H "content-type: application/json" \
+  -d "{\"projectId\":\"$SMOKE_PROJECT_ID\",\"type\":\"crawl_seed\",\"subject\":\"$SMOKE_BASE_URL\",\"payload\":{\"siteId\":\"$SMOKE_SITE_ID\",\"baseUrl\":\"$SMOKE_BASE_URL\",\"sitemapUrl\":\"$SMOKE_SITEMAP_URL\"}}"
+
+# 4. Cron-Route einmal triggern (drained die Queue)
+curl -sS "http://localhost:3000/api/cron/crawl" \
+  -H "authorization: Bearer $CRON_SECRET" | jq
+
+# 5. Crawl-Run-Status / Artefakte prüfen
+curl -sS "http://localhost:3000/api/internal/projects/$SMOKE_PROJECT_ID/sites/$SMOKE_SITE_ID/crawl-runs" | jq
+```
+
+Job-Payload:
 
 ```json
 {
-  "siteId": "site-...",
-  "baseUrl": "https://deine-domain.example/",
-  "sitemapUrl": "https://deine-domain.example/sitemap.xml"
+  "siteId": "site-smoke",
+  "baseUrl": "https://deine-test-site.example/",
+  "sitemapUrl": "https://deine-test-site.example/sitemap.xml"
 }
 ```
 
-## Erfolgskriterien
+> Hinweis: Die konkreten internen API-Pfade können je nach Routing variieren — maßgeblich ist, dass ein `crawl_seed`-Job angelegt und anschließend `/api/cron/crawl` mit gültigem `CRON_SECRET` aufgerufen wird.
 
-Ein echter Site-Smoke gilt als bestanden, wenn:
+## Erfolgskriterien (CRITERIA)
 
-- der `crawl_seed`-Job `succeeded` oder bei bewusstem Fixture-Fehler nachvollziehbar `failed` ist,
-- ein Crawl Run mit Summary vorhanden ist,
-- `discovered_urls`, Fetch Results, Indexability Assessments und Health Score persistiert wurden,
+Der manuelle Site-Smoke gilt als bestanden, wenn:
+
+- die Cron-Antwort `ok: true` liefert und `crawl.processed >= 1` ist,
+- pro gedraintem Zyklus eine `crawl_drain_cycle`-Logzeile mit `jobId` + `crawlRunId` erscheint,
+- der `crawl_seed`-Job `succeeded` ist (oder bei bewusstem Fehler nachvollziehbar `failed` mit `errorMessage`),
+- ein Crawl Run mit Summary vorhanden ist (`discoveredUrls`, `fetchedUrls`, `healthScore !== null`),
+- `discovered_urls`, Fetch Results und Indexability Assessments persistiert wurden,
 - Sitemap-Index-Dateien nur in-scope verfolgt wurden,
-- Redirect-Loops als erklärbarer `network_error` statt als Endloslauf sichtbar werden.
+- Redirect-Loops als erklärbarer `network_error` statt als Endloslauf sichtbar werden,
+- robots-blockierte URLs als `blocked_by_robots` ohne Page-Fetch erfasst werden,
+- die Requests den erwarteten `User-Agent` an die Zielsite gesendet haben.
 
 ## Einschränkungen
 
-- Vercel-Serverless-SQLite ist ephemer; echte Site-Smokes lokal oder gegen ein persistentes Ziel ausführen.
-- JS-Rendering, große Vollcrawls und externe Scheduler sind weiterhin außerhalb von WP-0.3.
+- Kein netzwerkabhängiger Test in CI — der echte Site-Smoke ist manuell.
+- Vercel-Serverless ist statenlos; persistenter State liegt ausschließlich in Neon-Postgres.
+- JS-Rendering, große Vollcrawls und externe Scheduler sind weiterhin außerhalb des Scopes.
+```

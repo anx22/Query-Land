@@ -67,7 +67,39 @@ export async function drainCrawlJobs(options: DrainCrawlJobsOptions): Promise<Dr
       break;
     }
     cycles.push(result);
+    // Structured per-cycle log correlating the drained job to its crawl run, so
+    // a scheduled invocation is traceable in serverless logs (no daemon log).
+    // Matches the JSON style in services/crawler/src/worker.ts.
+    logCrawlCycle({
+      jobId: result.jobId,
+      crawlRunId: result.crawlRunId,
+      outcome: result.status,
+      discoveredUrls: result.discoveredUrls,
+      fetchedUrls: result.fetchedUrls,
+      issues: result.issues,
+      errorMessage: result.errorMessage,
+      processed: cycles.length
+    });
   }
 
   return { processed: cycles.length, stoppedReason, cycles };
+}
+
+/**
+ * Emits one structured JSON line per drained crawl cycle so a Vercel cron
+ * invocation can be correlated by jobId + crawlRunId. Suppressed under tests to
+ * keep CI output clean and deterministic.
+ */
+function logCrawlCycle(fields: {
+  jobId?: string;
+  crawlRunId?: string;
+  outcome?: string;
+  discoveredUrls?: number;
+  fetchedUrls?: number;
+  issues?: number;
+  errorMessage?: string;
+  processed: number;
+}): void {
+  if (process.env.NODE_ENV === "test") return;
+  console.log(JSON.stringify({ level: "info", service: "crawl-cron", event: "crawl_drain_cycle", ...fields }));
 }

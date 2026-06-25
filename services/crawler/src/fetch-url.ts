@@ -1,4 +1,5 @@
 import type { FetchResult } from "@seo-tool/domain-model";
+import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_RETRY_BASE_DELAY_MS, DEFAULT_RETRY_MAX_DELAY_MS, backoffDelayMs } from "./config.js";
 import type { FetchWorkerInput } from "./types.js";
 import { normalizeCrawlUrl } from "./url-normalization.js";
 
@@ -6,6 +7,9 @@ export async function fetchUrl(input: FetchWorkerInput): Promise<FetchResult> {
   const fetchImpl = input.fetchImpl ?? fetch;
   const fetchedAt = input.fetchedAt ?? new Date().toISOString();
   const maxAttempts = Math.max(1, input.retry?.maxAttempts ?? 1);
+  const baseDelayMs = input.retry?.delayMs ?? DEFAULT_RETRY_BASE_DELAY_MS;
+  const maxDelayMs = input.retry?.maxDelayMs ?? DEFAULT_RETRY_MAX_DELAY_MS;
+  const sleep = input.retry?.sleep ?? defaultSleep;
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -14,7 +18,8 @@ export async function fetchUrl(input: FetchWorkerInput): Promise<FetchResult> {
     } catch (error) {
       lastError = error;
       if (attempt < maxAttempts) {
-        await sleep(input.retry?.delayMs ?? 0);
+        // Capped exponential backoff: base * 2^(attempt-1), clamped to maxDelay.
+        await sleep(backoffDelayMs(attempt, baseDelayMs, maxDelayMs));
       }
     }
   }
@@ -33,7 +38,11 @@ async function fetchWithRedirectLimit(input: FetchWorkerInput, fetchImpl: typeof
     const timeout = controller ? setTimeout(() => controller.abort(), input.timeoutMs) : null;
 
     try {
-      const response = await fetchImpl(currentUrl, { redirect: "manual", signal: controller?.signal });
+      const response = await fetchImpl(currentUrl, {
+        redirect: "manual",
+        signal: controller?.signal,
+        headers: { "user-agent": input.userAgent ?? DEFAULT_CRAWLER_USER_AGENT }
+      });
       if (timeout) clearTimeout(timeout);
       const headers = normalizeHeaders(response.headers);
       const statusCode = response.status;
@@ -114,6 +123,6 @@ function networkErrorMessage(error: unknown, attempts: number): string {
   return attempts > 1 ? `${message} after ${attempts} attempts` : message;
 }
 
-function sleep(ms: number): Promise<void> {
+function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -19,6 +19,7 @@ export function createCrawlSeedJob(input: CrawlSeedInput): FoundationJob {
 }
 
 export { calculateHealthScore };
+export { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_RETRY_BASE_DELAY_MS, DEFAULT_RETRY_MAX_DELAY_MS, backoffDelayMs } from "./config.js";
 export { evaluateAuditIssues } from "./audit-rules.js";
 export { runCrawlWorkerCycle } from "./crawl-cycle.js";
 export { fetchUrl } from "./fetch-url.js";

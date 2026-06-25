@@ -29,7 +29,12 @@ export interface SitemapIndexDiscoveryInput extends SitemapDiscoveryInput {
 
 export interface FetchRetryPolicy {
   maxAttempts: number;
+  /** Base delay (ms) for the first retry. Subsequent retries use capped exponential backoff. */
   delayMs?: number;
+  /** Upper bound (ms) for any single backoff wait. Defaults to DEFAULT_RETRY_MAX_DELAY_MS. */
+  maxDelayMs?: number;
+  /** Injectable sleep so tests can assert the backoff sequence without real timers. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface FetchWorkerInput {
@@ -39,6 +44,8 @@ export interface FetchWorkerInput {
   timeoutMs?: number;
   retry?: FetchRetryPolicy;
   maxRedirects?: number;
+  /** User-Agent header to send and to use for robots.txt group selection. */
+  userAgent?: string;
 }
 
 export interface AuditPageInput {
@@ -84,6 +91,8 @@ export interface CrawlWorkerCycleOptions {
   maxOutgoingLinkChecks?: number;
   maxSitemapIndexDepth?: number;
   maxSitemapFetches?: number;
+  /** User-Agent header to send and to use for robots.txt group selection. */
+  userAgent?: string;
 }
 
 export interface CrawlWorkerCycleResult {
