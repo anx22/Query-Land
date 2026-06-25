@@ -2476,6 +2476,231 @@ paths:
           description: Invalid transition
         '404':
           description: Proposal not found
+  # UX7-W1 Content Workspace (refresh-centric, MANUAL brief — no LLM auto-generation).
+  /projects/{projectId}/sites/{siteId}/content-recommendations:
+    get:
+      summary: List content recommendations (briefs) for a site
+      operationId: listContentRecommendations
+      responses:
+        '200':
+          description: Content recommendations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContentRecommendation'
+    post:
+      summary: Create an editable content brief
+      operationId: createContentRecommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContentRecommendationRequest'
+      responses:
+        '201':
+          description: Brief created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentRecommendation'
+  /content-recommendations/{recommendationId}:
+    get:
+      summary: Get a content brief
+      operationId: getContentRecommendation
+      responses:
+        '200':
+          description: Content recommendation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentRecommendation'
+        '404':
+          description: Content recommendation not found
+    patch:
+      summary: Edit a content brief
+      operationId: updateContentRecommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Updated brief
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentRecommendation'
+  /content-recommendations/{recommendationId}/transition:
+    post:
+      summary: Transition a content brief through its lifecycle
+      operationId: transitionContentRecommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [draft, ready, in_progress, done, dismissed] }
+      responses:
+        '200':
+          description: Transitioned brief
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentRecommendation'
+        '409':
+          description: Invalid transition
+  /content-recommendations/{recommendationId}/create-proposal:
+    post:
+      summary: Bridge a brief into the proposal/MCP rail (dev_ticket or fix_pr)
+      operationId: createProposalFromBrief
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind: { type: string, enum: [dev_ticket, fix_pr] }
+                title: { type: string }
+                body: { type: string }
+      responses:
+        '201':
+          description: Proposal created from brief
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      proposal:
+                        $ref: '#/components/schemas/Proposal'
+                      recommendation:
+                        $ref: '#/components/schemas/ContentRecommendation'
+  /projects/{projectId}/sites/{siteId}/page-metrics:
+    get:
+      summary: List deterministic demo-tagged page metric time-series
+      operationId: listPageMetrics
+      responses:
+        '200':
+          description: Page metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PageMetric'
+    post:
+      summary: Record page metric points
+      operationId: recordPageMetrics
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metrics]
+              properties:
+                metrics:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PageMetric'
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      inserted: { type: integer }
+                      updated: { type: integer }
+  /projects/{projectId}/sites/{siteId}/refresh-candidates:
+    get:
+      summary: List deterministically ranked refresh candidates (decay + open issues)
+      operationId: listRefreshCandidates
+      responses:
+        '200':
+          description: Refresh candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RefreshCandidate'
+  /projects/{projectId}/sites/{siteId}/content-score:
+    get:
+      summary: Deterministic content score for a URL (health + open issues + trend)
+      operationId: getContentScore
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Content score
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContentScore'
+  /projects/{projectId}/sites/{siteId}/internal-link-suggestions:
+    get:
+      summary: Internal-link suggestions for a URL, derived from the crawl link graph
+      operationId: getInternalLinkSuggestions
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Internal link suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContentInternalLink'
 components:
   securitySchemes:
     bearerAuth:
@@ -2502,6 +2727,125 @@ components:
       schema:
         type: string
   schemas:
+    ContentTerm:
+      type: object
+      required: [term, done]
+      properties:
+        term: { type: string }
+        done: { type: boolean }
+    ContentInternalLink:
+      type: object
+      required: [url, reason]
+      properties:
+        url: { type: string }
+        anchor: { type: string, nullable: true }
+        reason: { type: string }
+    ContentRecommendation:
+      type: object
+      required: [id, projectId, siteId, url, title, intent, status, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        url: { type: string }
+        opportunityId: { type: string, nullable: true }
+        title: { type: string }
+        targetTopic: { type: string }
+        targetQueries:
+          type: array
+          items: { type: string }
+        intent: { type: string, enum: [informational, commercial, transactional, navigational] }
+        sections:
+          type: array
+          items: { type: string }
+        terms:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentTerm'
+        internalLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentInternalLink'
+        validationMetric: { type: string }
+        status: { type: string, enum: [draft, ready, in_progress, done, dismissed] }
+        notes: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateContentRecommendationRequest:
+      type: object
+      required: [url, title]
+      properties:
+        url: { type: string }
+        title: { type: string }
+        opportunityId: { type: string, nullable: true }
+        targetTopic: { type: string }
+        targetQueries:
+          type: array
+          items: { type: string }
+        intent: { type: string, enum: [informational, commercial, transactional, navigational] }
+        sections:
+          type: array
+          items: { type: string }
+        terms:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentTerm'
+        internalLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentInternalLink'
+        validationMetric: { type: string }
+        notes: { type: string }
+    PageMetric:
+      type: object
+      required: [url, metric, value, capturedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        url: { type: string }
+        metric: { type: string, enum: [clicks, impressions, position, ctr] }
+        value: { type: number }
+        capturedAt: { type: string, format: date-time }
+        sourceConfidence: { type: string }
+    RefreshCandidate:
+      type: object
+      required: [url, clicksTrend, latestClicks, openIssues, refreshScore, reasons]
+      properties:
+        url: { type: string }
+        clicksTrend: { type: number }
+        latestClicks: { type: number }
+        openIssues: { type: integer }
+        refreshScore: { type: number }
+        reasons:
+          type: array
+          items: { type: string }
+    ContentScore:
+      type: object
+      required: [url, score, healthScore, openIssues, metricTrend, reasons]
+      properties:
+        url: { type: string }
+        score: { type: number }
+        healthScore: { type: number }
+        openIssues: { type: integer }
+        metricTrend: { type: number }
+        reasons:
+          type: array
+          items: { type: string }
+    Proposal:
+      type: object
+      required: [id, projectId, kind, title, body, status, source, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        kind: { type: string, enum: [dev_ticket, fix_pr] }
+        title: { type: string }
+        body: { type: string }
+        opportunityId: { type: string, nullable: true }
+        status: { type: string, enum: [proposed, accepted, rejected] }
+        source: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     ApiError:
       type: object
       required: [error]
