@@ -39,7 +39,7 @@ export interface OpportunityBoardData {
 
 export async function loadOpportunityBoard(): Promise<OpportunityBoardData> {
   const dashboard = await loadFoundationDashboardData();
-  const selectedSite = dashboard.sites[0] ?? null;
+  const selectedSite = dashboard.selectedSite ?? dashboard.sites[0] ?? null;
 
   const base = {
     apiBaseUrl: dashboard.apiBaseUrl,

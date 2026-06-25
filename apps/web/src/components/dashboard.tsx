@@ -115,6 +115,26 @@ export function Dashboard({ data }: { data: OverviewData }) {
     recentReports,
   } = data;
 
+  // Project-first cockpit: the Overview is the cockpit OF the active project.
+  // With no project there is nothing to show — guide straight to creation
+  // instead of a wall of empty KPI charts. (The OnboardingChecklist above, in
+  // AppShell, carries the full waterfall.)
+  if (connected && !project) {
+    return (
+      <section className="card overview-cockpit-empty">
+        <p className="kicker">Übersicht · Kein Projekt</p>
+        <h1>Die Übersicht ist das Cockpit deines Projekts</h1>
+        <p className="muted">
+          Ein Projekt ist die Klammer über allen Analysen. Lege zuerst ein Projekt an —
+          danach füllt sich diese Übersicht mit Sichtbarkeit, Health Score und Chancen.
+        </p>
+        <a className="button" href="/projects">
+          Projekt anlegen
+        </a>
+      </section>
+    );
+  }
+
   // Delta calculations (plain numbers; null = no previous data)
   const visibilityDelta =
     latestVisibility !== null && previousVisibility !== null

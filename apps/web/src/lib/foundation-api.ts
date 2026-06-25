@@ -55,6 +55,8 @@ export interface FoundationDashboardData {
   projects: FoundationProject[];
   selectedProject: FoundationProject | null;
   sites: FoundationSite[];
+  /** Active site (crawl/audit scope) inside the selected project, or null. */
+  selectedSite: FoundationSite | null;
   integrations: FoundationIntegration[];
   jobs: FoundationJob[];
   sourceMap: FoundationSourceMapEntry[];
@@ -93,7 +95,7 @@ export interface CreateFoundationJobInput {
 export async function loadFoundationDashboardData(): Promise<FoundationDashboardData> {
   try {
     const projects = await apiGet<FoundationProject[]>("/projects");
-    const { getActiveProjectId } = await import("./active-project");
+    const { getActiveProjectId, getActiveSiteId } = await import("./active-project");
     const activeProjectId = await getActiveProjectId();
     const selectedProject =
       (activeProjectId ? projects.find((project) => project.id === activeProjectId) : null) ??
@@ -106,12 +108,19 @@ export async function loadFoundationDashboardData(): Promise<FoundationDashboard
       apiGet<FoundationSourceMapEntry[]>("/source-map")
     ]);
 
+    // Resolve the active site within the selected project: cookie pick if it is
+    // still part of this project, else the first site (stable default).
+    const activeSiteId = await getActiveSiteId();
+    const selectedSite =
+      (activeSiteId ? sites.find((site) => site.id === activeSiteId) : null) ?? sites[0] ?? null;
+
     return {
       apiBaseUrl,
       connected: true,
       projects,
       selectedProject,
       sites,
+      selectedSite,
       integrations,
       jobs,
       sourceMap
@@ -124,6 +133,7 @@ export async function loadFoundationDashboardData(): Promise<FoundationDashboard
       projects: [],
       selectedProject: null,
       sites: [],
+      selectedSite: null,
       integrations: [],
       jobs: [],
       sourceMap: []

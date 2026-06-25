@@ -153,7 +153,7 @@ export const PREREQUISITE_META: Record<Prerequisite, PrerequisiteMeta> = {
       "Noch kein Crawl gestartet. Starte einen Crawl im Technical Audit, um technische Daten und URLs zu sammeln.",
     reason: "Zuerst einen Crawl im Technical Audit starten.",
     ctaLabel: "Crawl starten",
-    ctaHref: "/technical-audit",
+    ctaHref: "/technical-audit#crawl-start",
   },
 };
 

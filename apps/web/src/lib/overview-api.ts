@@ -126,7 +126,7 @@ function emptyOverview(project: FoundationProject | null, site: FoundationSite |
 export async function loadOverviewData(): Promise<OverviewData> {
   const dashboard = await loadFoundationDashboardData();
   const project = dashboard.selectedProject;
-  const site = dashboard.sites[0] ?? null;
+  const site = dashboard.selectedSite ?? dashboard.sites[0] ?? null;
 
   if (!dashboard.connected || !project) {
     return emptyOverview(project, site, {

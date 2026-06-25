@@ -10,12 +10,18 @@
  */
 
 import { cookies } from "next/headers";
-import { ACTIVE_PROJECT_COOKIE } from "./active-project-cookie";
+import { ACTIVE_PROJECT_COOKIE, ACTIVE_SITE_COOKIE } from "./active-project-cookie";
 
-export { ACTIVE_PROJECT_COOKIE };
+export { ACTIVE_PROJECT_COOKIE, ACTIVE_SITE_COOKIE };
 
 /** Read the active project id from the request cookie, or null if unset. */
 export async function getActiveProjectId(): Promise<string | null> {
   const store = await cookies();
   return store.get(ACTIVE_PROJECT_COOKIE)?.value ?? null;
+}
+
+/** Read the active site id from the request cookie, or null if unset. */
+export async function getActiveSiteId(): Promise<string | null> {
+  const store = await cookies();
+  return store.get(ACTIVE_SITE_COOKIE)?.value ?? null;
 }

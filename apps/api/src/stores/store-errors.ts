@@ -4,7 +4,14 @@ export class RequestError extends Error {
   }
 }
 
-export function sqliteConstraintError(error: unknown, fallbackCode: string, fallbackMessage: string): RequestError {
+export function sqliteConstraintError(
+  error: unknown,
+  fallbackCode: string,
+  fallbackMessage: string,
+  /** Specific message for the unique-violation (409) case, so the user learns
+   *  it's a duplicate rather than a generic "could not be stored". */
+  uniqueMessage?: string
+): RequestError {
   const message = error instanceof Error ? error.message : String(error);
   const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
 
@@ -17,7 +24,7 @@ export function sqliteConstraintError(error: unknown, fallbackCode: string, fall
     return new RequestError(404, "unknown_project", "Referenced project does not exist");
   }
   if (isUnique) {
-    return new RequestError(409, fallbackCode, fallbackMessage);
+    return new RequestError(409, fallbackCode, uniqueMessage ?? fallbackMessage);
   }
   return new RequestError(400, fallbackCode, fallbackMessage);
 }
