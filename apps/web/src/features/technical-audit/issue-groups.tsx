@@ -17,6 +17,9 @@ import type { AuditIssueHistoryEntry, AuditIssueRecord, AuditIssueSeverity } fro
 import type { IssueGroup } from "../../lib/audit-api";
 import { dismissIssueAction, loadIssueHistoryAction, reopenIssueAction, resolveIssueAction } from "./actions";
 import { availableIssueActions, formatHistoryEntry, ISSUE_ACTION_LABEL, issueStatusLabel, type IssueAction } from "./issue-actions";
+import { ruleLabel } from "./issue-labels";
+
+export { ruleLabel };
 
 const SEVERITY_BADGE: Record<AuditIssueSeverity, string> = {
   critical: "danger",
@@ -31,19 +34,6 @@ const SEVERITY_LABEL: Record<AuditIssueSeverity, string> = {
   medium: "Mittel",
   low: "Niedrig",
 };
-
-const RULE_LABEL: Record<IssueGroup["rule"], string> = {
-  http_error: "HTTP-Fehler",
-  redirect_chain: "Redirect-Kette",
-  missing_title: "Fehlender Title",
-  duplicate_title: "Doppelter Title",
-  canonical_mismatch: "Canonical-Abweichung",
-  broken_link: "Defekter Link",
-};
-
-export function ruleLabel(rule: IssueGroup["rule"]): string {
-  return RULE_LABEL[rule] ?? rule;
-}
 
 const ACTION_FN: Record<IssueAction, (formData: FormData) => void | Promise<void>> = {
   resolve: resolveIssueAction,
