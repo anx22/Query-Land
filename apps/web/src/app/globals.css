@@ -1458,3 +1458,47 @@ select:disabled {
 .crawl-start__scope {
   margin-top: 0.2rem;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Advanced / developer disclosure (e.g. Settings dev tooling)               */
+/* ------------------------------------------------------------------------- */
+
+.advanced-section {
+  margin-top: 1.5rem;
+  border: 1px dashed var(--line);
+  border-radius: 1rem;
+  background: var(--surface-muted);
+  padding: 0.5rem 1rem;
+}
+
+.advanced-section > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.2rem;
+}
+
+.advanced-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-section__title {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.advanced-section__title::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+
+.advanced-section[open] > summary .advanced-section__title::before {
+  content: "▾ ";
+}
+
+.advanced-section__hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

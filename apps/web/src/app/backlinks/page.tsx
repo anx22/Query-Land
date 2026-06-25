@@ -51,17 +51,17 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         {/* Intro + import action                                             */}
         {/* ----------------------------------------------------------------- */}
         <section className="card hero-card">
-          <p className="kicker">Authority &amp; Backlinks</p>
+          <p className="kicker">Verlinkung von anderen Websites</p>
           <h1>Backlink-Profil</h1>
           <p>
-            So entwickelt sich Ihr Linkprofil: <TermTooltip term="Backlink">Backlinks</TermTooltip> und{" "}
+            Backlinks sind Links von anderen Websites auf Ihre — ein wichtiges Vertrauenssignal für
+            Google. So entwickelt sich Ihr Linkprofil: <TermTooltip term="Backlink">Backlinks</TermTooltip> und{" "}
             <TermTooltip term="Verweisende Domain">verweisende Domains</TermTooltip> über die Zeit,{" "}
             <TermTooltip term="Follow / Nofollow">Follow / Nofollow</TermTooltip>-Mix, Zu- und Abgänge sowie die{" "}
-            <TermTooltip term="Follow-Ratio">Follow-Ratio</TermTooltip>. Quelle ist der GSC-Links-Report (Beleg-Klasse B).
+            <TermTooltip term="Follow-Ratio">Follow-Ratio</TermTooltip>.
           </p>
           <div className="badge-row">
-            <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
-            <span className="badge">{data.snapshots.length} Snapshot{data.snapshots.length !== 1 ? "s" : ""}</span>
+            <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
             <ConfidenceBadge level="B" />
             <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
           </div>

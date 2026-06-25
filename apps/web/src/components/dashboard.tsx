@@ -123,9 +123,9 @@ export function Dashboard({ data }: { data: OverviewData }) {
     return (
       <section className="card overview-cockpit-empty">
         <p className="kicker">Übersicht · Kein Projekt</p>
-        <h1>Die Übersicht ist das Cockpit deines Projekts</h1>
+        <h1>Die Übersicht ist das Cockpit Ihres Projekts</h1>
         <p className="muted">
-          Ein Projekt ist die Klammer über allen Analysen. Lege zuerst ein Projekt an —
+          Ein Projekt ist die Klammer über allen Analysen. Legen Sie zuerst ein Projekt an —
           danach füllt sich diese Übersicht mit Sichtbarkeit, Health Score und Chancen.
         </p>
         <a className="button" href="/projects">
