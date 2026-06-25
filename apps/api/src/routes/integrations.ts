@@ -20,6 +20,13 @@ export const routeIntegrations: ResourceRoute = async (store, method, pathname, 
     return json(200, { data: await store.runConnectorSync(syncMatch[1], { siteId }) });
   }
 
+  // Read-Endpoint für den Connector-Vertrag/Status einer einzelnen Integration
+  // (authStatus/quota/freshness/capabilities sowie letzter Sync/Evidence).
+  const detailMatch = pathname.match(/^\/integrations\/([^/]+)$/);
+  if (method === "GET" && detailMatch) {
+    return json(200, { data: await store.getIntegration(detailMatch[1]) });
+  }
+
   if (pathname !== "/integrations") return null;
   if (method === "GET") return json(200, { data: await store.listIntegrations() });
   if (method === "POST") {

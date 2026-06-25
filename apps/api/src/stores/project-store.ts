@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sourceConfidenceForProvider, validateBusinessValue, type IntegrationAccount, type IntegrationProvider, type Project, type Site } from "@seo-tool/domain-model";
-import { getConnector } from "../connectors/index.js";
+import { getConnector, type ConnectorContract } from "../connectors/index.js";
 import { mapIntegration, mapProject, mapSite } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
@@ -8,8 +8,27 @@ import type { AsyncDatabase } from "../db/index.js";
 
 export interface ConnectorSyncResult {
   integration: IntegrationAccount;
-  rawEventId: string;
+  /** Maschinenlesbares Sync-Ergebnis ("ok" oder ein Fehlermodus). */
+  outcome: ConnectorSyncOutcome;
+  /** Vorhanden bei einem erfolgreichen Lauf; null, wenn der Lauf blockiert/degraded war. */
+  rawEventId: string | null;
   normalizedMetricsInserted: number;
+  /** Aktueller Connector-Vertrag/Status nach dem Lauf (auth/quota/freshness/capabilities). */
+  contract: ConnectorContract;
+  /** Menschenlesbarer Grund bei degraded/blocked Läufen. */
+  reason?: string;
+}
+
+export type ConnectorSyncOutcome = "ok" | "missing_credentials" | "quota_exceeded" | "expired" | "degraded";
+
+/**
+ * Read-Sicht auf eine Integration: persistierter Account plus der typisierte
+ * Connector-Vertrag (oder null, wenn für den Provider noch kein Connector registriert ist).
+ */
+export interface IntegrationStatusView extends IntegrationAccount {
+  contract: ConnectorContract | null;
+  lastSyncedAt: string | null;
+  lastEvidenceAt: string | null;
 }
 
 export interface ConnectorSyncOptions {
@@ -28,7 +47,8 @@ export interface ProjectStore {
   createProject(input: Partial<Project>): Promise<Project>;
   listSites(projectId: string): Promise<Site[]>;
   createSite(projectId: string, input: Partial<Site>): Promise<Site>;
-  listIntegrations(): Promise<IntegrationAccount[]>;
+  listIntegrations(): Promise<IntegrationStatusView[]>;
+  getIntegration(integrationId: string): Promise<IntegrationStatusView>;
   createIntegration(projectId: string, provider: IntegrationProvider): Promise<IntegrationAccount>;
   runConnectorSync(integrationId: string, options?: ConnectorSyncOptions): Promise<ConnectorSyncResult>;
   listSiteWebVitals(projectId: string, siteId: string): Promise<WebVitalMetric[]>;
@@ -94,8 +114,49 @@ class SQLiteProjectStore implements ProjectStore {
     return site;
   }
 
-  async listIntegrations(): Promise<IntegrationAccount[]> {
-    return (await this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all()).map(mapIntegration);
+  async listIntegrations(): Promise<IntegrationStatusView[]> {
+    const rows = await this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all();
+    return Promise.all(rows.map((row) => this.toStatusView(row)));
+  }
+
+  async getIntegration(integrationId: string): Promise<IntegrationStatusView> {
+    const row = await this.db.prepare(`SELECT * FROM integration_accounts WHERE id = ?`).get(integrationId);
+    if (!row) {
+      throw new RequestError(404, "unknown_integration", "Integration not found");
+    }
+    return this.toStatusView(row);
+  }
+
+  /** Ob am integration_account verwendbare Credentials (auth_config) hinterlegt sind. */
+  private hasCredentials(row: Record<string, unknown>): boolean {
+    const raw = row.auth_config;
+    if (raw === null || raw === undefined) return false;
+    let parsed: unknown = raw;
+    if (typeof raw === "string") {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return false;
+      }
+    }
+    return Boolean(parsed) && typeof parsed === "object" && Object.keys(parsed as Record<string, unknown>).length > 0;
+  }
+
+  private async lastEvidenceAt(integrationId: string): Promise<string | null> {
+    const row = await this.db.prepare(`SELECT fetched_at FROM raw_events WHERE integration_account_id = ? ORDER BY fetched_at DESC LIMIT 1`).get(integrationId);
+    return row ? String(row.fetched_at) : null;
+  }
+
+  /** Persistierten Account mit dem typisierten Connector-Vertrag zu einer Status-Sicht verbinden. */
+  private async toStatusView(row: Record<string, unknown>): Promise<IntegrationStatusView> {
+    const integration = mapIntegration(row);
+    const connector = getConnector(integration.provider);
+    const lastSyncedAt = integration.freshness;
+    const lastEvidenceAt = await this.lastEvidenceAt(integration.id);
+    const contract = connector
+      ? connector.describe({ hasCredentials: this.hasCredentials(row), lastSyncedAt, lastEvidenceAt })
+      : null;
+    return { ...integration, contract, lastSyncedAt, lastEvidenceAt };
   }
 
   async createIntegration(projectId: string, provider: IntegrationProvider): Promise<IntegrationAccount> {
@@ -109,8 +170,12 @@ class SQLiteProjectStore implements ProjectStore {
       quotaRemaining: null,
       freshness: null
     };
+    // Stub-Credentials: ein über die API angelegter Account gilt als verbunden (auth_config
+    // nicht leer). Echte OAuth-Flows ersetzen diesen Stub-Wert. Seed-Accounts bleiben dagegen
+    // mit leerem auth_config "pending" und melden so missing_credentials.
+    const authConfig = JSON.stringify({ stub: true });
     try {
-      await this.db.prepare(`INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)`).run(integration.id, integration.projectId, integration.provider, integration.status, integration.sourceConfidence, integration.quotaRemaining, integration.freshness, now, now);
+      await this.db.prepare(`INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(integration.id, integration.projectId, integration.provider, integration.status, integration.sourceConfidence, authConfig, integration.quotaRemaining, integration.freshness, now, now);
     } catch (error) {
       throw sqliteConstraintError(error, "duplicate_integration", "Integration already exists or project is unknown");
     }
@@ -142,9 +207,31 @@ class SQLiteProjectStore implements ProjectStore {
     }
 
     const now = new Date().toISOString();
-    const ctx = { projectId: integration.projectId, integrationId, now, entityType, entityId };
+    const hasCredentials = this.hasCredentials(row as Record<string, unknown>);
+    const ctx = { projectId: integration.projectId, integrationId, now, entityType, entityId, hasCredentials };
     try {
       const fetched = connector.fetch(ctx);
+
+      // Fehlermodi (missing_credentials/quota_exceeded/expired/degraded) sind KEIN Crash:
+      // sie werden als sichtbarer, abfragbarer degraded-Status persistiert und als typisiertes
+      // Ergebnis zurückgegeben. So sieht UI/Agent den blockierten Zustand statt einer 502.
+      if (fetched.outcome !== "ok") {
+        await this.db.prepare(`UPDATE integration_accounts SET status = 'degraded', updated_at = ? WHERE id = ?`).run(now, integrationId);
+        await this.audit("system", "integration.sync_degraded", "integration_account", integrationId, { provider: integration.provider, outcome: fetched.outcome, reason: fetched.reason });
+        const view = await this.getIntegration(integrationId);
+        if (!view.contract) {
+          throw new RequestError(500, "integration_reload_failed", "Integration could not be reloaded after sync");
+        }
+        return {
+          integration: { id: view.id, projectId: view.projectId, provider: view.provider, status: view.status, sourceConfidence: view.sourceConfidence, quotaRemaining: view.quotaRemaining, freshness: view.freshness },
+          outcome: fetched.outcome,
+          rawEventId: null,
+          normalizedMetricsInserted: 0,
+          contract: view.contract,
+          reason: fetched.reason
+        };
+      }
+
       connector.validate(fetched.payload);
       const metrics = connector.normalize(fetched.payload, ctx);
       const rawEventId = `raw-${randomUUID()}`;
@@ -162,11 +249,17 @@ class SQLiteProjectStore implements ProjectStore {
       });
 
       await this.audit("system", "integration.sync", "integration_account", integrationId, { provider: integration.provider, metrics: metrics.length });
-      const updatedRow = await this.db.prepare(`SELECT * FROM integration_accounts WHERE id = ?`).get(integrationId);
-      if (!updatedRow) {
+      const view = await this.getIntegration(integrationId);
+      if (!view.contract) {
         throw new RequestError(500, "integration_reload_failed", "Integration could not be reloaded after sync");
       }
-      return { integration: mapIntegration(updatedRow), rawEventId, normalizedMetricsInserted: metrics.length };
+      return {
+        integration: { id: view.id, projectId: view.projectId, provider: view.provider, status: view.status, sourceConfidence: view.sourceConfidence, quotaRemaining: view.quotaRemaining, freshness: view.freshness },
+        outcome: "ok",
+        rawEventId,
+        normalizedMetricsInserted: metrics.length,
+        contract: view.contract
+      };
     } catch (error) {
       if (error instanceof RequestError) {
         throw error;
