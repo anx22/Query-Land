@@ -209,6 +209,45 @@ paths:
                         $ref: '#/components/schemas/FoundationJob'
                   idempotent: { type: boolean }
 
+  /projects/{projectId}/sites/{siteId}/crawl-runs/diff:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      summary: Diff two crawl runs (UX-6b) reconstructed from audit-issue/URL lifecycle fields
+      description: >-
+        Compares two crawl runs by their as-of time (finishedAt, falling back to startedAt).
+        The open-issue set "as of" each run is reconstructed from the lifecycle fields
+        (detectedAt/resolvedAt/dismissedAt). The runs are ordered chronologically, so the
+        result is always a base->compare comparison where compare is the newer run,
+        regardless of which id is passed as base/compare.
+      operationId: diffCrawlRuns
+      parameters:
+        - name: base
+          in: query
+          required: true
+          schema: { type: string }
+          description: A crawl run id in this site scope.
+        - name: compare
+          in: query
+          required: true
+          schema: { type: string }
+          description: Another crawl run id in this site scope.
+      responses:
+        '200':
+          description: Crawl run diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CrawlRunDiff'
+        '400':
+          description: Missing base or compare query parameter
+        '404':
+          description: base or compare run not found in this site scope
+
   /projects/{projectId}/sites/{siteId}/discovered-urls:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -2661,6 +2700,59 @@ components:
         actor: { type: string }
         reason: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
+    CrawlRunDiffIssue:
+      type: object
+      required: [id, url, rule, severity, message]
+      properties:
+        id: { type: string }
+        url: { type: string, format: uri }
+        rule: { type: string, enum: [http_error, redirect_chain, missing_title, duplicate_title, canonical_mismatch, broken_link] }
+        severity: { type: string, enum: [critical, high, medium, low] }
+        message: { type: string }
+    CrawlRunDiff:
+      type: object
+      required: [baseRunId, compareRunId, baseAsOf, compareAsOf, appearedIssues, fixedIssues, persistingCount, newUrls, deltas]
+      properties:
+        baseRunId:
+          type: string
+          description: The chronologically older run id.
+        compareRunId:
+          type: string
+          description: The chronologically newer run id.
+        baseAsOf:
+          type: string
+          format: date-time
+          description: As-of time used for the base run (finishedAt, falling back to startedAt).
+        compareAsOf:
+          type: string
+          format: date-time
+          description: As-of time used for the compare run (finishedAt, falling back to startedAt).
+        appearedIssues:
+          type: array
+          description: Issues open as of compare but not open as of base.
+          items:
+            $ref: '#/components/schemas/CrawlRunDiffIssue'
+        fixedIssues:
+          type: array
+          description: Issues open as of base but not open as of compare.
+          items:
+            $ref: '#/components/schemas/CrawlRunDiffIssue'
+        persistingCount:
+          type: integer
+          description: Count of issues open as of both runs.
+        newUrls:
+          type: array
+          description: URLs whose discoveredAt is in (baseAsOf, compareAsOf].
+          items:
+            $ref: '#/components/schemas/DiscoveredUrl'
+        deltas:
+          type: object
+          required: [healthScore, openIssues, discoveredUrls]
+          description: Summary deltas (compare - base) taken from each run's summary field.
+          properties:
+            healthScore: { type: integer, nullable: true }
+            openIssues: { type: integer }
+            discoveredUrls: { type: integer }
     DismissAuditIssueRequest:
       type: object
       properties:
