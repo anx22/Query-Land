@@ -1,0 +1,298 @@
+/*
+ * workspace.css — Content-Workspace (UX7-W2) layout. Reuses the global .card,
+ * .badge, .kicker, .muted, .notice classes; only workspace-specific structure
+ * lives here. Colors are functional, never brand-orange (mirrors audit.css).
+ */
+
+.cw-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .cw-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Refresh candidates list */
+.cw-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.cw-candidate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cw-candidate--active {
+  border-color: var(--accent, var(--success));
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+.cw-candidate__url {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.cw-candidate__meta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.cw-candidate__trend--down {
+  color: var(--danger);
+}
+
+.cw-candidate__trend--up {
+  color: var(--success);
+}
+
+.cw-candidate__score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Score gauge + reasons */
+.cw-score-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.cw-reasons {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Internal-link suggestions */
+.cw-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.cw-suggestion {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.cw-suggestion__url {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.cw-suggestion__reason {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* Brief list */
+.cw-brief-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.cw-brief {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cw-brief--active {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+.cw-brief__title {
+  font-weight: 600;
+}
+
+.cw-brief__meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* Status filter chips */
+.cw-filter {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+/* Brief editor */
+.cw-editor__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.cw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cw-field--nested {
+  margin-top: 0.5rem;
+}
+
+.cw-field__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.cw-field__label--sub {
+  font-weight: 500;
+}
+
+.cw-input,
+.cw-textarea {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+.cw-textarea {
+  resize: vertical;
+  min-height: 2.5rem;
+}
+
+.cw-terms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cw-term__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.cw-term__text--done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.cw-terms__empty {
+  font-size: 0.85rem;
+}
+
+.cw-editor__actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Lifecycle + proposal action rows */
+.cw-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  align-items: center;
+}
+
+.cw-action-row form {
+  display: inline;
+}
+
+/* Skeleton (loading.tsx) */
+.cw-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cw-skeleton__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.cw-skeleton__line,
+.cw-skeleton__block {
+  background: var(--line);
+  border-radius: 6px;
+  opacity: 0.6;
+  animation: cw-pulse 1.4s ease-in-out infinite;
+}
+
+.cw-skeleton__line {
+  height: 0.9rem;
+  margin: 0.4rem 0;
+}
+
+.cw-skeleton__line--kicker {
+  width: 30%;
+}
+
+.cw-skeleton__line--title {
+  width: 60%;
+  height: 1.6rem;
+}
+
+.cw-skeleton__block {
+  height: 160px;
+  margin-top: 0.5rem;
+}
+
+@keyframes cw-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
