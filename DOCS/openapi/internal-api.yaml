@@ -410,6 +410,12 @@ paths:
     post:
       summary: Dismiss an audit issue without waiting for crawler auto-resolution
       operationId: dismissAuditIssue
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DismissAuditIssueRequest'
       responses:
         '200':
           description: Audit issue dismissed
@@ -441,6 +447,29 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/AuditIssueRecord'
+  /projects/{projectId}/sites/{siteId}/audit-issues/{issueId}/history:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/SiteId'
+      - name: issueId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: List the lifecycle history (status transitions) of an audit issue
+      operationId: listAuditIssueHistory
+      responses:
+        '200':
+          description: Audit issue lifecycle history, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditIssueHistoryEntry'
   /projects/{projectId}/sites/{siteId}/web-vitals:
     get:
       summary: List latest Core Web Vitals metrics for a site
@@ -2617,6 +2646,27 @@ components:
         message: { type: string }
         detectedAt: { type: string, format: date-time }
         resolvedAt: { type: string, format: date-time, nullable: true }
+        dismissedAt: { type: string, format: date-time, nullable: true }
+        dismissReason: { type: string, nullable: true }
+        lastActor: { type: string, nullable: true }
+    AuditIssueHistoryEntry:
+      type: object
+      required: [id, projectId, siteId, issueId, action, actor, reason, createdAt]
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        siteId: { type: string }
+        issueId: { type: string }
+        action: { type: string, enum: [resolve, dismiss, reopen] }
+        actor: { type: string }
+        reason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    DismissAuditIssueRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Optional free-text reason captured for the dismissal.
     RecordAuditIssuesRequest:
       type: object
       required: [issues]

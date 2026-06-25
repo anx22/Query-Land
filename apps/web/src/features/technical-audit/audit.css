@@ -376,6 +376,56 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  align-items: flex-end;
+}
+.issue-drawer__dismiss {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 14rem;
+}
+.issue-drawer__reason-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.issue-drawer__reason {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg, transparent);
+  color: inherit;
+}
+.issue-drawer__history {
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
+}
+.issue-drawer__history-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+.issue-drawer__history-empty {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+}
+.issue-drawer__history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.issue-drawer__history-item {
+  font-size: 0.82rem;
+  color: var(--text, inherit);
 }
 
 /* --- URL-Explorer table --- */

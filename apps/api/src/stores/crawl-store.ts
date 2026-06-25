@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { calculateHealthScore, type AuditIssueRecord, type AuditIssueSeverity, type CrawlHealthScore, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type IndexabilityRecord, type UrlFetchRecord } from "@seo-tool/domain-model";
-import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapUrlFetchRecord } from "../row-mappers.js";
+import { calculateHealthScore, type AuditIssueHistoryEntry, type AuditIssueRecord, type AuditIssueSeverity, type CrawlHealthScore, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type IndexabilityRecord, type UrlFetchRecord } from "@seo-tool/domain-model";
+import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueHistoryEntry, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapUrlFetchRecord } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";
@@ -53,9 +53,10 @@ export interface CrawlStore {
   listAuditIssues(projectId: string, siteId: string): Promise<AuditIssueRecord[]>;
   listAuditIssuesPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: AuditIssueListFilters): Promise<ListPage<AuditIssueRecord>>;
   recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): Promise<{ issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number }>;
-  resolveAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord>;
-  dismissAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord>;
-  reopenAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord>;
+  resolveAuditIssue(projectId: string, siteId: string, issueId: string, actor?: string): Promise<AuditIssueRecord>;
+  dismissAuditIssue(projectId: string, siteId: string, issueId: string, reason?: string | null, actor?: string): Promise<AuditIssueRecord>;
+  reopenAuditIssue(projectId: string, siteId: string, issueId: string, actor?: string): Promise<AuditIssueRecord>;
+  listAuditIssueHistory(projectId: string, siteId: string, issueId: string): Promise<AuditIssueHistoryEntry[]>;
   listDiscoveredUrls(projectId: string, siteId?: string): Promise<DiscoveredUrl[]>;
   listDiscoveredUrlsPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): Promise<ListPage<DiscoveredUrl>>;
   listUrlExplorerRows(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): Promise<ListPage<UrlExplorerRow>>;
@@ -222,7 +223,7 @@ class SQLiteCrawlStore implements CrawlStore {
 
   async computeHealthScore(projectId: string, siteId: string): Promise<CrawlHealthScore> {
     await this.assertSiteScope(projectId, siteId);
-    const openIssues = (await this.listAuditIssues(projectId, siteId)).filter((issue) => issue.resolvedAt === null);
+    const openIssues = (await this.listAuditIssues(projectId, siteId)).filter((issue) => issue.resolvedAt === null && issue.dismissedAt === null);
     const issueCounts = countIssueSeverities(openIssues);
     const score: CrawlHealthScore = {
       id: `health-${randomUUID()}`,
@@ -250,9 +251,9 @@ class SQLiteCrawlStore implements CrawlStore {
     const where = [`project_id = ?`, `site_id = ?`];
     const params: unknown[] = [projectId, siteId];
     if (filters.status === "open") {
-      where.push(`resolved_at IS NULL`);
+      where.push(`resolved_at IS NULL AND dismissed_at IS NULL`);
     } else if (filters.status === "resolved") {
-      where.push(`resolved_at IS NOT NULL`);
+      where.push(`(resolved_at IS NOT NULL OR dismissed_at IS NOT NULL)`);
     }
     if (filters.severity) {
       where.push(`severity = ?`);
@@ -307,7 +308,7 @@ class SQLiteCrawlStore implements CrawlStore {
     const submittedIssueIds = new Set(issues.map((issue) => issue.id));
 
     if (checkedDiscoveredUrlIds.length > 0) {
-      const openScopedIssues = this.db.prepare(`SELECT id FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL AND (discovered_url_id = ? OR url = ? OR url = ?)`);
+      const openScopedIssues = this.db.prepare(`SELECT id FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL AND dismissed_at IS NULL AND (discovered_url_id = ? OR url = ? OR url = ?)`);
       const staleIssueIds = [...new Set((await Promise.all(checkedDiscoveredUrlIds.map(async (discoveredUrlId, index) => {
         const checkedUrlRow = checkedUrlRows[index];
         return (await openScopedIssues.all(projectId, siteId, discoveredUrlId, String(checkedUrlRow?.url ?? ""), String(checkedUrlRow?.normalized_url ?? ""))).map((row) => String(row.id));
@@ -344,31 +345,74 @@ class SQLiteCrawlStore implements CrawlStore {
     return { issues: stored, inserted, updated, resolved };
   }
 
-  async resolveAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
-    return this.setAuditIssueResolution(projectId, siteId, issueId, new Date().toISOString(), "crawl.issue.resolve");
+  async resolveAuditIssue(projectId: string, siteId: string, issueId: string, actor = "system"): Promise<AuditIssueRecord> {
+    const now = new Date().toISOString();
+    return this.applyAuditIssueTransition(projectId, siteId, issueId, "resolve", actor, {
+      resolvedAt: now,
+      dismissedAt: null,
+      dismissReason: null
+    });
   }
 
-  async dismissAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
-    return this.setAuditIssueResolution(projectId, siteId, issueId, new Date().toISOString(), "crawl.issue.dismiss");
+  async dismissAuditIssue(projectId: string, siteId: string, issueId: string, reason: string | null = null, actor = "system"): Promise<AuditIssueRecord> {
+    const now = new Date().toISOString();
+    return this.applyAuditIssueTransition(projectId, siteId, issueId, "dismiss", actor, {
+      // A dismissed issue is distinct from a resolved one: it has a dismissed_at
+      // timestamp + reason and an explicitly null resolved_at.
+      resolvedAt: null,
+      dismissedAt: now,
+      dismissReason: reason
+    }, reason);
   }
 
-  async reopenAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
-    return this.setAuditIssueResolution(projectId, siteId, issueId, null, "crawl.issue.reopen");
+  async reopenAuditIssue(projectId: string, siteId: string, issueId: string, actor = "system"): Promise<AuditIssueRecord> {
+    return this.applyAuditIssueTransition(projectId, siteId, issueId, "reopen", actor, {
+      resolvedAt: null,
+      dismissedAt: null,
+      dismissReason: null
+    });
   }
 
-  private async setAuditIssueResolution(projectId: string, siteId: string, issueId: string, resolvedAt: string | null, action: string): Promise<AuditIssueRecord> {
+  async listAuditIssueHistory(projectId: string, siteId: string, issueId: string): Promise<AuditIssueHistoryEntry[]> {
+    await this.assertAuditIssueScope(projectId, siteId, issueId);
+    return (await this.db.prepare(`
+      SELECT * FROM audit_issue_history
+      WHERE project_id = ? AND site_id = ? AND issue_id = ?
+      ORDER BY created_at DESC, id DESC
+    `).all(projectId, siteId, issueId)).map(mapAuditIssueHistoryEntry);
+  }
+
+  private async applyAuditIssueTransition(
+    projectId: string,
+    siteId: string,
+    issueId: string,
+    action: "resolve" | "dismiss" | "reopen",
+    actor: string,
+    state: { resolvedAt: string | null; dismissedAt: string | null; dismissReason: string | null },
+    reason: string | null = null
+  ): Promise<AuditIssueRecord> {
     await this.assertSiteScope(projectId, siteId);
     const now = new Date().toISOString();
-    await this.db.prepare(`
+    const resolvedBy = action === "resolve" ? actor : null;
+    const dismissedBy = action === "dismiss" ? actor : null;
+    const result = await this.db.prepare(`
       UPDATE audit_issues
-      SET resolved_at = ?, updated_at = ?
+      SET resolved_at = ?, dismissed_at = ?, dismiss_reason = ?, resolved_by = ?, dismissed_by = ?, last_actor = ?, updated_at = ?
       WHERE id = ? AND project_id = ? AND site_id = ?
-    `).run(resolvedAt, now, issueId, projectId, siteId);
+    `).run(state.resolvedAt, state.dismissedAt, state.dismissReason, resolvedBy, dismissedBy, actor, now, issueId, projectId, siteId);
+    if (Number(result.changes ?? 0) === 0) {
+      throw new RequestError(404, "audit_issue_not_found", "Audit issue not found", { projectId, siteId, issueId });
+    }
     const row = await this.db.prepare(`SELECT * FROM audit_issues WHERE id = ? AND project_id = ? AND site_id = ?`).get(issueId, projectId, siteId);
     if (!row) {
       throw new RequestError(404, "audit_issue_not_found", "Audit issue not found", { projectId, siteId, issueId });
     }
-    await this.audit("system", action, "audit_issue", issueId, { projectId, siteId });
+    // Record a queryable per-issue history entry in addition to the global audit log.
+    await this.db.prepare(`
+      INSERT INTO audit_issue_history (id, project_id, site_id, issue_id, action, actor, reason, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(`aih-${randomUUID()}`, projectId, siteId, issueId, action, actor, reason, now);
+    await this.audit(actor, `crawl.issue.${action}`, "audit_issue", issueId, { projectId, siteId, reason });
     return mapAuditIssueRecord(row);
   }
 
@@ -563,9 +607,16 @@ class SQLiteCrawlStore implements CrawlStore {
     const discoveredUrls = Number((await this.db.prepare(`SELECT COUNT(*) AS count FROM discovered_urls WHERE project_id = ? AND site_id = ?`).get(projectId, siteId))?.count ?? 0);
     const fetchedUrls = Number((await this.db.prepare(`SELECT COUNT(*) AS count FROM url_fetch_results WHERE project_id = ? AND site_id = ?`).get(projectId, siteId))?.count ?? 0);
     const indexabilityAssessments = Number((await this.db.prepare(`SELECT COUNT(*) AS count FROM url_indexability_assessments WHERE project_id = ? AND site_id = ?`).get(projectId, siteId))?.count ?? 0);
-    const openIssues = Number((await this.db.prepare(`SELECT COUNT(*) AS count FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL`).get(projectId, siteId))?.count ?? 0);
+    const openIssues = Number((await this.db.prepare(`SELECT COUNT(*) AS count FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL AND dismissed_at IS NULL`).get(projectId, siteId))?.count ?? 0);
     const healthRow = await this.db.prepare(`SELECT score FROM crawl_health_scores WHERE project_id = ? AND site_id = ? ORDER BY generated_at DESC LIMIT 1`).get(projectId, siteId);
     return { discoveredUrls, fetchedUrls, indexabilityAssessments, openIssues, healthScore: healthRow ? Number(healthRow.score) : null };
+  }
+
+  private async assertAuditIssueScope(projectId: string, siteId: string, issueId: string): Promise<void> {
+    const row = await this.db.prepare(`SELECT id FROM audit_issues WHERE id = ? AND project_id = ? AND site_id = ?`).get(issueId, projectId, siteId);
+    if (!row) {
+      throw new RequestError(404, "audit_issue_not_found", "Audit issue not found", { projectId, siteId, issueId });
+    }
   }
 
   private async assertDiscoveredUrlScope(projectId: string, siteId: string, discoveredUrlId: string): Promise<void> {

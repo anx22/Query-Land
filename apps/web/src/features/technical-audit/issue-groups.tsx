@@ -12,11 +12,11 @@
  * Empty-state handled by the parent (renders nothing when there are no groups).
  */
 
-import { useState } from "react";
-import type { AuditIssueRecord, AuditIssueSeverity } from "@seo-tool/domain-model";
+import { useEffect, useState } from "react";
+import type { AuditIssueHistoryEntry, AuditIssueRecord, AuditIssueSeverity } from "@seo-tool/domain-model";
 import type { IssueGroup } from "../../lib/audit-api";
-import { dismissIssueAction, reopenIssueAction, resolveIssueAction } from "./actions";
-import { availableIssueActions, ISSUE_ACTION_LABEL, issueStatusLabel, type IssueAction } from "./issue-actions";
+import { dismissIssueAction, loadIssueHistoryAction, reopenIssueAction, resolveIssueAction } from "./actions";
+import { availableIssueActions, formatHistoryEntry, ISSUE_ACTION_LABEL, issueStatusLabel, type IssueAction } from "./issue-actions";
 
 const SEVERITY_BADGE: Record<AuditIssueSeverity, string> = {
   critical: "danger",
@@ -112,6 +112,26 @@ export function IssueGroups({ groups }: IssueGroupsProps) {
 }
 
 function IssueDetailDrawer({ issue, onClose }: { issue: AuditIssueRecord; onClose: () => void }) {
+  const [history, setHistory] = useState<AuditIssueHistoryEntry[] | null>(null);
+
+  // Load the issue's lifecycle history when the drawer opens / switches issue.
+  useEffect(() => {
+    let cancelled = false;
+    setHistory(null);
+    loadIssueHistoryAction(issue.projectId, issue.siteId, issue.id)
+      .then((entries) => {
+        if (!cancelled) setHistory(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [issue.projectId, issue.siteId, issue.id]);
+
+  const actions = availableIssueActions(issue);
+
   return (
     <aside className="issue-drawer" role="dialog" aria-label="Issue-Details" aria-modal="false">
       <div className="issue-drawer__head">
@@ -136,19 +156,69 @@ function IssueDetailDrawer({ issue, onClose }: { issue: AuditIssueRecord; onClos
             <dd>{new Date(issue.resolvedAt).toLocaleString("de-DE")}</dd>
           </>
         ) : null}
+        {issue.dismissedAt ? (
+          <>
+            <dt>Verworfen</dt>
+            <dd>{new Date(issue.dismissedAt).toLocaleString("de-DE")}</dd>
+          </>
+        ) : null}
+        {issue.dismissReason ? (
+          <>
+            <dt>Grund</dt>
+            <dd>{issue.dismissReason}</dd>
+          </>
+        ) : null}
       </dl>
       <div className="issue-drawer__actions">
-        {availableIssueActions(issue).map((action) => (
-          <form key={action} action={ACTION_FN[action]}>
-            <input type="hidden" name="projectId" value={issue.projectId} />
-            <input type="hidden" name="siteId" value={issue.siteId} />
-            <input type="hidden" name="issueId" value={issue.id} />
-            <button type="submit" className="button compact">
-              {ISSUE_ACTION_LABEL[action]}
-            </button>
-          </form>
-        ))}
+        {actions.map((action) =>
+          action === "dismiss" ? (
+            <form key={action} className="issue-drawer__dismiss" action={ACTION_FN[action]}>
+              <input type="hidden" name="projectId" value={issue.projectId} />
+              <input type="hidden" name="siteId" value={issue.siteId} />
+              <input type="hidden" name="issueId" value={issue.id} />
+              <label className="issue-drawer__reason-label" htmlFor={`dismiss-reason-${issue.id}`}>
+                Grund (optional)
+              </label>
+              <textarea
+                id={`dismiss-reason-${issue.id}`}
+                name="reason"
+                className="issue-drawer__reason"
+                rows={2}
+                placeholder="z. B. Falsch-positiv, wird über JS gesetzt"
+              />
+              <button type="submit" className="button compact">
+                {ISSUE_ACTION_LABEL[action]}
+              </button>
+            </form>
+          ) : (
+            <form key={action} action={ACTION_FN[action]}>
+              <input type="hidden" name="projectId" value={issue.projectId} />
+              <input type="hidden" name="siteId" value={issue.siteId} />
+              <input type="hidden" name="issueId" value={issue.id} />
+              <button type="submit" className="button compact">
+                {ISSUE_ACTION_LABEL[action]}
+              </button>
+            </form>
+          )
+        )}
       </div>
+
+      <section className="issue-drawer__history" aria-label="Verlauf">
+        <h3 className="issue-drawer__history-title">Verlauf</h3>
+        {history === null ? (
+          <p className="issue-drawer__history-empty">Wird geladen…</p>
+        ) : history.length === 0 ? (
+          <p className="issue-drawer__history-empty">Noch keine Statusänderungen.</p>
+        ) : (
+          <ol className="issue-drawer__history-list">
+            {history.map((entry) => (
+              <li key={entry.id} className="issue-drawer__history-item">
+                {formatHistoryEntry(entry)}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
     </aside>
   );
 }

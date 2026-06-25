@@ -1,5 +1,5 @@
-import type { AuditIssueRecord, CrawlHealthScore, CrawlRun } from "@seo-tool/domain-model";
-import { apiPost } from "../../lib/api-client";
+import type { AuditIssueHistoryEntry, AuditIssueRecord, CrawlHealthScore, CrawlRun } from "@seo-tool/domain-model";
+import { apiGet, apiPost } from "../../lib/api-client";
 import type { FoundationJob } from "../../lib/foundation-api";
 
 // Mutating Technical-Audit operations used by the server actions. The read path
@@ -22,12 +22,17 @@ export async function resolveAuditIssue(projectId: string, siteId: string, issue
   return updateAuditIssue(projectId, siteId, issueId, "resolve");
 }
 
-export async function dismissAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
-  return updateAuditIssue(projectId, siteId, issueId, "dismiss");
+export async function dismissAuditIssue(projectId: string, siteId: string, issueId: string, reason?: string): Promise<AuditIssueRecord> {
+  const body = reason && reason.trim() !== "" ? { reason: reason.trim() } : {};
+  return apiPost<AuditIssueRecord>(`/projects/${projectId}/sites/${siteId}/audit-issues/${issueId}/dismiss`, body);
 }
 
 export async function reopenAuditIssue(projectId: string, siteId: string, issueId: string): Promise<AuditIssueRecord> {
   return updateAuditIssue(projectId, siteId, issueId, "reopen");
+}
+
+export async function loadAuditIssueHistory(projectId: string, siteId: string, issueId: string): Promise<AuditIssueHistoryEntry[]> {
+  return apiGet<AuditIssueHistoryEntry[]>(`/projects/${projectId}/sites/${siteId}/audit-issues/${issueId}/history`);
 }
 
 function updateAuditIssue(projectId: string, siteId: string, issueId: string, action: "resolve" | "dismiss" | "reopen"): Promise<AuditIssueRecord> {

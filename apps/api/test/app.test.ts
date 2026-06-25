@@ -11,7 +11,7 @@ async function testApp() {
 }
 
 test("migrations are versioned and idempotent", async () => {
-  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql"];
+  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql"];
   const db = await createDatabase("sqlite::memory:");
   try {
     const first = await runMigrations(db);
@@ -32,7 +32,8 @@ test("migrations are versioned and idempotent", async () => {
       { version: 9, name: "pr_checks" },
       { version: 10, name: "backlinks" },
       { version: 11, name: "reporting" },
-      { version: 12, name: "ai_aeo" }
+      { version: 12, name: "ai_aeo" },
+      { version: 13, name: "issue_lifecycle" }
     ]);
 
     const second = await runMigrations(db);
@@ -767,7 +768,10 @@ test("audit issue API resolves issues and health recompute ignores resolved issu
 
   const dismissed = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-resolve-low/dismiss", {});
   assert.equal(dismissed.status, 200);
-  assert.equal((dismissed.body as { data: { resolvedAt: string | null } }).data.resolvedAt !== null, true);
+  // Dismiss is now a distinct state: it sets dismissed_at (not resolved_at) but
+  // still removes the issue from the open/health-relevant set.
+  assert.equal((dismissed.body as { data: { resolvedAt: string | null; dismissedAt: string | null } }).data.resolvedAt, null);
+  assert.equal((dismissed.body as { data: { resolvedAt: string | null; dismissedAt: string | null } }).data.dismissedAt !== null, true);
 
   const healthAfterIssueActions = await app("POST", "/projects/proj-demo/sites/site-demo/health-scores/compute", {});
   assert.equal((healthAfterIssueActions.body as { data: { totalIssues: number; score: number } }).data.totalIssues, 1);
@@ -776,5 +780,106 @@ test("audit issue API resolves issues and health recompute ignores resolved issu
   const missing = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/missing/resolve", {});
   assert.equal(missing.status, 404);
   assert.equal((missing.body as { error: { code: string } }).error.code, "audit_issue_not_found");
+  await store.close();
+});
+
+test("dismiss is a distinct lifecycle state with reason + actor and queryable history", async () => {
+  const { app, store } = await testApp();
+  await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-lifecycle",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/lifecycle",
+        rule: "missing_title",
+        severity: "medium",
+        message: "Title is missing",
+        detectedAt: "2026-06-25T08:00:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+
+  type IssueBody = { data: { resolvedAt: string | null; dismissedAt: string | null; dismissReason: string | null; lastActor: string | null } };
+
+  // Dismiss with a reason. The default (no auth gate) actor falls back to "system".
+  const dismissed = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-lifecycle/dismiss", { reason: "Falsch-positiv: Title via JS gesetzt" });
+  assert.equal(dismissed.status, 200);
+  const dismissedData = (dismissed.body as IssueBody).data;
+  // Distinct from resolve: dismissed_at + reason set, resolved_at stays null.
+  assert.equal(dismissedData.resolvedAt, null);
+  assert.equal(dismissedData.dismissedAt !== null, true);
+  assert.equal(dismissedData.dismissReason, "Falsch-positiv: Title via JS gesetzt");
+  assert.equal(dismissedData.lastActor, "system");
+
+  // A dismissed issue is no longer "open".
+  const openAfterDismiss = (await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues?status=open")).body as { meta: { total: number } };
+  assert.equal(openAfterDismiss.meta.total, 0);
+  const resolvedFilter = (await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues?status=resolved")).body as { meta: { total: number } };
+  assert.equal(resolvedFilter.meta.total, 1);
+
+  // Reopen clears both dismissed + resolved state.
+  const reopened = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-lifecycle/reopen", {});
+  assert.equal(reopened.status, 200);
+  const reopenedData = (reopened.body as IssueBody).data;
+  assert.equal(reopenedData.resolvedAt, null);
+  assert.equal(reopenedData.dismissedAt, null);
+  assert.equal(reopenedData.dismissReason, null);
+
+  // Resolve is distinct from dismiss: sets resolved_at, leaves dismissed_at null.
+  const resolved = await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues/issue-lifecycle/resolve", {});
+  const resolvedData = (resolved.body as IssueBody).data;
+  assert.equal(resolvedData.resolvedAt !== null, true);
+  assert.equal(resolvedData.dismissedAt, null);
+
+  // History is recorded per transition, newest first.
+  const history = (await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues/issue-lifecycle/history")).body as {
+    data: Array<{ action: string; actor: string; reason: string | null }>;
+  };
+  assert.deepEqual(history.data.map((entry) => entry.action), ["resolve", "reopen", "dismiss"]);
+  assert.equal(history.data.every((entry) => entry.actor === "system"), true);
+  const dismissEntry = history.data.find((entry) => entry.action === "dismiss");
+  assert.equal(dismissEntry?.reason, "Falsch-positiv: Title via JS gesetzt");
+
+  // History for an unknown issue 404s.
+  const missingHistory = await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues/nope/history");
+  assert.equal(missingHistory.status, 404);
+  await store.close();
+});
+
+test("audit issue lifecycle threads the request-context actor when present", async () => {
+  const { app, store } = await testApp();
+  await app("POST", "/projects/proj-demo/sites/site-demo/audit-issues", {
+    issues: [
+      {
+        id: "issue-actor",
+        projectId: "proj-demo",
+        siteId: "site-demo",
+        discoveredUrlId: null,
+        url: "https://example.com/actor",
+        rule: "missing_title",
+        severity: "low",
+        message: "Title is missing",
+        detectedAt: "2026-06-25T08:00:00.000Z",
+        resolvedAt: null
+      }
+    ]
+  });
+
+  // Simulate an authenticated request: the auth gate would put actor on context.
+  const resolved = await app(
+    "POST",
+    "/projects/proj-demo/sites/site-demo/audit-issues/issue-actor/resolve",
+    {},
+    { actor: { userId: "user-7", role: "editor" } }
+  );
+  assert.equal((resolved.body as { data: { lastActor: string | null } }).data.lastActor, "user-7");
+
+  const history = (await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues/issue-actor/history")).body as {
+    data: Array<{ action: string; actor: string }>;
+  };
+  assert.equal(history.data[0]?.actor, "user-7");
   await store.close();
 });

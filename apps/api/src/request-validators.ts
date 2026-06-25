@@ -112,8 +112,29 @@ function auditIssueField(value: unknown, index: number): AuditIssueRecord {
     severity: enumField(input, auditIssueSeverities, "severity"),
     message: stringField(input, "message"),
     detectedAt: stringField(input, "detectedAt"),
-    resolvedAt: input.resolvedAt === null || input.resolvedAt === undefined ? null : stringField(input, "resolvedAt")
+    resolvedAt: input.resolvedAt === null || input.resolvedAt === undefined ? null : stringField(input, "resolvedAt"),
+    dismissedAt: input.dismissedAt === null || input.dismissedAt === undefined ? null : stringField(input, "dismissedAt"),
+    dismissReason: input.dismissReason === null || input.dismissReason === undefined ? null : stringField(input, "dismissReason"),
+    lastActor: input.lastActor === null || input.lastActor === undefined ? null : stringField(input, "lastActor")
   };
+}
+
+/**
+ * Parse the optional dismiss reason from a dismiss-issue request body.
+ * Accepts an absent body / absent field (→ null) or a non-empty string.
+ */
+export function dismissAuditIssueRequest(body: unknown): string | null {
+  if (body === undefined || body === null) return null;
+  if (typeof body !== "object" || Array.isArray(body)) {
+    throw new RequestError(400, "invalid_body", "Request body must be an object");
+  }
+  const reason = (body as Record<string, unknown>).reason;
+  if (reason === undefined || reason === null) return null;
+  if (typeof reason !== "string") {
+    throw new RequestError(400, "invalid_dismiss_reason", "reason must be a string", { field: "reason" });
+  }
+  const trimmed = reason.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 export function recordDiscoveredUrlsRequest(body: unknown): RecordDiscoveredUrlsRequest {
