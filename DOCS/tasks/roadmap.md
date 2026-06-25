@@ -92,7 +92,7 @@
 
 ## 6. Hygiene & Querschnitt
 
-- **GAP-SEC-001** — Next/PostCSS Dependency-Audit (moderate Findings) bewusst entscheiden. *(offen)*
+- **GAP-SEC-001** — Dependency-Audit: ✅ `undici` (2× high) per non-breaking `npm audit fix` behoben (→ 7.28.0). Verbleibend: 2× **moderate** `postcss <8.5.10` (transitiv via `next`). **Bewusst akzeptiertes Restrisiko:** PostCSS läuft nur build-time, kein untrusted CSS-Input → keine reale Exposure; der `--force`-Fix (`next@9.3.3`) ist ein breaking Downgrade und tabu. Echter Fix kommt automatisch mit dem nächsten regulären Next-Upgrade.
 - **Code-Hygiene:** ✅ Legacy-SQLite-Namen umbenannt (PR #38). Rest-Notiz: `stackDecision.database`-String in `packages/shared-config` nennt noch „SQLite embedded".
 - **Doku-Hygiene:** ✅ abgeschlossen (URL-Drift, SQLite-Default-Sprache, Wave-Status, Handoff→Roadmap).
 
