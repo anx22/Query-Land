@@ -1,10 +1,20 @@
+import type { UserRole } from "@seo-tool/domain-model";
+
 export interface ApiResponse {
   status: number;
   body: unknown;
 }
 
+/** Authenticated principal for a request, populated by the auth gate. */
+export interface Actor {
+  userId: string;
+  role: UserRole;
+}
+
 export interface RequestContext {
   headers?: Record<string, string | undefined>;
+  /** Set by the auth gate once a session token is validated (see auth-gate.ts). */
+  actor?: Actor;
 }
 
 export interface ApiErrorBody {

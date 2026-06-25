@@ -62,6 +62,9 @@ class SQLiteAuthStore implements AuthStore {
     if (!row || !verifyPassword(password, String(row.password_hash))) {
       return null;
     }
+    // Opportunistic session hygiene: purge expired rows on each successful login
+    // (cheap, indexed by expires_at). Keeps the table bounded without a separate daemon.
+    await this.cleanupExpiredSessions();
     const token = `seo_${randomUUID()}_${randomUUID()}`;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7).toISOString();
