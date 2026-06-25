@@ -3,6 +3,15 @@ import { createIntegrationRequest } from "../request-validators.js";
 import type { ResourceRoute } from "./shared.js";
 
 export const routeIntegrations: ResourceRoute = async (store, method, pathname, _searchParams, body) => {
+  const scheduleMatch = pathname.match(/^\/integrations\/([^/]+)\/sync\/schedule$/);
+  if (method === "POST" && scheduleMatch) {
+    const siteId = body && typeof body === "object" && !Array.isArray(body) && typeof (body as { siteId?: unknown }).siteId === "string"
+      ? (body as { siteId: string }).siteId
+      : undefined;
+    const result = await store.scheduleConnectorSync(scheduleMatch[1], { siteId });
+    return json(result.idempotent ? 200 : 201, { data: result.job, idempotent: result.idempotent });
+  }
+
   const syncMatch = pathname.match(/^\/integrations\/([^/]+)\/sync$/);
   if (method === "POST" && syncMatch) {
     const siteId = body && typeof body === "object" && !Array.isArray(body) && typeof (body as { siteId?: unknown }).siteId === "string"

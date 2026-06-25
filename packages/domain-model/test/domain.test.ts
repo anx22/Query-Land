@@ -3,9 +3,26 @@ import test from "node:test";
 import { normalizeEmail, validatePassword } from "../src/auth.js";
 import { calculateHealthScore } from "../src/crawl.js";
 import { sourceConfidenceForProvider } from "../src/integrations.js";
-import { createCrawlSeedJobInput, makeIdempotencyKey, validateCrawlSeedJobPayload } from "../src/jobs.js";
+import { createCrawlSeedJobInput, makeConnectorSyncJobSubject, makeIdempotencyKey, validateConnectorSyncJobPayload, validateCrawlSeedJobPayload } from "../src/jobs.js";
 import { hasRequiredEvidence, scoreOpportunity, type Opportunity } from "../src/opportunities.js";
 import { validateBusinessValue, type Market, type Project, type Site } from "../src/project.js";
+
+test("connector_sync payload requires integrationId and carries optional siteId", () => {
+  assert.deepEqual(validateConnectorSyncJobPayload({ integrationId: "int-1" }), { integrationId: "int-1" });
+  assert.deepEqual(validateConnectorSyncJobPayload({ integrationId: "int-1", siteId: "site-1" }), { integrationId: "int-1", siteId: "site-1" });
+  assert.throws(() => validateConnectorSyncJobPayload({}), /integrationId/);
+  assert.throws(() => validateConnectorSyncJobPayload(null), /must be an object/);
+});
+
+test("connector_sync subject is day-scoped for daily idempotency", () => {
+  assert.equal(makeConnectorSyncJobSubject("int-1", "2026-06-25"), "int-1:2026-06-25");
+  assert.equal(makeConnectorSyncJobSubject("int-1", "2026-06-25", "site-1"), "int-1:2026-06-25:site-1");
+  assert.equal(
+    makeConnectorSyncJobSubject("int-1", "2026-06-25"),
+    makeConnectorSyncJobSubject("int-1", "2026-06-25"),
+    "same integration + day yields a stable subject"
+  );
+});
 
 test("auth normalizes credentials and enforces minimum password length", () => {
   assert.equal(normalizeEmail(" User@Example.COM "), "user@example.com");

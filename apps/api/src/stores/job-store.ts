@@ -1,13 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { makeIdempotencyKey, type FoundationJob } from "@seo-tool/domain-model";
+import { makeConnectorSyncJobSubject, makeIdempotencyKey, type FoundationJob } from "@seo-tool/domain-model";
 import { mapJob } from "../sqlite-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";
 
+export interface ScheduleConnectorSyncOptions {
+  siteId?: string;
+  now?: () => Date;
+}
+
 export interface JobStore {
   listJobs(): Promise<FoundationJob[]>;
   createJob(projectId: string, type: FoundationJob["type"], subject: string, payload?: Record<string, unknown>): Promise<{ job: FoundationJob; idempotent: boolean }>;
+  scheduleConnectorSync(integrationId: string, options?: ScheduleConnectorSyncOptions): Promise<{ job: FoundationJob; idempotent: boolean }>;
   claimNextJob(type?: FoundationJob["type"]): Promise<FoundationJob | null>;
   completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): Promise<FoundationJob>;
 }
@@ -68,6 +74,17 @@ class SQLiteJobStore implements JobStore {
     }
     await this.audit("system", "job.create", "job_queue", job.id, { projectId, type, subject });
     return { job, idempotent: false };
+  }
+
+  async scheduleConnectorSync(integrationId: string, options: ScheduleConnectorSyncOptions = {}): Promise<{ job: FoundationJob; idempotent: boolean }> {
+    const row = await this.db.prepare(`SELECT project_id FROM integration_accounts WHERE id = ?`).get(integrationId);
+    if (!row) {
+      throw new RequestError(404, "unknown_integration", "Integration not found");
+    }
+    const projectId = String(row.project_id);
+    const day = (options.now ? options.now() : this.now()).toISOString().slice(0, 10);
+    const subject = makeConnectorSyncJobSubject(integrationId, day, options.siteId);
+    return this.createJob(projectId, "connector_sync", subject, options.siteId ? { integrationId, siteId: options.siteId } : { integrationId });
   }
 
   async claimNextJob(type?: FoundationJob["type"]): Promise<FoundationJob | null> {
