@@ -33,7 +33,9 @@ import { loadFoundationDashboardData, type FoundationProject, type FoundationSit
 import { computeReadiness, type ReadinessState } from "./readiness";
 import {
   resolveOffset,
+  resolveUrlExplorerFilter,
   URL_EXPLORER_PAGE_SIZE,
+  type UrlExplorerFilter,
   type UrlExplorerRow,
 } from "../features/technical-audit/url-explorer";
 import {
@@ -281,6 +283,8 @@ export interface TechnicalAuditOverviewData {
   urlExplorerRows: UrlExplorerRow[];
   /** Pagination meta for the URL-Explorer table. */
   urlExplorerMeta: ListMeta;
+  /** Active server-side URL-Explorer filter (fetch status class + source). */
+  activeUrlFilter: UrlExplorerFilter;
 
   /**
    * Runs offered in the crawl-diff selectors (newest first, capped), independent
@@ -319,7 +323,7 @@ function emptyData(
     previousHealthScore: null,
     issueGroups: [],
     openIssueTotal: 0,
-    activeIssueFilter: { status: "open", severity: "all" },
+    activeIssueFilter: { status: "open", severity: "all", rule: "all" },
     displayedIssueTotal: 0,
     recentCrawlRuns: [],
     runOffset: 0,
@@ -327,6 +331,7 @@ function emptyData(
     discoveredUrlTotal: 0,
     urlExplorerRows: [],
     urlExplorerMeta: emptyListMeta(0),
+    activeUrlFilter: { status: "all", source: "all" },
     diffSelectableRuns: [],
     diffSelection: { base: null, compare: null },
     crawlDiff: null,
@@ -339,33 +344,53 @@ function emptyData(
 
 export type IssueStatusFilter = "open" | "resolved" | "all";
 export type IssueSeverityFilter = "all" | "critical" | "high" | "medium" | "low";
+export type IssueRuleFilter = "all" | AuditIssueRecord["rule"];
 
 export interface IssueFilter {
   status: IssueStatusFilter;
   severity: IssueSeverityFilter;
+  rule: IssueRuleFilter;
 }
 
 export const ISSUE_STATUS_FILTERS: IssueStatusFilter[] = ["open", "resolved", "all"];
 export const ISSUE_SEVERITY_FILTERS: IssueSeverityFilter[] = ["all", "critical", "high", "medium", "low"];
+export const ISSUE_RULE_FILTERS: IssueRuleFilter[] = [
+  "all",
+  "http_error",
+  "redirect_chain",
+  "missing_title",
+  "duplicate_title",
+  "canonical_mismatch",
+  "broken_link",
+];
 
-/** Normalize raw query input into a valid filter, defaulting to open / all. */
-export function resolveIssueFilter(input: { issueStatus?: string; issueSeverity?: string } = {}): IssueFilter {
+/** Normalize raw query input into a valid filter, defaulting to open / all / all rules. */
+export function resolveIssueFilter(
+  input: { issueStatus?: string; issueSeverity?: string; issueRule?: string } = {}
+): IssueFilter {
   const status = ISSUE_STATUS_FILTERS.includes(input.issueStatus as IssueStatusFilter)
     ? (input.issueStatus as IssueStatusFilter)
     : "open";
   const severity = ISSUE_SEVERITY_FILTERS.includes(input.issueSeverity as IssueSeverityFilter)
     ? (input.issueSeverity as IssueSeverityFilter)
     : "all";
-  return { status, severity };
+  const rule = ISSUE_RULE_FILTERS.includes(input.issueRule as IssueRuleFilter)
+    ? (input.issueRule as IssueRuleFilter)
+    : "all";
+  return { status, severity, rule };
 }
 
 export function isDefaultIssueFilter(filter: IssueFilter): boolean {
-  return filter.status === "open" && filter.severity === "all";
+  return filter.status === "open" && filter.severity === "all" && filter.rule === "all";
 }
 
 function matchesStatus(issue: AuditIssueRecord, status: IssueStatusFilter): boolean {
   if (status === "all") return true;
   return status === "resolved" ? issue.resolvedAt !== null : issue.resolvedAt === null;
+}
+
+function matchesRule(issue: AuditIssueRecord, rule: IssueRuleFilter): boolean {
+  return rule === "all" || issue.rule === rule;
 }
 
 // ---------------------------------------------------------------------------
@@ -375,10 +400,24 @@ function matchesStatus(issue: AuditIssueRecord, status: IssueStatusFilter): bool
 const URL_SAMPLE_LIMIT = 200;
 const ISSUE_SAMPLE_LIMIT = 200;
 
+/** Build the /url-explorer query string for the active page + filter. */
+function buildUrlExplorerQuery(offset: number, filter: UrlExplorerFilter): string {
+  const params = new URLSearchParams({
+    limit: String(URL_EXPLORER_PAGE_SIZE),
+    offset: String(offset),
+  });
+  if (filter.status !== "all") params.set("status", filter.status);
+  if (filter.source !== "all") params.set("source", filter.source);
+  return params.toString();
+}
+
 export async function loadTechnicalAuditOverview(
   options: {
     issueStatus?: string;
     issueSeverity?: string;
+    issueRule?: string;
+    urlStatus?: string;
+    urlSource?: string;
     urlOffset?: string;
     runOffset?: string;
     diffBase?: string;
@@ -390,6 +429,7 @@ export async function loadTechnicalAuditOverview(
   const site = dashboard.selectedSite ?? dashboard.sites[0] ?? null;
   const apiBaseUrl = dashboard.apiBaseUrl;
   const activeIssueFilter = resolveIssueFilter(options);
+  const activeUrlFilter = resolveUrlExplorerFilter(options);
   const readiness = computeReadiness({
     projects: dashboard.projects,
     selectedProject: dashboard.selectedProject,
@@ -407,6 +447,7 @@ export async function loadTechnicalAuditOverview(
         readiness,
       }),
       activeIssueFilter,
+      activeUrlFilter,
     };
   }
 
@@ -429,9 +470,7 @@ export async function loadTechnicalAuditOverview(
     apiGetEnvelope<DiscoveredUrl[]>(`${base}/discovered-urls?limit=${URL_SAMPLE_LIMIT}`)
       .then((env) => env)
       .catch(() => ({ data: [] as DiscoveredUrl[], meta: undefined })),
-    apiGetEnvelope<UrlExplorerRow[]>(
-      `${base}/url-explorer?limit=${URL_EXPLORER_PAGE_SIZE}&offset=${requestedUrlOffset}`
-    )
+    apiGetEnvelope<UrlExplorerRow[]>(`${base}/url-explorer?${buildUrlExplorerQuery(requestedUrlOffset, activeUrlFilter)}`)
       .then((env) => env)
       .catch(() => ({ data: [] as UrlExplorerRow[], meta: undefined })),
   ]);
@@ -472,12 +511,13 @@ export async function loadTechnicalAuditOverview(
   if (!isDefaultIssueFilter(activeIssueFilter)) {
     const issueParams = new URLSearchParams({ status: activeIssueFilter.status, limit: String(ISSUE_SAMPLE_LIMIT) });
     if (activeIssueFilter.severity !== "all") issueParams.set("severity", activeIssueFilter.severity);
+    if (activeIssueFilter.rule !== "all") issueParams.set("rule", activeIssueFilter.rule);
     displayedEnv = await apiGetEnvelope<AuditIssueRecord[]>(`${base}/audit-issues?${issueParams.toString()}`)
       .then((env) => env)
       .catch(() => ({ data: [] as AuditIssueRecord[] }));
   }
   const displayedIssues = (Array.isArray(displayedEnv.data) ? displayedEnv.data : []).filter(
-    (i) => matchesStatus(i, activeIssueFilter.status)
+    (i) => matchesStatus(i, activeIssueFilter.status) && matchesRule(i, activeIssueFilter.rule)
   );
   const issueGroups = groupIssues(displayedIssues);
   const displayedIssueTotal =
@@ -568,6 +608,7 @@ export async function loadTechnicalAuditOverview(
     discoveredUrlTotal,
     urlExplorerRows,
     urlExplorerMeta,
+    activeUrlFilter,
     diffSelectableRuns,
     diffSelection,
     crawlDiff,
