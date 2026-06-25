@@ -25,6 +25,7 @@ import type {
   AuditIssueSeverity,
   CrawlHealthScore,
   CrawlRun,
+  CrawlRunDiff,
   DiscoveredUrl,
 } from "@seo-tool/domain-model";
 import { apiGet, apiGetEnvelope, emptyListMeta, type ListMeta } from "./api-client";
@@ -34,6 +35,11 @@ import {
   URL_EXPLORER_PAGE_SIZE,
   type UrlExplorerRow,
 } from "../features/technical-audit/url-explorer";
+import {
+  hasCompleteSelection,
+  resolveDiffSelection,
+  type DiffSelection,
+} from "../features/technical-audit/crawl-diff";
 
 // ---------------------------------------------------------------------------
 // Funnel
@@ -272,10 +278,27 @@ export interface TechnicalAuditOverviewData {
   urlExplorerRows: UrlExplorerRow[];
   /** Pagination meta for the URL-Explorer table. */
   urlExplorerMeta: ListMeta;
+
+  /**
+   * Runs offered in the crawl-diff selectors (newest first, capped), independent
+   * of the recent-runs pagination so cross-page comparisons stay selectable.
+   */
+  diffSelectableRuns: CrawlRun[];
+  /** Active crawl-diff selection (resolved against the available runs). */
+  diffSelection: DiffSelection;
+  /**
+   * Crawl-diff result for the active selection; null when fewer than two runs
+   * exist, no/partial selection, or the diff fetch failed. Only fetched when
+   * both diffBase & diffCompare are present.
+   */
+  crawlDiff: CrawlRunDiff | null;
 }
 
 /** Page size for the recent crawl-runs list. */
 export const RUN_PAGE_SIZE = 5;
+
+/** Max runs offered in the crawl-diff selectors (newest first). */
+export const DIFF_RUN_LIMIT = 50;
 
 function emptyData(
   project: FoundationProject | null,
@@ -301,6 +324,9 @@ function emptyData(
     discoveredUrlTotal: 0,
     urlExplorerRows: [],
     urlExplorerMeta: emptyListMeta(0),
+    diffSelectableRuns: [],
+    diffSelection: { base: null, compare: null },
+    crawlDiff: null,
   };
 }
 
@@ -347,7 +373,14 @@ const URL_SAMPLE_LIMIT = 200;
 const ISSUE_SAMPLE_LIMIT = 200;
 
 export async function loadTechnicalAuditOverview(
-  options: { issueStatus?: string; issueSeverity?: string; urlOffset?: string; runOffset?: string } = {}
+  options: {
+    issueStatus?: string;
+    issueSeverity?: string;
+    urlOffset?: string;
+    runOffset?: string;
+    diffBase?: string;
+    diffCompare?: string;
+  } = {}
 ): Promise<TechnicalAuditOverviewData> {
   const dashboard = await loadFoundationDashboardData();
   const project = dashboard.selectedProject;
@@ -466,6 +499,43 @@ export async function loadTechnicalAuditOverview(
   });
   const funnelEmpty = funnelStages.every((s) => s.value === null);
 
+  // --- Crawl-diff (UX-6b) ---
+  // Only do diff-related work when the user has touched the selectors. With no
+  // diffBase/diffCompare in the query the section renders its placeholder from
+  // the already-fetched recent runs — no extra fetch (overview stays stable).
+  const diffRequested = options.diffBase != null || options.diffCompare != null;
+
+  // Selector universe: when a diff is requested, fetch a dedicated, larger run
+  // list (newest first) so two runs from different recent-runs pages stay
+  // comparable. Otherwise reuse the runs already on the active page.
+  const diffSelectableRuns = diffRequested
+    ? await apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=${DIFF_RUN_LIMIT}`)
+        .then((env) =>
+          [...(Array.isArray(env.data) ? env.data : [])].sort((a, b) =>
+            b.startedAt.localeCompare(a.startedAt)
+          )
+        )
+        .catch(() => sortedRuns)
+    : sortedRuns;
+
+  // Resolve the requested selection against the selectable runs; unknown ids are
+  // dropped. The diff is only fetched when both sides are present.
+  const diffSelection = resolveDiffSelection(
+    { diffBase: options.diffBase, diffCompare: options.diffCompare },
+    diffSelectableRuns.map((r) => r.id)
+  );
+
+  let crawlDiff: CrawlRunDiff | null = null;
+  if (hasCompleteSelection(diffSelection)) {
+    const diffParams = new URLSearchParams({
+      base: diffSelection.base as string,
+      compare: diffSelection.compare as string,
+    });
+    crawlDiff = await apiGet<CrawlRunDiff>(`${base}/crawl-runs/diff?${diffParams.toString()}`).catch(
+      () => null
+    );
+  }
+
   return {
     connected: true,
     apiBaseUrl,
@@ -486,5 +556,8 @@ export async function loadTechnicalAuditOverview(
     discoveredUrlTotal,
     urlExplorerRows,
     urlExplorerMeta,
+    diffSelectableRuns,
+    diffSelection,
+    crawlDiff,
   };
 }

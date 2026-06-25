@@ -20,6 +20,15 @@ import {
   URL_EXPLORER_PAGE_SIZE,
 } from "../../features/technical-audit/url-explorer";
 import { isDefaultIssueFilter, loadTechnicalAuditOverview, RUN_PAGE_SIZE } from "../../lib/audit-api";
+import {
+  diffRuleLabel,
+  formatDelta,
+  hasCompleteSelection,
+  runOptionLabel,
+  severityBadgeTone,
+  severityLabel,
+  type FormattedDelta,
+} from "../../features/technical-audit/crawl-diff";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +80,192 @@ function Pagination({
   );
 }
 
+/** A single Δ card (sign + functional tone + label). */
+function DeltaCard({ label, delta, unit }: { label: string; delta: FormattedDelta; unit?: string }) {
+  return (
+    <div className="audit-delta-card">
+      <span className="audit-delta-card__label">{label}</span>
+      <span className={`audit-delta-card__value audit-delta-card__value--${delta.tone}`}>
+        {delta.text}
+        {unit && delta.text !== "—" ? unit : ""}
+      </span>
+    </div>
+  );
+}
+
+/** List of appeared/fixed diff issues (url + rule + severity + message). */
+function DiffIssueList({
+  title,
+  issues,
+}: {
+  title: string;
+  issues: { id: string; url: string; rule: Parameters<typeof diffRuleLabel>[0]; severity: Parameters<typeof severityLabel>[0]; message: string }[];
+}) {
+  return (
+    <div className="audit-diff-list">
+      <div className="audit-diff-list__head">
+        <span className="audit-diff-list__title">{title}</span>
+        <span className="audit-diff-list__count">{issues.length.toLocaleString("de-DE")}</span>
+      </div>
+      {issues.length > 0 ? (
+        <ul className="audit-diff-issues">
+          {issues.map((issue) => (
+            <li className="audit-diff-issue" key={issue.id}>
+              <div className="audit-diff-issue__head">
+                <span className={`badge ${severityBadgeTone(issue.severity)}`.trim()}>
+                  {severityLabel(issue.severity)}
+                </span>
+                <span className="audit-diff-issue__rule">{diffRuleLabel(issue.rule)}</span>
+              </div>
+              <span className="audit-diff-issue__url">{issue.url}</span>
+              <span className="audit-diff-issue__message">{issue.message}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="audit-diff-list__empty">Keine.</p>
+      )}
+    </div>
+  );
+}
+
+/** Crawl-Vergleich section: two run selectors (GET form) + the rendered diff. */
+function CrawlDiffSection({
+  data,
+  currentParams,
+}: {
+  data: Awaited<ReturnType<typeof loadTechnicalAuditOverview>>;
+  currentParams: Record<string, string | undefined>;
+}) {
+  const runs = data.diffSelectableRuns;
+  const { diffSelection, crawlDiff } = data;
+
+  // Params to preserve across the GET form submit (everything except the two
+  // diff selectors, which the form's own fields carry).
+  const preserved = Object.entries(currentParams).filter(
+    ([key, value]) => key !== "diffBase" && key !== "diffCompare" && value != null && value !== ""
+  );
+
+  return (
+    <section className="card">
+      <p className="kicker">
+        <TermTooltip term="crawl">Crawl</TermTooltip>-Vergleich
+      </p>
+      <p className="muted">
+        Zwei Crawl-Läufe gegenüberstellen: was kam hinzu, was wurde behoben und wie haben sich
+        Health-Score, offene Issues und entdeckte URLs verändert.
+        <ConfidenceBadge level="A" />
+      </p>
+
+      {runs.length < 2 ? (
+        <p className="audit-diff-empty">
+          Für einen Vergleich werden mindestens zwei Crawl-Läufe benötigt. Starte weitere Crawls, um
+          Veränderungen über die Zeit zu sehen.
+        </p>
+      ) : (
+        <>
+          <form method="get" action="/technical-audit" className="audit-diff-selectors">
+            {preserved.map(([key, value]) => (
+              <input key={key} type="hidden" name={key} value={value as string} />
+            ))}
+            <label className="audit-diff-selector">
+              <span className="audit-diff-selector__label">Basis (älter)</span>
+              <select
+                className="audit-diff-select"
+                name="diffBase"
+                defaultValue={diffSelection.base ?? ""}
+                aria-label="Basis-Lauf wählen"
+              >
+                <option value="">— wählen —</option>
+                {runs.map((run) => (
+                  <option key={run.id} value={run.id}>
+                    {runOptionLabel(run)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="audit-diff-selector">
+              <span className="audit-diff-selector__label">Vergleich (neuer)</span>
+              <select
+                className="audit-diff-select"
+                name="diffCompare"
+                defaultValue={diffSelection.compare ?? ""}
+                aria-label="Vergleichs-Lauf wählen"
+              >
+                <option value="">— wählen —</option>
+                {runs.map((run) => (
+                  <option key={run.id} value={run.id}>
+                    {runOptionLabel(run)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="button compact">
+              Vergleichen
+            </button>
+          </form>
+
+          {!hasCompleteSelection(diffSelection) ? (
+            <p className="audit-diff-empty">
+              Wähle einen Basis- und einen Vergleichs-Lauf und klicke auf „Vergleichen“.
+            </p>
+          ) : crawlDiff === null ? (
+            <p className="audit-diff-empty">
+              Der Vergleich konnte nicht geladen werden. Bitte erneut versuchen.
+            </p>
+          ) : (
+            <>
+              <div className="audit-diff-deltas">
+                <DeltaCard
+                  label="Δ Health-Score"
+                  delta={formatDelta(crawlDiff.deltas.healthScore, "higherIsBetter")}
+                />
+                <DeltaCard
+                  label="Δ offene Issues"
+                  delta={formatDelta(crawlDiff.deltas.openIssues, "higherIsWorse")}
+                />
+                <DeltaCard
+                  label="Δ entdeckte URLs"
+                  delta={formatDelta(crawlDiff.deltas.discoveredUrls, "none")}
+                />
+              </div>
+
+              <div className="audit-diff-lists">
+                <DiffIssueList title="Neu seit Basis" issues={crawlDiff.appearedIssues} />
+                <DiffIssueList title="Behoben" issues={crawlDiff.fixedIssues} />
+                <div className="audit-diff-list">
+                  <div className="audit-diff-list__head">
+                    <span className="audit-diff-list__title">Neu entdeckte URLs</span>
+                    <span className="audit-diff-list__count">
+                      {crawlDiff.newUrls.length.toLocaleString("de-DE")}
+                    </span>
+                  </div>
+                  {crawlDiff.newUrls.length > 0 ? (
+                    <ul className="audit-diff-urls">
+                      {crawlDiff.newUrls.map((url) => (
+                        <li className="audit-diff-url" key={url.id}>
+                          {url.normalizedUrl || url.url}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="audit-diff-list__empty">Keine.</p>
+                  )}
+                </div>
+              </div>
+
+              <p className="audit-diff-persisting">
+                {crawlDiff.persistingCount.toLocaleString("de-DE")} Issue(s) bestehen in beiden Läufen
+                fort.
+              </p>
+            </>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default async function Page({
   searchParams,
 }: {
@@ -82,6 +277,8 @@ export default async function Page({
     issueSeverity: firstParam(params.severity),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
+    diffBase: firstParam(params.diffBase),
+    diffCompare: firstParam(params.diffCompare),
   });
 
   // Flatten the current searchParams to a single-value map for href building,
@@ -91,6 +288,8 @@ export default async function Page({
     severity: firstParam(params.severity),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
+    diffBase: firstParam(params.diffBase),
+    diffCompare: firstParam(params.diffCompare),
   };
 
   const urlPage = computePageInfo(data.urlExplorerMeta.offset, URL_EXPLORER_PAGE_SIZE, data.urlExplorerMeta.total);
@@ -233,6 +432,9 @@ export default async function Page({
         <UrlExplorerTable rows={data.urlExplorerRows} />
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
       </section>
+
+      {/* Crawl-Vergleich (crawl-diff) */}
+      <CrawlDiffSection data={data} currentParams={currentParams} />
 
       {/* Recent crawl runs */}
       <section className="card">
