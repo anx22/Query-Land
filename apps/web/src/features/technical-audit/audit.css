@@ -296,3 +296,18 @@
     transition: none;
   }
 }
+
+/* Issue filter bar — stacked status/severity badge rows acting as filter links */
+.issue-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+.issue-filter-bar__label {
+  font-size: 0.8rem;
+  min-width: 6.5rem;
+}
+.issue-filter-bar a.badge {
+  text-decoration: none;
+}

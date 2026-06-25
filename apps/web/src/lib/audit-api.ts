@@ -245,10 +245,14 @@ export interface TechnicalAuditOverviewData {
   latestHealthScore: CrawlHealthScore | null;
   previousHealthScore: CrawlHealthScore | null;
 
-  /** Grouped open audit issues, impact-sorted. */
+  /** Grouped audit issues for the active filter, impact-sorted. */
   issueGroups: IssueGroup[];
   /** Total open issues counted across groups. */
   openIssueTotal: number;
+  /** Active server-side issue filter (status + severity). */
+  activeIssueFilter: IssueFilter;
+  /** Total issues matching the active filter (from list meta). */
+  displayedIssueTotal: number;
 
   /** Recent crawl runs (latest first). */
   recentCrawlRuns: CrawlRun[];
@@ -272,9 +276,46 @@ function emptyData(
     previousHealthScore: null,
     issueGroups: [],
     openIssueTotal: 0,
+    activeIssueFilter: { status: "open", severity: "all" },
+    displayedIssueTotal: 0,
     recentCrawlRuns: [],
     discoveredUrlTotal: 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Issue filter (server-side: status + severity)
+// ---------------------------------------------------------------------------
+
+export type IssueStatusFilter = "open" | "resolved" | "all";
+export type IssueSeverityFilter = "all" | "critical" | "high" | "medium" | "low";
+
+export interface IssueFilter {
+  status: IssueStatusFilter;
+  severity: IssueSeverityFilter;
+}
+
+export const ISSUE_STATUS_FILTERS: IssueStatusFilter[] = ["open", "resolved", "all"];
+export const ISSUE_SEVERITY_FILTERS: IssueSeverityFilter[] = ["all", "critical", "high", "medium", "low"];
+
+/** Normalize raw query input into a valid filter, defaulting to open / all. */
+export function resolveIssueFilter(input: { issueStatus?: string; issueSeverity?: string } = {}): IssueFilter {
+  const status = ISSUE_STATUS_FILTERS.includes(input.issueStatus as IssueStatusFilter)
+    ? (input.issueStatus as IssueStatusFilter)
+    : "open";
+  const severity = ISSUE_SEVERITY_FILTERS.includes(input.issueSeverity as IssueSeverityFilter)
+    ? (input.issueSeverity as IssueSeverityFilter)
+    : "all";
+  return { status, severity };
+}
+
+export function isDefaultIssueFilter(filter: IssueFilter): boolean {
+  return filter.status === "open" && filter.severity === "all";
+}
+
+function matchesStatus(issue: AuditIssueRecord, status: IssueStatusFilter): boolean {
+  if (status === "all") return true;
+  return status === "resolved" ? issue.resolvedAt !== null : issue.resolvedAt === null;
 }
 
 // ---------------------------------------------------------------------------
@@ -284,18 +325,24 @@ function emptyData(
 const URL_SAMPLE_LIMIT = 200;
 const ISSUE_SAMPLE_LIMIT = 200;
 
-export async function loadTechnicalAuditOverview(): Promise<TechnicalAuditOverviewData> {
+export async function loadTechnicalAuditOverview(
+  options: { issueStatus?: string; issueSeverity?: string } = {}
+): Promise<TechnicalAuditOverviewData> {
   const dashboard = await loadFoundationDashboardData();
   const project = dashboard.selectedProject;
   const site = dashboard.sites[0] ?? null;
   const apiBaseUrl = dashboard.apiBaseUrl;
+  const activeIssueFilter = resolveIssueFilter(options);
 
   if (!dashboard.connected || !project || !site) {
-    return emptyData(project, site, {
-      connected: dashboard.connected,
-      errorMessage: dashboard.errorMessage,
-      apiBaseUrl,
-    });
+    return {
+      ...emptyData(project, site, {
+        connected: dashboard.connected,
+        errorMessage: dashboard.errorMessage,
+        apiBaseUrl,
+      }),
+      activeIssueFilter,
+    };
   }
 
   const base = `/projects/${project.id}/sites/${site.id}`;
@@ -327,11 +374,29 @@ export async function loadTechnicalAuditOverview(): Promise<TechnicalAuditOvervi
   const previousHealthScore = sortedHealth.length >= 2 ? sortedHealth[sortedHealth.length - 2] : null;
 
   // --- Issues ---
+  // Open issues drive the overview (sections, funnel, health), independent of
+  // the display filter below.
   const openIssues = (Array.isArray(issuesEnv.data) ? issuesEnv.data : []).filter(
     (i) => i.resolvedAt === null
   );
-  const issueGroups = groupIssues(openIssues);
   const openIssueTotal = openIssues.length;
+
+  // Displayed issue groups honor the active status/severity filter (server-side).
+  // Only fetch again when the filter differs from the default open/all set.
+  let displayedEnv: { data: AuditIssueRecord[]; meta?: { total: number } } = issuesEnv;
+  if (!isDefaultIssueFilter(activeIssueFilter)) {
+    const issueParams = new URLSearchParams({ status: activeIssueFilter.status, limit: String(ISSUE_SAMPLE_LIMIT) });
+    if (activeIssueFilter.severity !== "all") issueParams.set("severity", activeIssueFilter.severity);
+    displayedEnv = await apiGetEnvelope<AuditIssueRecord[]>(`${base}/audit-issues?${issueParams.toString()}`)
+      .then((env) => env)
+      .catch(() => ({ data: [] as AuditIssueRecord[] }));
+  }
+  const displayedIssues = (Array.isArray(displayedEnv.data) ? displayedEnv.data : []).filter(
+    (i) => matchesStatus(i, activeIssueFilter.status)
+  );
+  const issueGroups = groupIssues(displayedIssues);
+  const displayedIssueTotal =
+    "meta" in displayedEnv && displayedEnv.meta ? displayedEnv.meta.total : displayedIssues.length;
 
   // --- Discovered URLs + sections ---
   const urls = Array.isArray(urlsEnv.data) ? urlsEnv.data : [];
@@ -365,6 +430,8 @@ export async function loadTechnicalAuditOverview(): Promise<TechnicalAuditOvervi
     previousHealthScore,
     issueGroups,
     openIssueTotal,
+    activeIssueFilter,
+    displayedIssueTotal,
     recentCrawlRuns: sortedRuns,
     discoveredUrlTotal,
   };

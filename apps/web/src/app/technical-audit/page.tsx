@@ -12,9 +12,14 @@ import { InfoTip } from "../../components/info-tip";
 import { HelpPanel } from "../../components/help-panel";
 import { GlossarLink } from "../../components/glossar-link";
 import { IssueGroups } from "../../features/technical-audit/issue-groups";
-import { loadTechnicalAuditOverview } from "../../lib/audit-api";
+import { IssueFilterBar } from "../../features/technical-audit/issue-filter-bar";
+import { isDefaultIssueFilter, loadTechnicalAuditOverview } from "../../lib/audit-api";
 
 export const dynamic = "force-dynamic";
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 const RUN_STATUS_LABEL: Record<string, string> = {
   running: "läuft",
@@ -22,8 +27,16 @@ const RUN_STATUS_LABEL: Record<string, string> = {
   failed: "fehlgeschlagen",
 };
 
-export default async function Page() {
-  const data = await loadTechnicalAuditOverview();
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = (await searchParams) ?? {};
+  const data = await loadTechnicalAuditOverview({
+    issueStatus: firstParam(params.status),
+    issueSeverity: firstParam(params.severity),
+  });
 
   const healthValue = data.latestHealthScore?.score ?? null;
   const healthDelta =
@@ -138,9 +151,13 @@ export default async function Page() {
       <section className="card">
         <p className="kicker">Issue-Gruppen</p>
         <p className="muted">
-          {data.openIssueTotal.toLocaleString("de-DE")} offene Issues, gruppiert nach Regel und
-          Schweregrad und nach Impact (Anzahl × Schweregrad-Gewicht) sortiert. <ConfidenceBadge level="A" />
+          {isDefaultIssueFilter(data.activeIssueFilter)
+            ? `${data.openIssueTotal.toLocaleString("de-DE")} offene Issues`
+            : `${data.displayedIssueTotal.toLocaleString("de-DE")} Issues im aktiven Filter`}
+          , gruppiert nach Regel und Schweregrad und nach Impact (Anzahl × Schweregrad-Gewicht)
+          sortiert. <ConfidenceBadge level="A" />
         </p>
+        <IssueFilterBar active={data.activeIssueFilter} />
         <IssueGroups groups={data.issueGroups} />
       </section>
 
