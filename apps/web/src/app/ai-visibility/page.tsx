@@ -54,14 +54,15 @@ export default async function Page({
       <div className="ai-root">
         {/* Hero */}
         <section className="card hero-card">
-          <p className="kicker">Modul 6 · Answer Engine Optimization</p>
+          <p className="kicker">KI-Suche · Sichtbarkeit</p>
           <h1>
             <TermTooltip term="AI-Visibility / Citation">KI-Sichtbarkeit</TermTooltip> &amp;{" "}
             <TermTooltip term="AEO">AEO</TermTooltip>
           </h1>
           <p>
-            Verfolgt, ob die eigene Domain in LLM-Antworten auf getrackte Prompts zitiert oder
-            erwähnt wird, und bewertet Seiten heuristisch auf Antwort-Engine-Reife.
+            Wenn Leute ChatGPT, Gemini &amp; Co. etwas fragen — wird deine Website in der Antwort
+            genannt? Hier siehst du, ob deine Domain in KI-Antworten zitiert wird und ob deine Seiten
+            dafür gut aufbereitet sind.
           </p>
           <div className="badge-row">
             <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
@@ -95,8 +96,8 @@ export default async function Page({
 
         {/* Score + facts */}
         <section className="card">
-          <p className="kicker">Citation-Anteil · Klasse E</p>
-          <h2>AI-Visibility-Score</h2>
+          <p className="kicker">Wie oft wird deine Domain in KI-Antworten genannt?</p>
+          <h2>KI-Sichtbarkeits-Score</h2>
           <WhyItMatters>
             Zeigt sachlich, in welchem Anteil getrackter Prompts die eigene Domain genannt wird — als
             Frühwarn-Signal, nicht als Beweis.
@@ -129,11 +130,11 @@ export default async function Page({
 
         {/* Citation matrix + add-prompt form */}
         <section className="card">
-          <p className="kicker">Citation-Matrix · Klasse E</p>
-          <h2>Prompts × zitiert?</h2>
+          <p className="kicker">Welche Frage, welche Nennung?</p>
+          <h2>Fragen × zitiert?</h2>
           <p>
-            Jede Zeile ist ein getrackter Prompt; „zitiert?" zeigt den letzten Snapshot
-            (● zitiert · ◐ erwähnt · ○ nicht zitiert · – kein Snapshot). LLM-Signal, kein Beleg.
+            Jede Zeile ist eine getrackte Frage (Prompt); „zitiert?" zeigt das letzte Ergebnis
+            (● zitiert · ◐ erwähnt · ○ nicht zitiert · – noch nicht geprüft). KI-Signal, kein Beleg.
           </p>
 
           <form action={createPromptAction} className="form-row">
@@ -176,12 +177,12 @@ export default async function Page({
 
         {/* AEO — Class A (deterministic, content-derived) */}
         <section className="card">
-          <p className="kicker">Answer Engine Optimization · Klasse A</p>
+          <p className="kicker">Ist deine Seite KI-tauglich aufbereitet?</p>
           <h2>AEO-Analyse</h2>
           <p>
-            Heuristische, content-basierte Checks, ob eine Seite für Antwort-Engines aufbereitet ist.
-            Die Bewertung erbt die Crawl-Konfidenz (Klasse A) — deterministisch und als Evidenz
-            zulässig.
+            Prüft anhand des Seiteninhalts, ob eine Seite so aufbereitet ist, dass KI-Antwortdienste
+            sie gut verwenden können (klare Struktur, Fragen &amp; Antworten, belastbare Fakten).
+            Basiert auf echten Crawl-Daten — als Beleg verwendbar.
           </p>
 
           {data.selectedSite ? (
@@ -232,11 +233,11 @@ export default async function Page({
 
         {/* Proposals — review-gated */}
         <section className="card">
-          <p className="kicker">MCP-Schreibtools · reviewpflichtig</p>
-          <h2>Proposals</h2>
+          <p className="kicker">Aufgaben &amp; Vorschläge</p>
+          <h2>Vorschläge</h2>
           <p>
-            Dev-Tickets und Fix-PR-Vorschläge entstehen im Status „Vorgeschlagen" und werden erst
-            nach manueller Prüfung aktiviert — keine automatischen Produktiv-Änderungen.
+            Aus Befunden entstehen Aufgaben- und Fix-Vorschläge im Status „Vorgeschlagen". Sie werden
+            erst nach manueller Prüfung aktiviert — nichts wird automatisch produktiv geändert.
           </p>
 
           <form action={createProposalAction}>

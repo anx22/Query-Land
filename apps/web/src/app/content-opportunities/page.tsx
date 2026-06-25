@@ -48,14 +48,14 @@ export default async function Page({
   return (
     <AppShell activePath="/content-opportunities">
       <section className="card hero-card">
-        <p className="kicker">Content &amp; Opportunities</p>
-        <h1>Opportunity Board</h1>
+        <p className="kicker">Content &amp; Chancen</p>
+        <h1>Optimierungschancen</h1>
         <p>
-          Priorisierte Optimierungschancen mit Evidenz, Maßnahmen und Validierung. Jede Chance folgt dem
+          Konkrete Verbesserungen für deine Website, nach Wirkung sortiert. Jede Chance folgt dem
           Muster: Beobachtung → Ursache → Maßnahme → messbares Ergebnis.
         </p>
         <WhyItMatters>
-          Die Impact×Effort-Matrix zeigt die günstigsten Hebel zuerst — Quick Wins vor Big Bets.
+          Die Wirkung-/Aufwand-Matrix zeigt die günstigsten Hebel zuerst — schnelle Erfolge vor großen Projekten.
         </WhyItMatters>
         <div className="badge-row">
           <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>

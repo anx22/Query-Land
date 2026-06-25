@@ -372,7 +372,8 @@ export default async function Page({
             </InfoTip>
           </p>
           <p className="muted">
-            Entdeckt → Gecrawlt → Indexierbar (aus dem letzten Crawl-Lauf). <ConfidenceBadge level="A" />
+            Wo verliert die Seite URLs auf dem Weg zu Google? Entdeckt → Gecrawlt → Indexierbar
+            (aus dem letzten Crawl-Lauf).
           </p>
           <IndexabilityFunnel stages={data.funnelStages} />
           <WhyItMatters>
@@ -402,10 +403,10 @@ export default async function Page({
 
       {/* Section treemap */}
       <section className="card">
-        <p className="kicker">Section-Health (Treemap)</p>
+        <p className="kicker">Gesundheit nach Website-Bereich</p>
         <p className="muted">
-          Website-Bereiche nach erstem Pfad-Segment; Kachelgröße = URL-Anzahl, Farbe = Health (Issue-Dichte).
-          <ConfidenceBadge level="A" />
+          Jede Kachel ist ein Bereich der Website (z. B. /blog). Größe = Anzahl URLs,
+          Farbe = technische Gesundheit (rot = viele Probleme).
         </p>
         <SectionTreemap sections={data.sections} />
         {data.sections.length > 0 ? (
@@ -433,8 +434,8 @@ export default async function Page({
           {isDefaultIssueFilter(data.activeIssueFilter)
             ? `${data.openIssueTotal.toLocaleString("de-DE")} offene Issues`
             : `${data.displayedIssueTotal.toLocaleString("de-DE")} Issues im aktiven Filter`}
-          , gruppiert nach Regel und Schweregrad und nach Impact (Anzahl × Schweregrad-Gewicht)
-          sortiert. <ConfidenceBadge level="A" />
+          , gruppiert nach Regel und Schweregrad und nach Wirkung (Anzahl × Schweregrad)
+          sortiert — das Wichtigste zuerst.
         </p>
         <IssueFilterBar active={data.activeIssueFilter} />
         <IssueGroups groups={data.issueGroups} />
@@ -448,8 +449,7 @@ export default async function Page({
           klicken, um Abruf-, Indexierbarkeits- und Crawl-Kontext zu sehen.
           {data.urlExplorerMeta.total > 0
             ? ` ${data.urlExplorerMeta.total.toLocaleString("de-DE")} URLs insgesamt.`
-            : ""}{" "}
-          <ConfidenceBadge level="A" />
+            : ""}
         </p>
         <UrlExplorerTable rows={data.urlExplorerRows} />
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />

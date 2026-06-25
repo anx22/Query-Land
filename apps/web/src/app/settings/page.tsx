@@ -6,8 +6,8 @@ import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckActio
 export const dynamic = "force-dynamic";
 
 const connectorProviders = [
-  { provider: "gsc", label: "Google Search Console", confidence: "B", description: "Stub für Search-Performance, Index Coverage und URL Inspection." },
-  { provider: "ga4", label: "Google Analytics 4", confidence: "A", description: "Stub für Engagement-, Landingpage- und Conversion-Kontext." }
+  { provider: "gsc", label: "Google Search Console", confidence: "B", description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
+  { provider: "ga4", label: "Google Analytics 4", confidence: "A", description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." }
 ] as const;
 
 const sovereigntyItems = [
@@ -25,32 +25,33 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const connectorItems = data.integrations.length > 0
     ? data.integrations.map((integration) => ({
       id: integration.id,
-      label: `${integration.provider.toUpperCase()} · Confidence ${integration.sourceConfidence}`,
+      label: `${providerLabel(integration.provider)} · ${connectorStatusLabel(integration.status)}`,
       status: integration.status,
       statusClassName: `status ${integration.status}`
     }))
-    : [{ id: "connector-empty", label: "Noch keine Connector-Stubs", status: "empty", statusClassName: "status blocked" }];
+    : [{ id: "connector-empty", label: "Noch keine Datenquelle verbunden", status: "empty", statusClassName: "status blocked" }];
   const connectorJobs = data.jobs.filter((job) => job.type === "connector_sync");
   const jobItems = connectorJobs.length > 0
     ? connectorJobs.map((job) => ({
       id: job.id,
-      label: `${job.type} · ${job.idempotencyKey ?? job.projectId}`,
+      label: `${providerLabel(job.subject)} — Datenabgleich`,
       status: job.status,
       statusClassName: `status ${job.status}`
     }))
-    : [{ id: "job-empty", label: "Noch kein Connector-Sync geplant", status: "empty", statusClassName: "status blocked" }];
+    : [{ id: "job-empty", label: "Noch kein Datenabgleich geplant", status: "empty", statusClassName: "status blocked" }];
 
   return (
     <AppShell activePath="/settings">
       <section className="card hero-card">
-        <p className="kicker">Settings · Connectors</p>
-        <h1>GSC/GA4 Connector-Stubs & Sync Jobs</h1>
+        <p className="kicker">Einstellungen · Datenquellen</p>
+        <h1>Datenquellen verbinden</h1>
         <p>
-          Connector-Stubs anlegen und Sync-Jobs planen — verbinden Sie Google Search Console und Google Analytics 4 mit Ihrem Projekt.
+          Verbinde Google Search Console und Google Analytics 4 mit deinem Projekt — danach fließen
+          echte Klicks, Rankings und Nutzungsdaten in deine Analysen ein.
         </p>
         <div className="badge-row">
-          <span className="badge primary">{data.integrations.length} Connectoren</span>
-          <span className="badge">{connectorJobs.length} Connector Jobs</span>
+          <span className="badge primary">{data.integrations.length} verbundene Datenquellen</span>
+          <span className="badge">{connectorJobs.length} geplante Abgleiche</span>
           <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
@@ -59,7 +60,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       <section className="content-grid">
         <div className="card">
-          <p className="kicker">Connector-Stubs erstellen</p>
+          <p className="kicker">Datenquelle verbinden</p>
+          <p className="muted">Lege die Verbindung zu Google an. Der echte Login folgt — heute wird die Datenquelle im Projekt vorbereitet.</p>
           <div className="connector-grid">
             {connectorProviders.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
@@ -69,13 +71,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <span className="badge primary">{connector.provider.toUpperCase()}</span>
                     <h2>{connector.label}</h2>
                     <p>{connector.description}</p>
-                    <span className="badge">Source Confidence {connector.confidence}</span>
                   </div>
                   <form action={createConnectorAction}>
                     <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
                     <input type="hidden" name="provider" value={connector.provider} />
                     <button className="button" type="submit" disabled={!data.connected || !selectedProject || Boolean(existing)}>
-                      {existing ? "Stub vorhanden" : "Stub anlegen"}
+                      {existing ? "Verbindung vorhanden" : "Verbindung anlegen"}
                     </button>
                   </form>
                 </article>
@@ -84,14 +85,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           </div>
         </div>
         <div className="card">
-          <p className="kicker">Aktuelle Connectoren</p>
+          <p className="kicker">Verbundene Datenquellen</p>
           <StatusList items={connectorItems} />
         </div>
       </section>
 
       <section className="content-grid">
         <div className="card">
-          <p className="kicker">Sync-Job planen</p>
+          <p className="kicker">Datenabgleich planen</p>
+          <p className="muted">Holt regelmäßig neue Daten von der verbundenen Quelle, damit Rankings und Kennzahlen aktuell bleiben.</p>
           <div className="connector-grid compact">
             {connectorProviders.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
@@ -100,9 +102,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
                   <input type="hidden" name="provider" value={connector.provider} />
                   <strong>{connector.label}</strong>
-                  <span>Plant `connector_sync` für Subject `{connector.provider}`.</span>
+                  <span>Plant einen täglichen Datenabgleich für {connector.label}.</span>
                   <button className="button secondary" type="submit" disabled={!data.connected || !selectedProject || !existing}>
-                    Sync-Job planen
+                    Abgleich planen
                   </button>
                 </form>
               );
@@ -110,74 +112,95 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           </div>
         </div>
         <div className="card">
-          <p className="kicker">Connector Job Monitor</p>
+          <p className="kicker">Status der Abgleiche</p>
           <StatusList items={jobItems} />
         </div>
       </section>
 
-      <section className="content-grid">
-        <div className="card">
-          <p className="kicker">Quell-Verknüpfung</p>
-          <h2>URL → Template → Repo</h2>
-          <p className="muted">URLs ihrem Quellcode zuordnen — ein Fix am Template korrigiert alle betroffenen Seiten gleichzeitig.</p>
-          <form className="form-card" action={createSourceMapEntryAction}>
-            <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
-            <label>URL-Pattern<input name="urlPattern" placeholder="https://example.com/pricing" required /></label>
-            <label>Repo-URL<input name="repoUrl" placeholder="https://github.com/acme/site" required /></label>
-            <label>Template<input name="templateName" placeholder="PricingPage" required /></label>
-            <label>Component<input name="component" placeholder="Pricing" required /></label>
-            <label>Repo-Pfad<input name="repoPath" placeholder="apps/web/app/pricing/page.tsx" required /></label>
-            <button className="button" type="submit" disabled={!data.connected || !selectedProject}>Mapping speichern</button>
-          </form>
-        </div>
-        <div className="card">
-          <p className="kicker">Aktuelle Source-Map-Einträge</p>
-          {data.sourceMap.length > 0 ? (
-            <div className="table-list">
-              {data.sourceMap.map((entry) => (
-                <article key={entry.id}>
-                  <strong>{entry.urlPattern}</strong>
-                  <span>{entry.template} · {entry.repoPath}</span>
-                  <span className="muted">Confidence: {entry.confidence}</span>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p>Noch keine Source-Map-Einträge. Lege oben eine URL→Repo-Zuordnung an.</p>
-          )}
-        </div>
-        <div className="card">
-          <p className="kicker">Pre-Merge-Gate</p>
-          <h2>Geänderte Repo-Pfade prüfen</h2>
-          <p className="muted">Löst geänderte Dateien über die Quell-Verknüpfung auf betroffene Templates und URLs auf und verknüpft offene Optimierungschancen. Als CI-Check vor dem Deployment einsetzbar.</p>
-          <form className="form-card" action={evaluatePrCheckAction}>
-            <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
-            <label>Geänderte Pfade (einer pro Zeile)<textarea name="changedPaths" rows={4} placeholder={"src/templates/pricing.tsx\napps/web/app/pricing/page.tsx"} required /></label>
-            <button className="button" type="submit" disabled={!data.connected || !selectedProject}>Gate auswerten</button>
-          </form>
-        </div>
-      </section>
+      {/* Developer / advanced tooling — separated from the everyday data-source flow above. */}
+      <details className="advanced-section">
+        <summary>
+          <span className="advanced-section__title">Für Entwickler (erweitert)</span>
+          <span className="advanced-section__hint">Quellcode-Verknüpfung, CI-Prüfung und Betriebs-Guardrails — für die Grundnutzung nicht nötig.</span>
+        </summary>
 
-      <section className="content-grid">
-        <div className="card">
-          <p className="kicker">Open Source &amp; Souveränität</p>
-          <h2>Open-source-first Guardrails</h2>
-          <p>
-            Query-Land bleibt selbst hostbar, speichert operative Daten lokal portabel und kapselt externe Dienste hinter austauschbaren Provider-Adaptern — kein Vendor-Lock-in.
-          </p>
-          <div className="badge-row">
-            <span className="badge primary">DEC-005</span>
-            <span className="badge">Security &amp; Privacy</span>
-            <span className="badge">No lock-in</span>
+        <section className="content-grid">
+          <div className="card">
+            <p className="kicker">Quellcode-Verknüpfung</p>
+            <h2>URL → Template → Repo</h2>
+            <p className="muted">Ordnet URLs ihrem Quellcode zu — ein Fix am Template korrigiert alle betroffenen Seiten gleichzeitig. Nur relevant, wenn das eigene Repo angebunden ist.</p>
+            <form className="form-card" action={createSourceMapEntryAction}>
+              <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
+              <label>URL-Pattern<input name="urlPattern" placeholder="https://example.com/pricing" required /></label>
+              <label>Repo-URL<input name="repoUrl" placeholder="https://github.com/acme/site" required /></label>
+              <label>Template<input name="templateName" placeholder="PricingPage" required /></label>
+              <label>Component<input name="component" placeholder="Pricing" required /></label>
+              <label>Repo-Pfad<input name="repoPath" placeholder="apps/web/app/pricing/page.tsx" required /></label>
+              <button className="button" type="submit" disabled={!data.connected || !selectedProject}>Mapping speichern</button>
+            </form>
           </div>
-        </div>
-        <div className="card">
-          <p className="kicker">Readiness Check</p>
-          <StatusList items={sovereigntyItems} />
-        </div>
-      </section>
+          <div className="card">
+            <p className="kicker">Aktuelle Quellcode-Zuordnungen</p>
+            {data.sourceMap.length > 0 ? (
+              <div className="table-list">
+                {data.sourceMap.map((entry) => (
+                  <article key={entry.id}>
+                    <strong>{entry.urlPattern}</strong>
+                    <span>{entry.template} · {entry.repoPath}</span>
+                    <span className="muted">Confidence: {entry.confidence}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p>Noch keine Zuordnungen. Lege oben eine URL→Repo-Zuordnung an.</p>
+            )}
+          </div>
+          <div className="card">
+            <p className="kicker">CI-Prüfung vor dem Deployment</p>
+            <h2>Geänderte Repo-Pfade prüfen</h2>
+            <p className="muted">Löst geänderte Dateien über die Quellcode-Verknüpfung auf betroffene Templates und URLs auf und verknüpft offene Optimierungschancen. Als CI-Check vor dem Deployment einsetzbar.</p>
+            <form className="form-card" action={evaluatePrCheckAction}>
+              <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
+              <label>Geänderte Pfade (einer pro Zeile)<textarea name="changedPaths" rows={4} placeholder={"src/templates/pricing.tsx\napps/web/app/pricing/page.tsx"} required /></label>
+              <button className="button" type="submit" disabled={!data.connected || !selectedProject}>Prüfung auswerten</button>
+            </form>
+          </div>
+        </section>
+
+        <section className="content-grid">
+          <div className="card">
+            <p className="kicker">Betrieb &amp; Souveränität</p>
+            <h2>Open-source-first</h2>
+            <p>
+              Query-Land bleibt selbst hostbar, speichert operative Daten lokal portabel und kapselt externe Dienste hinter austauschbaren Provider-Adaptern — kein Vendor-Lock-in.
+            </p>
+            <div className="badge-row">
+              <span className="badge">Security &amp; Privacy</span>
+              <span className="badge">No lock-in</span>
+            </div>
+          </div>
+          <div className="card">
+            <p className="kicker">Betriebs-Checkliste</p>
+            <StatusList items={sovereigntyItems} />
+          </div>
+        </section>
+      </details>
     </AppShell>
   );
+}
+
+function providerLabel(provider: string): string {
+  const key = provider.toLowerCase();
+  if (key === "gsc") return "Google Search Console";
+  if (key === "ga4") return "Google Analytics 4";
+  return provider.toUpperCase();
+}
+
+function connectorStatusLabel(status: string): string {
+  if (status === "pending") return "bereit zum Verbinden";
+  if (status === "active") return "verbunden";
+  if (status === "error") return "Fehler";
+  return status;
 }
 
 function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
@@ -189,13 +212,13 @@ function feedbackMessage(params: Record<string, string | string[] | undefined> |
     const templates = single(params?.prtemplates) ?? "0";
     const opps = single(params?.propps) ?? "0";
     const kind = prcheck === "review_required" ? "danger" : "success";
-    return { kind, message: `Pre-Merge-Gate: ${prcheck} · ${templates} betroffene Templates · ${opps} verknüpfte Opportunities.` };
+    return { kind, message: `CI-Prüfung: ${prcheck} · ${templates} betroffene Templates · ${opps} verknüpfte Optimierungschancen.` };
   }
   const sourcemapValue = single(params?.sourcemap);
-  if (sourcemapValue) return { kind: "success", message: "Source-Map-Eintrag wurde gespeichert." };
+  if (sourcemapValue) return { kind: "success", message: "Quellcode-Zuordnung wurde gespeichert." };
   const createdValue = single(params?.created);
-  if (createdValue) return { kind: "success", message: `${createdValue.toUpperCase()} Connector-Stub wurde gespeichert.` };
+  if (createdValue) return { kind: "success", message: `${providerLabel(createdValue)} wurde verbunden.` };
   const scheduledValue = single(params?.scheduled);
-  if (scheduledValue) return { kind: "success", message: `${scheduledValue.toUpperCase()} Sync-Job wurde geplant.` };
+  if (scheduledValue) return { kind: "success", message: `Datenabgleich für ${providerLabel(scheduledValue)} wurde geplant.` };
   return null;
 }
