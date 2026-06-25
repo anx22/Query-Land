@@ -46,8 +46,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <p className="kicker">Einstellungen · Datenquellen</p>
         <h1>Datenquellen verbinden</h1>
         <p>
-          Verbinde Google Search Console und Google Analytics 4 mit deinem Projekt — danach fließen
-          echte Klicks, Rankings und Nutzungsdaten in deine Analysen ein.
+          Verbinden Sie Google Search Console und Google Analytics 4 mit Ihrem Projekt — danach fließen
+          echte Klicks, Rankings und Nutzungsdaten in Ihre Analysen ein.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.integrations.length} verbundene Datenquellen</span>
@@ -61,7 +61,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       <section className="content-grid">
         <div className="card">
           <p className="kicker">Datenquelle verbinden</p>
-          <p className="muted">Lege die Verbindung zu Google an. Der echte Login folgt — heute wird die Datenquelle im Projekt vorbereitet.</p>
+          <p className="muted">Legen Sie die Verbindung zu Google an. Der echte Login folgt — heute wird die Datenquelle im Projekt vorbereitet.</p>
           <div className="connector-grid">
             {connectorProviders.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);

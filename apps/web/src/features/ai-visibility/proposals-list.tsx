@@ -31,11 +31,10 @@ export function ProposalsList({ proposals, connected }: ProposalsListProps) {
   if (proposals.length === 0) {
     return (
       <div className="ai-empty">
-        <p className="ai-empty__title">Noch keine Proposals</p>
+        <p className="ai-empty__title">Noch keine Vorschläge</p>
         <p className="ai-empty__hint">
-          Erstelle oben ein Proposal oder lass MCP-Schreibtools ein Dev-Ticket bzw. einen Fix-PR zur
-          Review vorschlagen. Vorschläge starten im Status „Vorgeschlagen" und werden erst nach
-          manueller Prüfung aktiviert.
+          Erstellen Sie oben einen Vorschlag (z. B. eine Aufgabe oder einen Fix). Vorschläge starten
+          im Status „Vorgeschlagen" und werden erst nach manueller Prüfung aktiviert.
         </p>
       </div>
     );

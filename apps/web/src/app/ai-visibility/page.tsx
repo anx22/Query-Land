@@ -60,13 +60,11 @@ export default async function Page({
             <TermTooltip term="AEO">AEO</TermTooltip>
           </h1>
           <p>
-            Wenn Leute ChatGPT, Gemini &amp; Co. etwas fragen — wird deine Website in der Antwort
-            genannt? Hier siehst du, ob deine Domain in KI-Antworten zitiert wird und ob deine Seiten
+            Wenn Leute ChatGPT, Gemini &amp; Co. etwas fragen — wird Ihre Website in der Antwort
+            genannt? Hier sehen Sie, ob Ihre Domain in KI-Antworten zitiert wird und ob Ihre Seiten
             dafür gut aufbereitet sind.
           </p>
           <div className="badge-row">
-            <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
-            <span className="badge">{data.selectedSite?.baseUrl ?? "keine Site"}</span>
             <span className={data.connected ? "badge success" : "badge danger"}>
               {data.connected ? "API verbunden" : "API offline"}
             </span>
@@ -96,7 +94,7 @@ export default async function Page({
 
         {/* Score + facts */}
         <section className="card">
-          <p className="kicker">Wie oft wird deine Domain in KI-Antworten genannt?</p>
+          <p className="kicker">Wie oft wird Ihre Domain in KI-Antworten genannt?</p>
           <h2>KI-Sichtbarkeits-Score</h2>
           <WhyItMatters>
             Zeigt sachlich, in welchem Anteil getrackter Prompts die eigene Domain genannt wird — als
@@ -177,7 +175,7 @@ export default async function Page({
 
         {/* AEO — Class A (deterministic, content-derived) */}
         <section className="card">
-          <p className="kicker">Ist deine Seite KI-tauglich aufbereitet?</p>
+          <p className="kicker">Ist Ihre Seite KI-tauglich aufbereitet?</p>
           <h2>AEO-Analyse</h2>
           <p>
             Prüft anhand des Seiteninhalts, ob eine Seite so aufbereitet ist, dass KI-Antwortdienste

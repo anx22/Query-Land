@@ -34,11 +34,11 @@ export default async function Page({
   return (
     <AppShell activePath="/keywords-rank">
       <section className="card hero-card">
-        <p className="kicker">Keywords &amp; Rank</p>
+        <p className="kicker">Suchbegriffe &amp; Platzierungen</p>
         <h1>Keywords &amp; Rankings</h1>
         <p>
-          Das eigene Keyword-Universum mit Positionen und Sichtbarkeit. Jede Zeile zeigt den
-          Positions-Trend, die Veränderung gegenüber dem letzten Snapshot und die Quell-Konfidenz.
+          Für welche Suchbegriffe Ihre Website bei Google erscheint — und auf welcher Position. Jede
+          Zeile zeigt den Positions-Trend und die Veränderung seit der letzten Messung.
         </p>
         <WhyItMatters>
           <TermTooltip term="Striking Distance">Striking-Distance</TermTooltip>-Keywords (Position 11–20)
@@ -197,7 +197,7 @@ function feedbackMessage(
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.added)) return { kind: "success", message: "Keywords klassifiziert und gespeichert." };
   if (singleParam(params?.group)) return { kind: "success", message: "Keyword-Cluster angelegt." };
-  if (singleParam(params?.ranked)) return { kind: "success", message: "Rang-Snapshot erfasst (SERP-Provider-Stub)." };
+  if (singleParam(params?.ranked)) return { kind: "success", message: "Ranking-Messung erfasst (Demo-Daten)." };
   if (singleParam(params?.visibility)) return { kind: "success", message: "Visibility-Index neu berechnet." };
   return null;
 }

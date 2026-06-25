@@ -97,7 +97,7 @@ function requiredString(formData: FormData, key: string): string {
 function providerString(formData: FormData): ConnectorProvider {
   const provider = requiredString(formData, "provider") as ConnectorProvider;
   if (!allowedProviders.includes(provider)) {
-    throw new Error("Nur GSC und GA4 sind in diesem Sprint als Connector-Stubs erlaubt.");
+    throw new Error("Nur Google Search Console und Google Analytics 4 sind aktuell als Datenquellen verfügbar.");
   }
   return provider;
 }

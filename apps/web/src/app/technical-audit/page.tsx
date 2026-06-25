@@ -377,7 +377,7 @@ export default async function Page({
       />
 
       {/* Help zone — layout-separated from the productive panels below */}
-      <HelpPanel title="So liest du das Technical Audit">
+      <HelpPanel title="So lesen Sie das Technical Audit">
         <p>
           Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt,
           wo URLs auf dem Weg in den Google-Index verloren gehen. Der{" "}

@@ -51,15 +51,13 @@ export default async function Page({
         <p className="kicker">Content &amp; Chancen</p>
         <h1>Optimierungschancen</h1>
         <p>
-          Konkrete Verbesserungen für deine Website, nach Wirkung sortiert. Jede Chance folgt dem
+          Konkrete Verbesserungen für Ihre Website, nach Wirkung sortiert. Jede Chance folgt dem
           Muster: Beobachtung → Ursache → Maßnahme → messbares Ergebnis.
         </p>
         <WhyItMatters>
           Die Wirkung-/Aufwand-Matrix zeigt die günstigsten Hebel zuerst — schnelle Erfolge vor großen Projekten.
         </WhyItMatters>
         <div className="badge-row">
-          <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
-          <span className="badge">{data.selectedSite?.baseUrl ?? "keine Site"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
             {data.connected ? "API verbunden" : "API offline"}
           </span>
@@ -121,10 +119,10 @@ function feedbackMessage(
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.generated)) {
-    return { kind: "success", message: "Opportunities generiert (alle Klassen, idempotent)." };
+    return { kind: "success", message: "Optimierungschancen erzeugt." };
   }
   if (singleParam(params?.synced)) {
-    return { kind: "success", message: "Search-Performance synchronisiert (GSC-Stub, Klasse B)." };
+    return { kind: "success", message: "Such-Performance aktualisiert (Demo-Daten)." };
   }
   if (singleParam(params?.revalidated)) {
     return { kind: "success", message: "Opportunity re-validiert (validated oder reopened)." };

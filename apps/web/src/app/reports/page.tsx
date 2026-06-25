@@ -71,15 +71,16 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
     <AppShell activePath="/reports">
       {/* Hero — metaphor lives only in the framing copy (Serious-Zone elsewhere). */}
       <section className="card hero-card">
-        <p className="kicker">Reporting &amp; Alarme</p>
+        <p className="kicker">Berichte &amp; Warnungen</p>
         <h1>
           <TermTooltip term="report">Reports</TermTooltip> &amp; <TermTooltip term="alert">Alarme</TermTooltip>
         </h1>
         <p>
-          Halten Sie den Stand Ihrer Sichtbarkeit fest: generierte Snapshots aus Health, Opportunities, Sichtbarkeit und Authority, geplante Lieferungen und Schwellwert-Alarme auf projektweite Kennzahlen.
+          Berichte als Momentaufnahme Ihrer wichtigsten Kennzahlen (Health, Sichtbarkeit, Chancen,
+          Backlinks) — mit automatischer Lieferung per E-Mail und Warnungen, sobald ein Wert eine
+          festgelegte Schwelle über- oder unterschreitet.
         </p>
         <div className="badge-row">
-          <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
@@ -143,9 +144,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
       {/* Reports inventory */}
       <section className="card">
-        <p className="kicker">Reports-Bestand</p>
+        <p className="kicker">Vorhandene Berichte</p>
         <h2>Generierte Reports</h2>
-        <WhyItMatters>Ein fester Snapshot je Lieferung macht Fortschritt belegbar — auch rückwirkend.</WhyItMatters>
+        <WhyItMatters>Eine feste Momentaufnahme je Lieferung macht Fortschritt belegbar — auch rückwirkend.</WhyItMatters>
         {data.reports.length > 0 ? (
           <div className="reports-table-scroll">
             <table className="reports-table">
@@ -240,9 +241,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       <section className="content-grid">
         {/* Schedules */}
         <div className="card">
-          <p className="kicker">Schedules</p>
+          <p className="kicker">Automatische Lieferung</p>
           <h2>Geplante Lieferungen</h2>
-          <WhyItMatters>Automatische Lieferungen halten Stakeholder ohne manuelles Nachfassen auf dem Laufenden.</WhyItMatters>
+          <WhyItMatters>Automatische Lieferungen halten alle Beteiligten ohne manuelles Nachfassen auf dem Laufenden.</WhyItMatters>
 
           {data.schedules.length > 0 ? (
             <div className="table-list">

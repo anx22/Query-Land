@@ -29,16 +29,16 @@ export default async function Page({
   return (
     <AppShell activePath="/url-dossier">
       <section className="card hero-card">
-        <p className="kicker">URL Dossier</p>
-        <h1>Eine URL als vollständiges SEO-Objekt</h1>
+        <p className="kicker">Eine Seite, alle SEO-Infos</p>
+        <h1>URL-Dossier</h1>
         <p>
-          Identität, <TermTooltip term="indexierbarkeit">Indexierbarkeit</TermTooltip>, GSC-Leistung, Rankings,
-          interne und externe Verlinkung, Web Vitals, Issues und Chancen für eine einzelne URL — inklusive{" "}
-          <TermTooltip term="quell-verknüpfung">Quell-Verknüpfung</TermTooltip> zur verantwortlichen Code-Stelle.
+          Alles zu einer einzelnen Seite an einem Ort: ob Google sie findet
+          (<TermTooltip term="indexierbarkeit">Indexierbarkeit</TermTooltip>), wie sie in der Suche
+          läuft, ihre Rankings, interne und externe Links, Ladewerte (Web Vitals), Probleme und
+          Chancen — inklusive Hinweis auf die zuständige{" "}
+          <TermTooltip term="quell-verknüpfung">Code-Stelle</TermTooltip>.
         </p>
         <div className="badge-row">
-          <span className="badge primary">{data.selectedProject?.name ?? "kein Projekt"}</span>
-          <span className="badge">{data.selectedSite?.baseUrl ?? "keine Site"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
             {data.connected ? "API verbunden" : "API offline"}
           </span>
