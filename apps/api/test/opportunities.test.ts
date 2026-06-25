@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-1.2: Opportunity-Rueckgrat (§6). Beweist Anlage mit Evidenz-Pflicht (§2.3),
 // Prioritaetsscore (§6.4), Filter/Pagination und das Statusmodell §6.5.
@@ -12,7 +12,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 

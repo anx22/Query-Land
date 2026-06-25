@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-1.3: erster Generator + Validierungsloop (§6.6/§6.5). Aus Indexierbarkeits-Blockern
 // entstehen technical_fix-Opportunities; der Re-Check setzt implemented -> validated|reopened.
@@ -12,7 +12,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 

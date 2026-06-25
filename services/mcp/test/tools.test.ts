@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
-import { createSQLiteStore, type SQLiteStore as BackendStore } from "@seo-tool/api";
+import { createStore, type Store as BackendStore } from "@seo-tool/api";
 import type { AuditIssueRecord, DiscoveredUrl, Opportunity } from "@seo-tool/domain-model";
 import { callTool } from "../src/dispatch.js";
 import { createSeoMcpTools, ToolError } from "../src/tools.js";
@@ -19,7 +19,7 @@ interface Seeded {
 }
 
 async function seed(t: TestContext): Promise<Seeded> {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   t.after(async () => { await store.close(); });
   const project = await store.createProject({ name: "MCP Test", slug: `mcp-test-${Math.random().toString(36).slice(2)}` });
   const site = await store.createSite(project.id, { baseUrl: "https://shop.example", scopeType: "domain", businessValue: 70 });
@@ -233,7 +233,7 @@ interface BacklinkSeeded {
 }
 
 async function seedBacklinks(t: TestContext): Promise<BacklinkSeeded> {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   t.after(async () => { await store.close(); });
   const project = await store.createProject({ name: "Backlink Test", slug: `bl-test-${Math.random().toString(36).slice(2)}` });
   await store.createSite(project.id, { baseUrl: "https://bl.example", scopeType: "domain", businessValue: 50 });
@@ -289,7 +289,7 @@ test("get_backlink_changes returns newReferringDomains and lostReferringDomains 
 });
 
 test("get_backlink_changes throws no_snapshots for a project with no imports", async (t) => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   t.after(async () => { await store.close(); });
   const project = await store.createProject({ name: "Empty Project", slug: `empty-${Math.random().toString(36).slice(2)}` });
   await store.createSite(project.id, { baseUrl: "https://empty.example", scopeType: "domain", businessValue: 50 });

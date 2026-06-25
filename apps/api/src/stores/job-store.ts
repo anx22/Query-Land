@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { makeConnectorSyncJobSubject, makeIdempotencyKey, type FoundationJob } from "@seo-tool/domain-model";
-import { mapJob } from "../sqlite-mappers.js";
+import { mapJob } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";

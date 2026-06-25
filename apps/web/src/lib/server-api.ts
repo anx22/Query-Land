@@ -1,4 +1,4 @@
-import { createApp, createSQLiteStore } from "@seo-tool/api";
+import { createApp, createStore } from "@seo-tool/api";
 
 interface ApiResponse {
   status: number;
@@ -17,11 +17,11 @@ type SeoToolGlobal = typeof globalThis & {
 
 const globalForApi = globalThis as SeoToolGlobal;
 
-// createSQLiteStore is async (connect + migrate); cache the handler promise on
+// createStore is async (connect + migrate); cache the handler promise on
 // the global so a single embedded store/handler is reused across HMR reloads.
 function internalApiHandler(): Promise<ApiHandler> {
   if (!globalForApi.__seoToolApiHandlerPromise) {
-    globalForApi.__seoToolApiHandlerPromise = createSQLiteStore().then((store) => createApp(store));
+    globalForApi.__seoToolApiHandlerPromise = createStore().then((store) => createApp(store));
   }
   return globalForApi.__seoToolApiHandlerPromise;
 }

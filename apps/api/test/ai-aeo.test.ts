@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { analyzeAeo, computeAiVisibilityScore } from "@seo-tool/domain-model";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-6.1/6.2/6.3: AI Layer & MCP-Schreibtools (Welle 7). AI-Visibility (LLM-Stub, Klasse E — NIE
 // Evidenz), AEO-Scan (Klasse A, speist aeo-Opportunities), reviewpflichtige Proposals.
@@ -13,7 +13,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // Welle-1-Gate-Smoke (WP-0.2): beweist den Foundation-Flow end-to-end gegen die echten
 // API-Routen (nicht Fixtures): Projekt anlegen -> Site anlegen -> Connector-Stub anlegen ->
@@ -18,7 +18,7 @@ function dataOf<T>(response: ApiResponse): T {
 }
 
 test("Welle-1 Foundation-Gate: project -> site -> connector -> crawl -> job -> reload persists", async () => {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   const app = createApp(store);
 
   // 1. Projekt anlegen

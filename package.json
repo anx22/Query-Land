@@ -16,7 +16,7 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "validate:openapi": "node scripts/validate-openapi.mjs",
     "check": "npm run typecheck && npm run check:boundaries && npm run validate:openapi && npm test",
-    "migrate:sqlite": "npm --workspace @seo-tool/api run build && node apps/api/dist/src/migrate-sqlite.js",
+    "migrate:sqlite": "npm --workspace @seo-tool/api run build && node apps/api/dist/src/migrate-legacy.js",
     "build:web": "npm --workspace @seo-tool/web run build"
   },
   "devDependencies": {

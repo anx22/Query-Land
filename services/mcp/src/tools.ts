@@ -16,7 +16,7 @@ import type {
   Site,
   UrlFetchRecord
 } from "@seo-tool/domain-model";
-import type { SQLiteStore as BackendStore } from "@seo-tool/api";
+import type { Store as BackendStore } from "@seo-tool/api";
 
 /**
  * JSON-Schema subset used for MCP tool input declarations. Kept intentionally

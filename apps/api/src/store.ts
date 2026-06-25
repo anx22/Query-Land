@@ -19,7 +19,7 @@ import { createReportStore, type ReportStore } from "./stores/report-store.js";
 import { createSearchPerformanceStore, type SearchPerformanceStore } from "./stores/search-performance-store.js";
 import { createSourceMapStore, type SourceMapStore } from "./stores/source-map-store.js";
 import { RequestError } from "./stores/store-errors.js";
-import { seedFoundation } from "./sqlite-seed.js";
+import { seedFoundation } from "./seed.js";
 
 export interface HealthStore {
   health(): HealthSnapshot;
@@ -29,12 +29,14 @@ export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore &
   close(): Promise<void>;
 };
 
-export type SQLiteStore = BackendStore;
+/** Postgres-backed store (Neon prod / PGlite local). */
+export type Store = BackendStore;
 
 export { RequestError };
 export type { AiStore, AlertStore, AuthStore, BacklinkStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, ProposalStore, RankStore, RecordAuditIssuesScope, RegisterInput, ReportStore, SearchPerformanceStore, SourceMapStore };
 
-export async function createSQLiteStore(databaseUrl = apiDefaults.databaseUrl): Promise<BackendStore> {
+/** Create the Postgres-backed store (Neon prod / PGlite local). */
+export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promise<BackendStore> {
   const db = await createDatabase(databaseUrl);
   await runMigrations(db);
   await seedFoundation(db);

@@ -1,17 +1,17 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { createSQLiteStore } from "@seo-tool/api";
+import { createStore } from "@seo-tool/api";
 import { callTool } from "./dispatch.js";
 import { createSeoMcpTools } from "./tools.js";
 
 /**
  * Start the MCP server using the official @modelcontextprotocol/sdk over stdio.
  * The database location is read from DATABASE_URL (same env var as the rest of
- * the app); createSQLiteStore falls back to apiDefaults.databaseUrl when unset.
+ * the app); createStore falls back to apiDefaults.databaseUrl when unset.
  */
 export async function startServer(): Promise<void> {
-  const store = await createSQLiteStore(process.env.DATABASE_URL);
+  const store = await createStore(process.env.DATABASE_URL);
   const tools = createSeoMcpTools(store);
 
   const server = new Server(

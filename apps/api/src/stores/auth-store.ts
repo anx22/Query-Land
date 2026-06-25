@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { normalizeEmail, validatePassword, type AuthUser, type UserRole } from "@seo-tool/domain-model";
 import { hashPassword, hashToken, verifyPassword } from "../password.js";
-import { mapUser } from "../sqlite-mappers.js";
+import { mapUser } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { sqliteConstraintError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";

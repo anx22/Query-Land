@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { analyzeCannibalization, analyzeCtrGap, analyzeStrikingDistance, expectedCtrForPosition, type SearchPerformanceMetricRow } from "@seo-tool/domain-model";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-3.1: Search-Performance-Intelligence (Welle 4). Deterministischer GSC-Stub (Klasse B,
 // DEC-002) speist die drei Gap-Analysen Striking-Distance, CTR-Gap und Kannibalisierung.
@@ -13,7 +13,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 

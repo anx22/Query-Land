@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compareAlert, reportToCsv, reportToHtml, reportToPdf, type Report } from "@seo-tool/domain-model";
 import { createApp } from "../src/app.js";
-import { createSQLiteStore } from "../src/sqlite-store.js";
+import { createStore } from "../src/store.js";
 
 // WP-5.1..5.4: Reporting & Alerts (Welle 6). Report-Generierung/Export/Versand/Schedules und
 // Alert-Regeln/Auswertung. Export-Funktionen sind reine, dependency-freie Serialisierer.
@@ -13,7 +13,7 @@ import { createSQLiteStore } from "../src/sqlite-store.js";
 type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
-  const store = await createSQLiteStore("sqlite::memory:");
+  const store = await createStore("sqlite::memory:");
   return { app: createApp(store), store };
 }
 
