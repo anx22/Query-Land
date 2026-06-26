@@ -92,7 +92,7 @@ export function KeywordTableClient({ rows, inspectors }: KeywordTableClientProps
   const activeChips = useMemo(() => {
     const chips: Array<{ key: string; label: string }> = [];
     if (filter.intent && filter.intent !== "all") chips.push({ key: "intent", label: `Intent: ${intentLabel(filter.intent)}` });
-    if (filter.brand && filter.brand !== "all") chips.push({ key: "brand", label: `Brand: ${filter.brand === "brand" ? "Brand" : "Non-Brand"}` });
+    if (filter.brand && filter.brand !== "all") chips.push({ key: "brand", label: `Marke: ${filter.brand === "brand" ? "Mit Marke" : "Ohne Marke"}` });
     if (filter.market && filter.market !== "all") chips.push({ key: "market", label: `Markt: ${filter.market}` });
     return chips;
   }, [filter]);
@@ -115,11 +115,11 @@ export function KeywordTableClient({ rows, inspectors }: KeywordTableClientProps
           </select>
         </label>
         <label>
-          Brand
+          Marke
           <select value={filter.brand ?? "all"} onChange={(e) => setParam("brand", e.target.value)}>
             <option value="all">Alle</option>
-            <option value="brand">Brand</option>
-            <option value="nonbrand">Non-Brand</option>
+            <option value="brand">Mit Marke</option>
+            <option value="nonbrand">Ohne Marke</option>
           </select>
         </label>
         <label>
@@ -204,7 +204,7 @@ export function KeywordTableClient({ rows, inspectors }: KeywordTableClientProps
               </span>
               <span role="cell">
                 {row.positionDelta != null && row.positionDelta !== 0 ? (
-                  <DeltaChip value={row.positionDelta} invertColors unit=" Pl." />
+                  <DeltaChip value={row.positionDelta} invertColors unit=" Plätze" />
                 ) : (
                   <span className="muted">–</span>
                 )}

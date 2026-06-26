@@ -438,13 +438,13 @@ export default async function Page({
         {data.sections.length > 0 ? (
           <div className="audit-treemap-legend" aria-hidden="true">
             <span className="audit-treemap-legend__item">
-              <span className="audit-treemap-legend__swatch" style={{ background: "var(--success)" }} /> gesund (≥70)
+              <span className="audit-treemap-legend__swatch audit-treemap-legend__swatch--success" /> gesund (≥70)
             </span>
             <span className="audit-treemap-legend__item">
-              <span className="audit-treemap-legend__swatch" style={{ background: "var(--warning)" }} /> auffällig (40–69)
+              <span className="audit-treemap-legend__swatch audit-treemap-legend__swatch--warning" /> auffällig (40–69)
             </span>
             <span className="audit-treemap-legend__item">
-              <span className="audit-treemap-legend__swatch" style={{ background: "var(--danger)" }} /> kritisch (&lt;40)
+              <span className="audit-treemap-legend__swatch audit-treemap-legend__swatch--danger" /> kritisch (&lt;40)
             </span>
           </div>
         ) : null}

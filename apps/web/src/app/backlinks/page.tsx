@@ -106,8 +106,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <span className="backlinks-gauge-note">
                     Backlinks gesamt
                     <InfoTip label="Backlinks gesamt erklären">
-                      Alle eingehenden Links aus dem GSC-Links-Report (Beleg-Klasse B). Siehe{" "}
-                      <GlossarLink term="Backlink">Backlink</GlossarLink>.
+                      Alle eingehenden Links, die Google Search Console meldet (verlässliche Quelle).
+                      Siehe <GlossarLink term="Backlink">Backlink</GlossarLink>.
                     </InfoTip>
                   </span>
                 </div>

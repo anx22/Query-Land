@@ -194,22 +194,22 @@ export default async function Page({
                 </label>
               </div>
               <label>
-                HTML-Inhalt
+                Seiteninhalt (HTML der Seite)
                 <textarea
                   name="content"
                   rows={4}
-                  placeholder="Füge hier den HTML-Inhalt der Seite ein…"
+                  placeholder="Quelltext der Seite hier einfügen…"
                   required
                 />
               </label>
               <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
-                AEO-Scan starten
+                Seite analysieren
               </button>
             </form>
           ) : (
             <p className="notice warning">
-              Keine Site konfiguriert. Lege zuerst eine Site in den Einstellungen an, um AEO-Scans
-              durchzuführen.
+              Noch keine Website hinterlegt. <a href="/projects">Zuerst eine Website hinzufügen →</a>{" "}
+              danach können Sie hier Seiten auf KI-Lesbarkeit prüfen.
             </p>
           )}
 
@@ -221,9 +221,9 @@ export default async function Page({
             </div>
           ) : (
             <div className="ai-empty">
-              <p className="ai-empty__title">Noch keine AEO-Assessments</p>
+              <p className="ai-empty__title">Noch keine Analyse durchgeführt</p>
               <p className="ai-empty__hint">
-                Starte oben einen Scan, um eine Seite auf Antwort-Engine-Reife zu prüfen.
+                Füllen Sie oben das Formular aus, um eine Seite auf KI-Tauglichkeit zu prüfen.
               </p>
             </div>
           )}

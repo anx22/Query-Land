@@ -122,9 +122,9 @@ export default async function Page({
         <p>
           Wähle links einen Refresh-Kandidaten — das treibt den Content-Score-Gauge und die internen
           Link-Vorschläge rechts. Erstelle daraus einen Brief, pflege Gliederung und Term-Checkliste
-          manuell und schiebe ihn über den Status-Verlauf bis „erledigt“. Performance-Signale
-          (Klicks-Trend, Score) sind aktuell Demo-Daten (Konfidenz E), bis ein GSC-Connector verbunden
-          ist.
+          manuell und schiebe ihn über den Status-Verlauf bis „erledigt“. Klick-Werte (Klick-Trend,
+          Score) erscheinen, sobald die Google Search Console verbunden ist — bis dahin bleibt diese
+          Liste leer.
         </p>
       </HelpPanel>
 
@@ -133,8 +133,8 @@ export default async function Page({
         <section className="card">
           <p className="kicker">Refresh-Kandidaten</p>
           <p className="muted">
-            Seiten mit fallendem Klicks-Trend, gewichtet nach Traffic-at-stake und offenen Issues.
-            Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="E" />
+            Seiten mit fallendem Klick-Trend, gewichtet nach geschätztem Traffic und offenen Problemen.
+            Die Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="E" />
           </p>
           {data.refreshCandidates.length > 0 ? (
             <div className="cw-candidates">
@@ -168,8 +168,8 @@ export default async function Page({
             </div>
           ) : (
             <p className="muted">
-              Keine Refresh-Kandidaten. Sobald Klick-Metriken (Demo oder echt) vorliegen und Seiten
-              abfallen, erscheinen sie hier.
+              Noch keine Refresh-Kandidaten. Sobald die Google Search Console verbunden ist und Seiten
+              an Klicks verlieren, erscheinen sie hier.
             </p>
           )}
         </section>

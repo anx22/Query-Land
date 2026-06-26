@@ -1585,3 +1585,30 @@ select:disabled {
 .website-card__name { margin: 0; }
 .website-card__url { display: inline-block; margin-top: 0.2rem; color: var(--primary); font-weight: 700; word-break: break-all; }
 .website-card__url--missing { color: var(--warning); }
+
+/* ------------------------------------------------------------------ */
+/* Overview / dashboard — design-system styling for the cockpit.       */
+/* Replaces ad-hoc inline-style spacing with token-based utilities and */
+/* gives the previously-unstyled semantic classes a consistent look.   */
+/* ------------------------------------------------------------------ */
+.overview-chart { margin-top: var(--space-4); }
+.overview-center { text-align: center; margin-top: var(--space-2); }
+.overview-delta-note { margin-left: var(--space-1); color: var(--muted); font-size: 0.8rem; }
+.overview-subhead { margin-top: var(--space-5); }
+.overview-cta { margin-top: var(--space-4); }
+
+.overview-empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); margin-top: var(--space-3); }
+.overview-empty-state__text { margin: 0; color: var(--muted); }
+.overview-empty-hint { margin-top: var(--space-2); color: var(--muted); font-size: 0.9rem; }
+.overview-site-context { margin-top: var(--space-2); color: var(--muted); font-size: 0.85rem; }
+
+.overview-opportunity-list { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.overview-opportunity-item { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: 0.5rem; }
+.overview-opportunity-item__header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.overview-opportunity-item__action { margin: 0; font-weight: 600; }
+.overview-opportunity-item__meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); color: var(--muted); font-size: 0.85rem; }
+.overview-link-more { display: inline-block; margin-top: var(--space-1); color: var(--primary); font-weight: 600; }
+
+.overview-issue-list { margin-top: var(--space-3); }
+.overview-issue-rule { display: flex; align-items: center; gap: var(--space-2); }
+.overview-issue-url { color: var(--muted); font-size: 0.78rem; word-break: break-all; }

@@ -228,7 +228,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           <WhyItMatters>
             Aggregierter technischer Gesundheitswert — kritische Issues drücken den Score.
           </WhyItMatters>
-          <div style={{ marginTop: "1rem" }}>
+          <div className="overview-chart">
             <ScoreGauge
               value={latestHealthScore?.score ?? null}
               max={100}
@@ -237,15 +237,13 @@ export function Dashboard({ data }: { data: OverviewData }) {
             />
           </div>
           {healthDelta !== null && (
-            <div style={{ textAlign: "center", marginTop: "0.5rem" }}>
+            <div className="overview-center">
               <DeltaChip value={healthDelta} />
-              <span style={{ marginLeft: "0.4rem", color: "var(--muted)", fontSize: "0.8rem" }}>
-                ggü. letzter Berechnung
-              </span>
+              <span className="overview-delta-note">seit letzter Berechnung</span>
             </div>
           )}
           {latestHealthScore !== null && (
-            <div style={{ textAlign: "center", marginTop: "0.5rem" }}>
+            <div className="overview-center">
               <ConfidenceBadge level="A" />
             </div>
           )}
@@ -267,7 +265,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
             -Verteilung
           </h2>
           <WhyItMatters text="Striking-Distance-Keywords (Position 11–20) sind die günstigsten Hebel für schnelle Sichtbarkeitsgewinne." />
-          <div style={{ marginTop: "1rem" }}>
+          <div className="overview-chart">
             <PositionDistribution
               buckets={positionBuckets}
               title="Positions-Verteilung der Keywords"
@@ -291,12 +289,12 @@ export function Dashboard({ data }: { data: OverviewData }) {
               <p className="overview-empty-state__text">
                 Noch kein Terrain kartiert — starten Sie eine Analyse (Crawl) und lassen Sie daraus im Content-&-Chancen-Board priorisierte Optimierungschancen erzeugen.
               </p>
-              <a className="button secondary" style={{ marginTop: "1rem", display: "inline-block" }} href="/content-opportunities">
+              <a className="button secondary overview-cta" href="/content-opportunities">
                 Chancen ansehen
               </a>
             </div>
           ) : (
-            <div className="overview-opportunity-list" style={{ marginTop: "1rem" }}>
+            <div className="overview-opportunity-list">
               {topOpportunities.map((opp) => (
                 <article key={opp.id} className="overview-opportunity-item">
                   <div className="overview-opportunity-item__header">
@@ -337,7 +335,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
               </p>
             </div>
           ) : (
-            <div className="table-list" style={{ marginTop: "0.75rem" }}>
+            <div className="table-list overview-issue-list">
               {criticalIssues.slice(0, 8).map((issue) => (
                 <article key={issue.id}>
                   <strong className="overview-issue-rule">
@@ -345,7 +343,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
                     {issue.rule.replace(/_/g, " ")}
                   </strong>
                   <span>{issue.message}</span>
-                  <span style={{ fontSize: "0.78rem" }}>{issue.url}</span>
+                  <span className="overview-issue-url">{issue.url}</span>
                 </article>
               ))}
               {criticalIssues.length > 8 && (
@@ -363,7 +361,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           <WhyItMatters text="Aktuelle Crawl-Ergebnisse und Reports geben Auskunft über den Stand der Daten." />
 
           {/* Crawl runs */}
-          <p className="kicker" style={{ marginTop: "1rem" }}>Crawl-Runs</p>
+          <p className="kicker overview-subhead">Crawl-Runs</p>
           {recentCrawlRuns.length === 0 ? (
             <p className="overview-empty-hint">
               Noch kein Crawl gestartet.{" "}
@@ -388,7 +386,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           )}
 
           {/* Reports */}
-          <p className="kicker" style={{ marginTop: "1.25rem" }}>Reports</p>
+          <p className="kicker overview-subhead">Reports</p>
           {recentReports.length === 0 ? (
             <p className="overview-empty-hint">
               Noch keine Reports generiert.{" "}

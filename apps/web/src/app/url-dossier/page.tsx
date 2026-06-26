@@ -66,8 +66,8 @@ export default async function Page({
           </form>
         ) : (
           <p className="notice">
-            Hier ist noch unerschlossenes Gebiet — es liegen keine entdeckten URLs für diese Site vor. Starte zuerst
-            einen Crawl im Technical Audit.
+            Für diese Website wurden noch keine Seiten gefunden. Starten Sie zuerst eine Analyse —{" "}
+            <a href="/technical-audit#crawl-start">zum Technical Audit →</a>
           </p>
         )}
       </section>
@@ -109,7 +109,8 @@ export default async function Page({
                     </>
                   ) : (
                     <EmptyLine>
-                      Kein Source-Anker zugeordnet. Lege in den Settings eine URL→Repo-Zuordnung an.
+                      Noch keiner Code-Stelle zugeordnet. <a href="/settings">In den Einstellungen
+                      eine URL→Code-Zuordnung anlegen →</a>
                     </EmptyLine>
                   )}
                 </article>
@@ -217,8 +218,8 @@ export default async function Page({
                 </>
               ) : (
                 <EmptyLine>
-                  Keine GSC-Leistungsdaten für diese URL. Verbinde Google Search Console und synchronisiere die
-                  Search-Performance.
+                  Noch keine Klick- und Ranking-Daten für diese Seite.{" "}
+                  <a href="/settings">Google Search Console verbinden →</a>
                 </EmptyLine>
               )}
             </SectionCard>
@@ -233,7 +234,7 @@ export default async function Page({
                         <span className="dossier-row-metrics">
                           <span>Pos. {formatPosition(row.latest?.position ?? null)}</span>
                           {row.positionTrend.length > 1 ? (
-                            <span className="dossier-spark" style={{ maxWidth: "6rem" }}>
+                            <span className="dossier-spark dossier-spark--compact">
                               <Sparkline data={row.positionTrend} ariaLabel={`Positions-Trend für ${row.keyword.phrase}`} />
                             </span>
                           ) : null}
@@ -247,7 +248,8 @@ export default async function Page({
                 </div>
               ) : (
                 <EmptyLine>
-                  Keine Keywords auf diese URL gemappt. Ordne in Keywords &amp; Rank Keywords der Ziel-URL zu.
+                  Noch keine Keywords für diese Seite hinterlegt.{" "}
+                  <a href="/keywords-rank">In „Keywords &amp; Rankings“ eine Ziel-URL zuordnen →</a>
                 </EmptyLine>
               )}
             </SectionCard>

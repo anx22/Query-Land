@@ -27,7 +27,7 @@ export function ReferringDomainsTable({ domains, limit = 50 }: ReferringDomainsT
       <div className="backlinks-empty" role="status">
         <strong className="backlinks-empty__title">Noch keine verweisenden Domains</strong>
         <span className="backlinks-empty__hint">
-          Importieren Sie den GSC-Links-Report, um verweisende Domains auszuwerten.
+          Verbinden Sie Google Search Console, um eingehende Links und ihre Quell-Domains auszuwerten.
         </span>
       </div>
     );
