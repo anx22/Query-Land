@@ -149,9 +149,9 @@ export const demoOpportunities: Opportunity[] = [
 export const stackDecision = {
   frontend: "Next.js/React",
   api: "TypeScript Node HTTP API",
-  database: "SQLite embedded for local/Codex execution; Postgres remains the scale-out migration target",
-  jobSystem: "SQLite-backed queue locally; same contract can migrate to Postgres-backed queue when scale requires it",
-  auth: "Backend-owned email/password sessions stored in the embedded database"
+  database: "Postgres (Neon in production via DATABASE_URL; embedded PGlite for local dev/tests)",
+  jobSystem: "Postgres-backed job queue (drained in-process by the Vercel cron route)",
+  auth: "Backend-owned email/password sessions stored in Postgres"
 } as const;
 
 // On Vercel a missing DATABASE_URL must fail loudly: the only writable path is
