@@ -343,6 +343,13 @@ export default async function Page({
         </p>
       ) : null}
 
+      {data.loadErrors.length > 0 ? (
+        <p className="notice danger" role="alert">
+          Einige Bereiche konnten nicht geladen werden ({data.loadErrors.join(", ")}). Die Anzeige ist
+          deshalb unvollständig — das ist ein Ladefehler, kein „leerer" Zustand. Bitte neu laden.
+        </p>
+      ) : null}
+
       <section className="card hero-card">
         <p className="kicker">Technical Audit</p>
         <h1>
