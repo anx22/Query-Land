@@ -64,7 +64,7 @@ Stattdessen ruhige, natürliche, minimale Landschaften (siehe §5.0 + §10).
 
 ### 2.2 Logomark — ein kartografisches System (zwei Ansichten desselben Terrains)
 Das Mark folgt **einem** kartografischen Prinzip in **zwei** Ansichten (Base-Assets:
-`assets/brand-exploration/`):
+`/brand/exploration/`, finale SVGs später unter `/brand/logo/`):
 
 - **Primär — Layered Ridges (Horizont-Ansicht):** ineinander gestaffelte 1px-Höhenzüge mit einer kleinen
   aufgehenden orangen Sonne. Trägt das Namens-Konzept „neues Land/Horizont" und ist die Quelle des
@@ -287,7 +287,8 @@ Horizont_ (kein Maritim/Kompass):
 ### Runde 3 — Base-Asset-Sets für beide Motivrichtungen (✔)
 Pro Richtung ein konsistentes Asset-System (Logomark · Favicon · Wordmark-Lockup · Header-Band ·
 Empty-State-Glyph/Daten-Textur · Mono/KO-Variante) + Standalone-Header-Bänder + ein
-System-Übersichtsblatt. Abgelegt unter **`assets/brand-exploration/`** (siehe dortige `README.md`):
+System-Übersichtsblatt. Abgelegt unter **`/brand/exploration/`** (Brand-Kit auf Repo-Ebene; siehe
+`/brand/README.md` + dortige `README.md`):
 
 - `00-system-overview` · `01-asset-system-A-layered-ridges` · `02-asset-system-B-terrain-contours`
 - `03-header-band-ridges` · `04-header-band-contours` · `05-identity-sheet`
