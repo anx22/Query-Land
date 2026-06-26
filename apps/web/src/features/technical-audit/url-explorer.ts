@@ -35,6 +35,8 @@ export type UrlSourceFilter = "all" | "seed" | "sitemap" | "link";
 export interface UrlExplorerFilter {
   status: UrlStatusFilter;
   source: UrlSourceFilter;
+  /** Case-insensitive URL substring search ("" = no search). */
+  q: string;
 }
 
 export const URL_STATUS_FILTERS: UrlStatusFilter[] = [
@@ -75,7 +77,7 @@ export function urlSourceFilterLabel(value: UrlSourceFilter): string {
 
 /** Normalize raw query input into a valid URL-Explorer filter (default = all/all). */
 export function resolveUrlExplorerFilter(
-  input: { urlStatus?: string; urlSource?: string } = {}
+  input: { urlStatus?: string; urlSource?: string; urlQ?: string } = {}
 ): UrlExplorerFilter {
   const status = URL_STATUS_FILTERS.includes(input.urlStatus as UrlStatusFilter)
     ? (input.urlStatus as UrlStatusFilter)
@@ -83,11 +85,12 @@ export function resolveUrlExplorerFilter(
   const source = URL_SOURCE_FILTERS.includes(input.urlSource as UrlSourceFilter)
     ? (input.urlSource as UrlSourceFilter)
     : "all";
-  return { status, source };
+  const q = (input.urlQ ?? "").trim();
+  return { status, source, q };
 }
 
 export function isDefaultUrlExplorerFilter(filter: UrlExplorerFilter): boolean {
-  return filter.status === "all" && filter.source === "all";
+  return filter.status === "all" && filter.source === "all" && filter.q === "";
 }
 
 /**
@@ -101,11 +104,12 @@ export function urlFilterHref(
 ): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(current)) {
-    if (key === "urlStatus" || key === "urlSource" || key === "urlOffset") continue;
+    if (key === "urlStatus" || key === "urlSource" || key === "urlQ" || key === "urlOffset") continue;
     if (value != null && value !== "") params.set(key, value);
   }
   if (filter.status !== "all") params.set("urlStatus", filter.status);
   if (filter.source !== "all") params.set("urlSource", filter.source);
+  if (filter.q !== "") params.set("urlQ", filter.q);
   const qs = params.toString();
   return qs ? `/technical-audit?${qs}` : "/technical-audit";
 }

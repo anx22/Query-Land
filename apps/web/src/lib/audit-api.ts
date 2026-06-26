@@ -339,7 +339,7 @@ function emptyData(
     discoveredUrlTotal: 0,
     urlExplorerRows: [],
     urlExplorerMeta: emptyListMeta(0),
-    activeUrlFilter: { status: "all", source: "all" },
+    activeUrlFilter: { status: "all", source: "all", q: "" },
     diffSelectableRuns: [],
     diffSelection: { base: null, compare: null },
     crawlDiff: null,
@@ -416,6 +416,7 @@ function buildUrlExplorerQuery(offset: number, filter: UrlExplorerFilter): strin
   });
   if (filter.status !== "all") params.set("status", filter.status);
   if (filter.source !== "all") params.set("source", filter.source);
+  if (filter.q !== "") params.set("q", filter.q);
   return params.toString();
 }
 
@@ -426,6 +427,7 @@ export async function loadTechnicalAuditOverview(
     issueRule?: string;
     urlStatus?: string;
     urlSource?: string;
+    urlQ?: string;
     urlOffset?: string;
     runOffset?: string;
     diffBase?: string;
