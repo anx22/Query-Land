@@ -1528,3 +1528,9 @@ select:disabled {
 .onboarding-step.is-optional {
   opacity: 0.95;
 }
+
+/* Highlight the active project in the "Alle Projekte" list. */
+.entity-row--active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}

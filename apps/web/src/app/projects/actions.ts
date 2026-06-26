@@ -8,6 +8,17 @@ import { createFoundationProject, createFoundationSite } from "../../lib/foundat
 
 const COOKIE_OPTIONS = { path: "/", maxAge: 31536000, sameSite: "lax" as const };
 
+/** Make a project the active one (so the project-centric /projects page binds its forms to it). */
+export async function setActiveProjectAction(formData: FormData) {
+  const projectId = requiredString(formData, "projectId");
+  const cookieStore = await cookies();
+  cookieStore.set(ACTIVE_PROJECT_COOKIE, projectId, COOKIE_OPTIONS);
+  // The active site belongs to the previous project — clear it so the new project's scope resolves.
+  cookieStore.delete(ACTIVE_SITE_COOKIE);
+  revalidateProjectViews();
+  redirect("/projects");
+}
+
 export async function createProjectAction(formData: FormData) {
   let projectId: string;
   try {
