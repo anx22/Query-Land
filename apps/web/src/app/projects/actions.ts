@@ -16,7 +16,8 @@ export async function setActiveProjectAction(formData: FormData) {
   // The active site belongs to the previous project — clear it so the new project's scope resolves.
   cookieStore.delete(ACTIVE_SITE_COOKIE);
   revalidateProjectViews();
-  redirect("/projects");
+  // "Open" a website → land on its overview cockpit.
+  redirect("/");
 }
 
 export async function createProjectAction(formData: FormData) {
@@ -41,6 +42,37 @@ export async function createProjectAction(formData: FormData) {
   (await cookies()).set(ACTIVE_PROJECT_COOKIE, projectId, COOKIE_OPTIONS);
   revalidateProjectViews();
   redirect("/projects?created=project");
+}
+
+/**
+ * Add a website in ONE step (the primary creation flow): one website = one project, so this creates
+ * the project and its site together. Only the address is required; the name defaults to the host.
+ */
+export async function createWebsiteAction(formData: FormData) {
+  let projectId: string;
+  let siteId: string;
+  try {
+    const baseUrl = requiredString(formData, "baseUrl");
+    const name = optionalString(formData, "name") ?? hostName(baseUrl);
+    const slug = optionalSlug(formData, "slug") ?? deriveSlug(name);
+    const project = await createFoundationProject({ name, slug, status: "active", defaultLocale: "de-DE" });
+    projectId = project.id;
+    const site = await createFoundationSite(projectId, {
+      baseUrl,
+      scopeType: optionalEnum(formData, "scopeType", ["domain", "subdomain", "folder"]) ?? "domain",
+      crawlFrequency: optionalEnum(formData, "crawlFrequency", ["manual", "daily", "weekly"]) ?? "weekly",
+      businessValue: optionalInteger(formData, "businessValue", 1, 100) ?? 50
+    });
+    siteId = site.id;
+  } catch (error) {
+    redirect(`/projects?error=${encodeURIComponent(messageFor(error))}`);
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(ACTIVE_PROJECT_COOKIE, projectId, COOKIE_OPTIONS);
+  cookieStore.set(ACTIVE_SITE_COOKIE, siteId, COOKIE_OPTIONS);
+  revalidateProjectViews();
+  redirect("/projects?created=website");
 }
 
 export async function createSiteAction(formData: FormData) {
@@ -117,6 +149,34 @@ function enumString<T extends string>(formData: FormData, key: string, allowed: 
     throw new Error(`${key} ist ungültig.`);
   }
   return value;
+}
+
+function optionalEnum<T extends string>(formData: FormData, key: string, allowed: T[]): T | undefined {
+  const raw = optionalString(formData, key) as T | undefined;
+  if (raw === undefined) return undefined;
+  if (!allowed.includes(raw)) {
+    throw new Error(`${key} ist ungültig.`);
+  }
+  return raw;
+}
+
+function optionalInteger(formData: FormData, key: string, min: number, max: number): number | undefined {
+  const raw = optionalString(formData, key);
+  if (raw === undefined) return undefined;
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${key} muss zwischen ${min} und ${max} liegen.`);
+  }
+  return value;
+}
+
+/** Friendly default name from a URL host, e.g. "https://www.acme.de/x" → "acme.de". */
+function hostName(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).host.replace(/^www\./, "") || baseUrl;
+  } catch {
+    return baseUrl;
+  }
 }
 
 function integerString(formData: FormData, key: string, min: number, max: number): number {

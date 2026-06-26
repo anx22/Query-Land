@@ -171,9 +171,11 @@ describe("onboardingSteps", () => {
         sites: [{ id: "s1", projectId: "p1", baseUrl: "https://x", scopeType: "domain", crawlFrequency: "weekly", businessValue: 50 }],
       }),
     );
+    // One website = one project, so the steps are: website (done), analysis, optional source.
     const steps = onboardingSteps(state);
-    expect(steps.map((s) => s.done)).toEqual([true, true, false, false]);
-    expect(currentStepIndex(steps)).toBe(2);
+    expect(steps.map((s) => s.done)).toEqual([true, false, false]);
+    expect(steps.map((s) => s.prerequisite)).toEqual(["site", "crawl", "integration"]);
+    expect(currentStepIndex(steps)).toBe(1);
     expect(isFullySetUp(state)).toBe(false);
   });
 

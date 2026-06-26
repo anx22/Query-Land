@@ -33,6 +33,15 @@
   --inactive-surface: #f0ece7;   /* flat fill for inactive chips/icons           */
   --inactive-line:    #e8dfd6;   /* border for inactive controls                 */
   --inactive-opacity: 0.55;      /* applied to fully-disabled action buttons     */
+
+  /* Spacing scale — one source of truth for vertical/horizontal rhythm so pages   */
+  /* stop hand-rolling margin-top values. Use the .stack/.cluster utilities below.  */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
 }
 
 * {
@@ -356,20 +365,59 @@ p {
 }
 
 .button {
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: var(--primary);
   color: white;
   cursor: pointer;
-  padding: 0.85rem 1.1rem;
+  min-height: 2.6rem;
+  padding: 0 1.2rem;
   font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .button.secondary {
-  border: 1px solid var(--line);
+  border-color: var(--line);
   background: var(--surface);
   color: var(--ink);
 }
+
+/* Full-width variant for form submits / primary card actions. Replaces the old
+   implicit "stretches in a form-card but not in a grid" inconsistency. */
+.button--block {
+  display: flex;
+  width: 100%;
+}
+
+.button.compact {
+  min-height: 2.1rem;
+  padding: 0 0.85rem;
+  font-size: 0.82rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Layout utilities — consistent rhythm without per-element inline styles */
+/* ------------------------------------------------------------------ */
+
+/* Vertical stack: even spacing between direct children. */
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.stack--sm { gap: var(--space-2); }
+.stack--lg { gap: var(--space-5); }
+
+/* Horizontal cluster (wraps): for button rows and chip rows. */
+.cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+/* Structured key/value facts — replaces important data shown as muted running text. */
+.facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+.fact { display: inline-flex; flex-direction: column; gap: 0.1rem; }
+.fact__label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.fact__value { font-size: 0.9rem; font-weight: 700; color: var(--ink); }
 
 /* Consolidated inactive/disabled state for ALL action buttons.                   */
 /* Applies to real <button disabled>, links with aria-disabled="true", and the    */
@@ -589,11 +637,6 @@ select:disabled {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.45rem;
-}
-
-.button.compact {
-  padding: 0.55rem 0.8rem;
-  font-size: 0.82rem;
 }
 
 /* ============================================================
@@ -1534,3 +1577,11 @@ select:disabled {
   border-color: var(--primary);
   background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
+
+/* Website index cards (1 website = 1 project). */
+.website-card { display: flex; flex-direction: column; gap: var(--space-4); }
+.website-card--active { border-color: var(--primary); }
+.website-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.website-card__name { margin: 0; }
+.website-card__url { display: inline-block; margin-top: 0.2rem; color: var(--primary); font-weight: 700; word-break: break-all; }
+.website-card__url--missing { color: var(--warning); }

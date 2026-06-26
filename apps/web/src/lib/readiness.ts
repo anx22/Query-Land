@@ -182,16 +182,12 @@ export interface OnboardingStep {
  * phase) and is surfaced last, never blocking completion.
  */
 export function onboardingSteps(state: ReadinessState): OnboardingStep[] {
+  // One website = one project, so creating a website covers both project + site in a single step.
   const order: Array<{ prerequisite: Prerequisite; title: string; description: string; optional?: boolean }> = [
-    {
-      prerequisite: "project",
-      title: "Projekt anlegen",
-      description: "Geben Sie Ihrem Vorhaben einen Namen — das Projekt klammert alle Auswertungen einer Website.",
-    },
     {
       prerequisite: "site",
       title: "Website hinzufügen",
-      description: "Welche Website soll analysiert werden? Tragen Sie einfach die Adresse ein.",
+      description: "Adresse der Website eintragen — Name und URL genügen. Das ist Ihr Projekt.",
     },
     {
       prerequisite: "crawl",

@@ -2,7 +2,6 @@ import { Navigation } from "./navigation";
 import { ReadinessBanner } from "./readiness-banner";
 import { OnboardingChecklist } from "./onboarding-checklist";
 import { ContextBar } from "./context-bar";
-import { SiteSwitcher } from "./site-switcher";
 import { DataStatusBanner } from "./data-status-banner";
 import { loadFoundationDashboardData } from "../lib/foundation-api";
 import { computeReadiness, firstUnmet } from "../lib/readiness";
@@ -41,10 +40,6 @@ export async function AppShell({
             siteBaseUrl={foundation.selectedSite?.baseUrl ?? null}
           />
           <div className="topbar__controls">
-            <SiteSwitcher
-              sites={foundation.sites.map((site) => ({ id: site.id, baseUrl: site.baseUrl }))}
-              activeSiteId={foundation.selectedSite?.id ?? null}
-            />
             <a className="badge" href="/login">Anmelden</a>
           </div>
         </header>
