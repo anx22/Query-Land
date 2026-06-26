@@ -86,7 +86,9 @@ class SQLiteProposalStore implements ProposalStore {
       throw new RequestError(400, "invalid_field", `status must be one of ${PROPOSAL_STATUSES.join(", ")}`);
     }
     const current = String((row as { status: string }).status) as ProposalStatus;
-    if (!ALLOWED_TRANSITIONS[current].includes(status)) {
+    // `current` comes from the DB; guard against a value outside the enum so an
+    // unexpected stored status yields a clean 409, not a TypeError on undefined.
+    if (!(ALLOWED_TRANSITIONS[current] ?? []).includes(status)) {
       throw new RequestError(409, "invalid_transition", `Cannot transition proposal from ${current} to ${status}`);
     }
     const now = new Date().toISOString();

@@ -21,7 +21,9 @@ export interface BacklinkFetchInput {
 export interface BacklinkProvider {
   readonly name: string;
   readonly sourceConfidence: SourceConfidence;
-  fetch(input: BacklinkFetchInput): BacklinkRow[];
+  // Uniform with SerpProvider / SearchAnalyticsProvider: a real (network) adapter may be
+  // async. Consumers MUST await this so a future live adapter can't reintroduce the B3 seam.
+  fetch(input: BacklinkFetchInput): BacklinkRow[] | Promise<BacklinkRow[]>;
 }
 
 // Kein echter Links-Provider verbunden → keine Backlinks. Ein echter Adapter ersetzt nur diese

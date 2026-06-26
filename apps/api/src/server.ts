@@ -9,7 +9,18 @@ export function createApiServer() {
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", async () => {
       const rawBody = Buffer.concat(chunks).toString("utf8");
-      const parsedBody = rawBody ? JSON.parse(rawBody) as unknown : undefined;
+      let parsedBody: unknown;
+      if (rawBody) {
+        try {
+          parsedBody = JSON.parse(rawBody) as unknown;
+        } catch {
+          // Malformed JSON must be a clean 400, not an unhandled 500. The web proxy route
+          // already returns invalid_json; keep the raw Node server consistent.
+          response.writeHead(400, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: { code: "invalid_json", message: "Request body is not valid JSON", requestId: `req-${Buffer.from(url.pathname).toString("hex").slice(0, 8)}` } }));
+          return;
+        }
+      }
       const apiResponse = await handleRequest(request.method ?? "GET", `${url.pathname}${url.search}`, parsedBody, {
         headers: {
           authorization: request.headers.authorization
