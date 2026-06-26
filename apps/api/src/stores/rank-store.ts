@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { computeVisibilityScore, type RankSnapshot, type SerpDevice, type SerpDiff, type SerpResult, type SerpSnapshot, type VisibilityScore } from "@seo-tool/domain-model";
-import { getSerpProvider } from "../serp/index.js";
+import { resolveSerpProvider } from "../serp/index.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";
@@ -52,8 +52,8 @@ class SQLiteRankStore implements RankStore {
     const site = await this.db.prepare(`SELECT base_url FROM sites WHERE project_id = ? ORDER BY created_at ASC LIMIT 1`).get(projectId) as { base_url?: string } | undefined;
     const ownDomain = hostOf(site?.base_url);
 
-    const provider = getSerpProvider();
-    const fetched = provider.fetch({ phrase: keyword.phrase, market, device, ownDomain });
+    const provider = await resolveSerpProvider(this.db, projectId);
+    const fetched = await provider.fetch({ phrase: keyword.phrase, market, device, ownDomain });
     const now = new Date().toISOString();
     const serpSnapshotId = `serp-${randomUUID()}`;
     const rankSnapshotId = `rank-${randomUUID()}`;

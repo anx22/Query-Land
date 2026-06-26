@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sourceConfidenceForProvider, validateBusinessValue, type IntegrationAccount, type IntegrationProvider, type Project, type Site } from "@seo-tool/domain-model";
 import { getConnector, type ConnectorContract } from "../connectors/index.js";
+import { encryptJson } from "../oauth/token-crypto.js";
 import { mapIntegration, mapProject, mapSite } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
@@ -35,6 +36,15 @@ export interface ConnectorSyncOptions {
   siteId?: string;
 }
 
+export interface UpsertIntegrationCredentialsInput {
+  projectId: string;
+  provider: IntegrationProvider;
+  property: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
 export interface WebVitalMetric {
   metric: string;
   value: number;
@@ -50,6 +60,7 @@ export interface ProjectStore {
   listIntegrations(): Promise<IntegrationStatusView[]>;
   getIntegration(integrationId: string): Promise<IntegrationStatusView>;
   createIntegration(projectId: string, provider: IntegrationProvider): Promise<IntegrationAccount>;
+  upsertIntegrationCredentials(input: UpsertIntegrationCredentialsInput): Promise<IntegrationAccount>;
   runConnectorSync(integrationId: string, options?: ConnectorSyncOptions): Promise<ConnectorSyncResult>;
   listSiteWebVitals(projectId: string, siteId: string): Promise<WebVitalMetric[]>;
 }
@@ -188,6 +199,34 @@ class SQLiteProjectStore implements ProjectStore {
     }
     await this.audit("system", "integration.create", "integration_account", integration.id, { projectId, provider });
     return integration;
+  }
+
+  /**
+   * Create-or-update an integration with real OAuth credentials (encrypted) and mark it connected.
+   * Called by the OAuth callback once tokens have been exchanged. Never logs token values.
+   */
+  async upsertIntegrationCredentials(input: UpsertIntegrationCredentialsInput): Promise<IntegrationAccount> {
+    const now = new Date().toISOString();
+    const sourceConfidence = sourceConfidenceForProvider(input.provider);
+    const authConfig = encryptJson({
+      accessToken: input.accessToken,
+      refreshToken: input.refreshToken,
+      expiresAt: input.expiresAt,
+      property: input.property
+    });
+    const id = `int-${input.provider}-${randomUUID()}`;
+    try {
+      await this.db.prepare(
+        `INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at)
+         VALUES (?, ?, ?, 'connected', ?, ?, NULL, ?, ?, ?)
+         ON CONFLICT (project_id, provider) DO UPDATE SET status = 'connected', source_confidence = ?, auth_config = ?, freshness = ?, updated_at = ?`
+      ).run(id, input.projectId, input.provider, sourceConfidence, authConfig, now, now, now, sourceConfidence, authConfig, now, now);
+    } catch (error) {
+      throw sqliteConstraintError(error, "integration_write_failed", "Integration could not be stored or project is unknown");
+    }
+    const row = await this.db.prepare(`SELECT * FROM integration_accounts WHERE project_id = ? AND provider = ?`).get(input.projectId, input.provider);
+    await this.audit("system", "integration.credentials_set", "integration_account", id, { projectId: input.projectId, provider: input.provider, property: input.property });
+    return mapIntegration(row as Record<string, unknown>);
   }
 
   async runConnectorSync(integrationId: string, options: ConnectorSyncOptions = {}): Promise<ConnectorSyncResult> {

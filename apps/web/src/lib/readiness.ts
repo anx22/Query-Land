@@ -48,12 +48,12 @@ export function computeReadiness(input: ReadinessInput): ReadinessState {
   const hasProject = input.projects.length > 0;
   const hasSite = input.sites.length > 0;
 
-  // "Connected" means a real, authenticated data source — status "active". A merely prepared
-  // (pending) connector does NOT count, so the optional data-source step stays honest and never
-  // satisfies a gate on a stub. (Real OAuth that flips a connector to "active" is a later phase.)
+  // "Connected" means a real, authenticated data source — DB status "connected" (set by the GSC
+  // OAuth callback). A merely prepared (pending) connector does NOT count, so the optional
+  // data-source boost step only flips to done once a real source is actually connected.
   const hasIntegration = input.integrations.some(
     (integration) =>
-      integration.status === "active" && (projectId === null || integration.projectId === projectId),
+      integration.status === "connected" && (projectId === null || integration.projectId === projectId),
   );
 
   // A crawl_seed job existing for the project means a crawl was kicked off.

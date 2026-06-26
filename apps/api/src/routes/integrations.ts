@@ -1,8 +1,14 @@
 import { json } from "../http.js";
-import { createIntegrationRequest } from "../request-validators.js";
+import { createIntegrationRequest, upsertIntegrationCredentialsRequest } from "../request-validators.js";
 import type { ResourceRoute } from "./shared.js";
 
 export const routeIntegrations: ResourceRoute = async (store, method, pathname, _searchParams, body) => {
+  // OAuth callback writes exchanged credentials here (create-or-update by project+provider).
+  if (method === "POST" && pathname === "/integrations/credentials") {
+    const input = upsertIntegrationCredentialsRequest(body);
+    return json(200, { data: await store.upsertIntegrationCredentials(input) });
+  }
+
   const scheduleMatch = pathname.match(/^\/integrations\/([^/]+)\/sync\/schedule$/);
   if (method === "POST" && scheduleMatch) {
     const siteId = body && typeof body === "object" && !Array.isArray(body) && typeof (body as { siteId?: unknown }).siteId === "string"

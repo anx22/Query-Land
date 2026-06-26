@@ -12,6 +12,7 @@ type RecordFetchResultRequest = Omit<UrlFetchRecord, "id" | "projectId" | "siteI
 type RecordIndexabilityRequest = Omit<IndexabilityRecord, "id" | "projectId" | "siteId" | "discoveredUrlId">;
 type RecordAuditIssuesRequest = { issues: AuditIssueRecord[]; checkedDiscoveredUrlIds: string[] };
 type CreateIntegrationRequest = { projectId: string; provider: IntegrationProvider };
+type UpsertIntegrationCredentialsRequest = { projectId: string; provider: IntegrationProvider; property: string; accessToken: string; refreshToken: string; expiresAt: string };
 type CreateJobRequest = { projectId: string; type: FoundationJob["type"]; subject: string; payload?: Record<string, unknown> };
 type AuthRequest = { email: string; password: string; name?: string };
 
@@ -198,6 +199,18 @@ export function createIntegrationRequest(body: unknown): CreateIntegrationReques
   return {
     projectId: stringField(input, "projectId"),
     provider: enumField(input, integrationProviders, "provider")
+  };
+}
+
+export function upsertIntegrationCredentialsRequest(body: unknown): UpsertIntegrationCredentialsRequest {
+  const input = objectBody(body);
+  return {
+    projectId: stringField(input, "projectId"),
+    provider: enumField(input, integrationProviders, "provider"),
+    property: stringField(input, "property"),
+    accessToken: stringField(input, "accessToken"),
+    refreshToken: stringField(input, "refreshToken"),
+    expiresAt: stringField(input, "expiresAt")
   };
 }
 

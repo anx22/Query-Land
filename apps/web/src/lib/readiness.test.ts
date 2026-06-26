@@ -44,7 +44,7 @@ describe("computeReadiness", () => {
           { id: "s1", projectId: "p1", baseUrl: "https://x", scopeType: "domain", crawlFrequency: "weekly", businessValue: 50 },
         ],
         integrations: [
-          { id: "i1", projectId: "p1", provider: "gsc", status: "active", sourceConfidence: "B", freshness: null },
+          { id: "i1", projectId: "p1", provider: "gsc", status: "connected", sourceConfidence: "B", freshness: null },
         ],
         jobs: [
           { id: "j1", projectId: "p1", type: "crawl_seed", status: "queued", idempotencyKey: "k", subject: "s", payload: {}, attempts: 0, updatedAt: "" },
@@ -54,7 +54,7 @@ describe("computeReadiness", () => {
     expect(state).toEqual({ hasProject: true, hasSite: true, hasIntegration: true, hasCrawl: true });
   });
 
-  it("counts only an active integration as connected, not a pending stub", () => {
+  it("counts only a connected integration, not a pending stub", () => {
     const pending = computeReadiness(
       baseInput({
         projects: [project],
@@ -68,7 +68,7 @@ describe("computeReadiness", () => {
       baseInput({
         projects: [project],
         selectedProject: project,
-        integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "active", sourceConfidence: "B", freshness: null }],
+        integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "connected", sourceConfidence: "B", freshness: null }],
       }),
     );
     expect(active.hasIntegration).toBe(true);
@@ -80,7 +80,7 @@ describe("computeReadiness", () => {
         projects: [project, otherProject],
         selectedProject: project,
         integrations: [
-          { id: "i1", projectId: "p2", provider: "gsc", status: "active", sourceConfidence: "B", freshness: null },
+          { id: "i1", projectId: "p2", provider: "gsc", status: "connected", sourceConfidence: "B", freshness: null },
         ],
         jobs: [
           { id: "j1", projectId: "p2", type: "crawl_seed", status: "succeeded", idempotencyKey: "k", subject: "s", payload: {}, attempts: 0, updatedAt: "" },
@@ -112,7 +112,7 @@ describe("firstUnmet / isRouteLocked", () => {
       projects: [project],
       selectedProject: project,
       sites: [{ id: "s1", projectId: "p1", baseUrl: "https://x", scopeType: "domain", crawlFrequency: "weekly", businessValue: 50 }],
-      integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "active", sourceConfidence: "B", freshness: null }],
+      integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "connected", sourceConfidence: "B", freshness: null }],
       jobs: [{ id: "j1", projectId: "p1", type: "crawl_seed", status: "succeeded", idempotencyKey: "k", subject: "s", payload: {}, attempts: 0, updatedAt: "" }],
     }),
   );
@@ -183,7 +183,7 @@ describe("onboardingSteps", () => {
         projects: [project],
         selectedProject: project,
         sites: [{ id: "s1", projectId: "p1", baseUrl: "https://x", scopeType: "domain", crawlFrequency: "weekly", businessValue: 50 }],
-        integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "active", sourceConfidence: "B", freshness: null }],
+        integrations: [{ id: "i1", projectId: "p1", provider: "gsc", status: "connected", sourceConfidence: "B", freshness: null }],
         jobs: [{ id: "j1", projectId: "p1", type: "crawl_seed", status: "succeeded", idempotencyKey: "k", subject: "s", payload: {}, attempts: 0, updatedAt: "" }],
       }),
     );

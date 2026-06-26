@@ -50,7 +50,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           echte Klicks, Rankings und Nutzungsdaten in Ihre Analysen ein.
         </p>
         <div className="badge-row">
-          <span className="badge primary">{data.integrations.length} verbundene Datenquellen</span>
+          <span className="badge primary">{data.integrations.filter((i) => i.status === "connected").length} verbundene Datenquellen</span>
           <span className="badge">{connectorJobs.length} geplante Abgleiche</span>
           <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
         </div>
@@ -61,10 +61,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       <section className="content-grid">
         <div className="card">
           <p className="kicker">Datenquelle verbinden</p>
-          <p className="muted">Legen Sie die Verbindung zu Google an. Der echte Login folgt — heute wird die Datenquelle im Projekt vorbereitet.</p>
+          <p className="muted">Melden Sie sich mit Google an, um echte Klicks, Rankings und Positionen aus der Search Console einfließen zu lassen.</p>
           <div className="connector-grid">
             {connectorProviders.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
+              const isConnected = existing?.status === "connected";
               return (
                 <article className="connector-card" key={connector.provider}>
                   <div>
@@ -72,13 +73,26 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <h2>{connector.label}</h2>
                     <p>{connector.description}</p>
                   </div>
-                  <form action={createConnectorAction}>
-                    <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
-                    <input type="hidden" name="provider" value={connector.provider} />
-                    <button className="button" type="submit" disabled={!data.connected || !selectedProject || Boolean(existing)}>
-                      {existing ? "Verbindung vorhanden" : "Verbindung anlegen"}
-                    </button>
-                  </form>
+                  {connector.provider === "gsc" ? (
+                    // Real Google OAuth: a GET redirect to the consent flow (not a server action).
+                    selectedProject && data.connected ? (
+                      <a className="button" href={`/api/oauth/google/authorize?projectId=${encodeURIComponent(selectedProject.id)}`}>
+                        {isConnected ? "Neu verbinden" : "Mit Google verbinden"}
+                      </a>
+                    ) : (
+                      <button className="button" type="button" disabled>
+                        Mit Google verbinden
+                      </button>
+                    )
+                  ) : (
+                    <form action={createConnectorAction}>
+                      <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
+                      <input type="hidden" name="provider" value={connector.provider} />
+                      <button className="button" type="submit" disabled={!data.connected || !selectedProject || Boolean(existing)}>
+                        {existing ? "Verbindung vorhanden" : "Verbindung anlegen"}
+                      </button>
+                    </form>
+                  )}
                 </article>
               );
             })}
@@ -198,8 +212,9 @@ function providerLabel(provider: string): string {
 
 function connectorStatusLabel(status: string): string {
   if (status === "pending") return "bereit zum Verbinden";
-  if (status === "active") return "verbunden";
-  if (status === "error") return "Fehler";
+  if (status === "connected") return "verbunden";
+  if (status === "degraded") return "eingeschränkt";
+  if (status === "error") return "Fehler — bitte neu verbinden";
   return status;
 }
 
@@ -207,6 +222,8 @@ function feedbackMessage(params: Record<string, string | string[] | undefined> |
   const single = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
   const errorValue = single(params?.error);
   if (errorValue) return { kind: "danger", message: errorValue };
+  const connectedValue = single(params?.connected);
+  if (connectedValue) return { kind: "success", message: `${providerLabel(connectedValue)} ist verbunden. Echte Klick-, Ranking- und Positionsdaten fließen ab jetzt ein.` };
   const prcheck = single(params?.prcheck);
   if (prcheck) {
     const templates = single(params?.prtemplates) ?? "0";
