@@ -62,11 +62,20 @@ Stattdessen ruhige, natürliche, minimale Landschaften (siehe §5.0 + §10).
   in `Query‑Land` orange (`--primary`), oder ein orange **Punkt** am Ende. Nie das ganze Wort orange.
 - **Casing:** `Query-Land` (Titlecase, beide Wortteile groß). Nicht `query-land`, nicht `QueryLand`.
 
-### 2.2 Logomark (Konzept — in Exploration)
-Ein **kartografisches Höhenlinien-Mark**: 3–4 ineinander verschachtelte, ultradünne (1px) Konturlinien,
-die zugleich (a) eine topografische Karte (Land/Terrain = der eigene URL-Bestand) und (b) ein
-**Query-Caret/Cursor** oder Lupen-Fokuspunkt andeuten. Charcoal-Linien, **ein** orange Höhenring als
-Akzent. Wirkt wie eine technische Zeichnung / Blueprint-Annotation, nicht wie ein App-Icon mit Verlauf.
+### 2.2 Logomark — ein kartografisches System (zwei Ansichten desselben Terrains)
+Das Mark folgt **einem** kartografischen Prinzip in **zwei** Ansichten (Base-Assets:
+`assets/brand-exploration/`):
+
+- **Primär — Layered Ridges (Horizont-Ansicht):** ineinander gestaffelte 1px-Höhenzüge mit einer kleinen
+  aufgehenden orangen Sonne. Trägt das Namens-Konzept „neues Land/Horizont" und ist die Quelle des
+  **Header-Motivs** (§5.0). Reduktion bis Favicon: ein Kamm + Sonne.
+- **Sekundär — Terrain Contours (Aufsicht):** konzentrische topografische Höhenlinien mit einem
+  **Such-Fokuspunkt** (Query-Cursor/Lupe) im Zentrum, **ein** orange Höhenring. Analytischer, dient als
+  **App-Mark/Daten-Textur** und Brücke zur Datenwelt. Reduktion bis Favicon: innerster orange Ring + Punkt.
+
+Beide sind dasselbe Land — Ridges von der Seite (Horizont), Contours von oben (Karte). Charcoal-1px,
+nie gefüllt, wirkt wie eine technische Zeichnung / Survey-Map-Annotation, nicht wie ein App-Icon mit Verlauf.
+Je Mark existiert eine **Mono/KO-Variante** (reines Charcoal, kein Orange) für einfarbige Einsätze.
 
 - **Strichstärke:** 1px (bei kleinen Größen 1.25px für Optik).
 - **Gefüllt:** nie. Das Mark bleibt eine Linienzeichnung — konsistent zur „oneline icon"-Regel.
@@ -275,9 +284,19 @@ Horizont_ (kein Maritim/Kompass):
 - Nächste Verdichtung: ein finales Header-Motiv als sauberes **SVG** (nicht KI-Raster) ableiten,
   Logomark dazu konsistent zeichnen, dann B-1…B-7 umsetzen.
 
+### Runde 3 — Base-Asset-Sets für beide Motivrichtungen (✔)
+Pro Richtung ein konsistentes Asset-System (Logomark · Favicon · Wordmark-Lockup · Header-Band ·
+Empty-State-Glyph/Daten-Textur · Mono/KO-Variante) + Standalone-Header-Bänder + ein
+System-Übersichtsblatt. Abgelegt unter **`assets/brand-exploration/`** (siehe dortige `README.md`):
+
+- `00-system-overview` · `01-asset-system-A-layered-ridges` · `02-asset-system-B-terrain-contours`
+- `03-header-band-ridges` · `04-header-band-contours` · `05-identity-sheet`
+- `06-wordmark-hero-ridges` · `07-before-after-overview` (echter Overview-Screen transformiert)
+
 **Vorgehen:** Mockups sind _Orientierung_, nicht 1:1-Vorlage; verbindlich bleiben Tokens (`globals.css`)
-und Voice (`ux-ui-sprint.md`). Finale Header-/Logo-Assets entstehen als handgezeichnete SVGs in der
-Linien-DNA der Mockups.
+und Voice (`ux-ui-sprint.md`). **Nächster Schritt:** je ein finales Logomark (Ridges + Contours) und das
+primäre Header-Band als handgezeichnete **SVGs** in dieser Linien-DNA ableiten → Favicon → dann
+B-1 (Typo) umsetzen.
 
 ---
 
