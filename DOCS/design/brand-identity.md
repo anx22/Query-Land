@@ -62,20 +62,21 @@ Stattdessen ruhige, natürliche, minimale Landschaften (siehe §5.0 + §10).
   in `Query‑Land` orange (`--primary`), oder ein orange **Punkt** am Ende. Nie das ganze Wort orange.
 - **Casing:** `Query-Land` (Titlecase, beide Wortteile groß). Nicht `query-land`, nicht `QueryLand`.
 
-### 2.2 Logomark — ein kartografisches System (zwei Ansichten desselben Terrains)
-Das Mark folgt **einem** kartografischen Prinzip in **zwei** Ansichten (Base-Assets:
-`/brand/exploration/`, finale SVGs später unter `/brand/logo/`):
+### 2.2 Kartografisches System — ein Terrain, drei Anwendungen
+**Verbindliches Vokabular: `/brand/README.md`.** Das Marken-Bildsystem ist **ein** Terrain, dargestellt
+in komplementären Ansichten (Assets unter `/brand/header/` + `/brand/guidelines/`; finale SVGs später
+unter `/brand/logo/`):
 
-- **Primär — Layered Ridges (Horizont-Ansicht):** ineinander gestaffelte 1px-Höhenzüge mit einer kleinen
-  aufgehenden orangen Sonne. Trägt das Namens-Konzept „neues Land/Horizont" und ist die Quelle des
-  **Header-Motivs** (§5.0). Reduktion bis Favicon: ein Kamm + Sonne.
-- **Sekundär — Terrain Contours (Aufsicht):** konzentrische topografische Höhenlinien mit einem
-  **Such-Fokuspunkt** (Query-Cursor/Lupe) im Zentrum, **ein** orange Höhenring. Analytischer, dient als
-  **App-Mark/Daten-Textur** und Brücke zur Datenwelt. Reduktion bis Favicon: innerster orange Ring + Punkt.
+- **Horizont** (Höhenzüge + aufgehende orange Sonne, Seitenansicht): **Hero/Overview-Header** →
+  `header/horizon/`. Trägt das Namens-Konzept „neues Land/Horizont".
+- **Ridges** (topografische **Höhenlinien-Bänder**, Landschaft als Konturlinien): **Unterseiten-Header** →
+  `header/ridges/`.
+- **Contours** (konzentrische Höhenlinien-Ringe + zentraler **Such-Fokuspunkt**, ein orange Ring):
+  **Logomark / Daten-Textur**. Reduktion bis Favicon: innerster orange Ring + Punkt.
 
-Beide sind dasselbe Land — Ridges von der Seite (Horizont), Contours von oben (Karte). Charcoal-1px,
-nie gefüllt, wirkt wie eine technische Zeichnung / Survey-Map-Annotation, nicht wie ein App-Icon mit Verlauf.
-Je Mark existiert eine **Mono/KO-Variante** (reines Charcoal, kein Orange) für einfarbige Einsätze.
+Alles dasselbe Land — Horizont von der Seite, Contours von oben (Grundprinzip:
+`guidelines/cartographic-system.jpg`). Charcoal-1px, nie gefüllt, wie eine technische Zeichnung /
+Survey-Map-Annotation. Je Mark eine **Mono/KO-Variante** (reines Charcoal) für einfarbige Einsätze.
 
 - **Strichstärke:** 1px (bei kleinen Größen 1.25px für Optik).
 - **Gefüllt:** nie. Das Mark bleibt eine Linienzeichnung — konsistent zur „oneline icon"-Regel.
@@ -176,13 +177,15 @@ Namens-Konzept (§1): _neues Land, neuer Horizont, die gute Lage voraus._
 
 - **Einsatz:** Header von Overview/Hero, Login, Empty-States, Reports-Deckblatt, Marketing. **Nicht** in
   dichten Datenbereichen — sie rahmt, sie konkurriert nie mit Zahlen (Serious-Zone).
-- **Stil:** Charcoal-1px-Linien auf Papier, **ein** orange Akzent (die Sonne / ein Höhenring). Sehr
+- **Stil:** Charcoal-1px-Linien auf Papier, **ein** orange Akzent (Sonne bzw. Höhenring). Sehr
   zurückhaltend, dekorativ, nie fotografisch, nie farbig gefüllt. Lesbarkeit der Headline hat Vorrang.
-- **Variantenfamilie** (eine Direction, mehrere Motive — aus Exploration §10):
-  _Layered Ridges_ (empfohlen, am stärksten „neuer Horizont") · _Terrain Contours_ (analytischer,
-  Survey-Map) · _Open Plain/Trail_ (Weg zum Horizont) · _New Land Vista_ (Plateau-Silhouetten).
-- **Bezug zum Logomark:** dieselbe Linien-DNA wie das topografische Höhenlinien-Mark (§2.2) — Mark = die
-  Karte im Kleinen, Header-Illustration = der Horizont im Großen. Ein konsistentes kartografisches System.
+- **Zwei feste Anwendungen** (Vokabular: `/brand/README.md`):
+  - **Horizont** (Höhenzüge + aufgehende Sonne) → **Hero/Overview** (`brand/header/horizon/`).
+  - **Ridges** (topografische Höhenlinien-Bänder) → **Unterseiten** (`brand/header/ridges/`).
+  - _Weitere Landschaften_ (Valley/Plateau/Dunes …) = **Asset-Extension für später**
+    (`brand/illustration/landscapes/`).
+- **Bezug zum Logomark:** dieselbe Linien-DNA wie das Contours-Mark (§2.2) — Mark = die Karte im Kleinen,
+  Header = das Terrain im Großen. Ein konsistentes kartografisches System.
 
 ### 5.1 Detail-Signaturen
 Diese Detail-Entscheidungen sind der eigentliche Markenkern — die Summe macht den Wiedererkennungswert.
@@ -279,25 +282,20 @@ Horizont_ (kein Maritim/Kompass):
 
 **Zwischenstand / Empfehlung:**
 - Editorial-Tech-Fundament ist bestätigt → **B-1 (Typo) priorisieren**.
-- **Layered Ridges** als primäres Header-Motiv (am stärksten „neuer Horizont"), **Terrain Contours** als
-  analytische Alternative/Sekundärmotiv und Brücke zum Logomark.
-- Nächste Verdichtung: ein finales Header-Motiv als sauberes **SVG** (nicht KI-Raster) ableiten,
-  Logomark dazu konsistent zeichnen, dann B-1…B-7 umsetzen.
+- **Belegte Zuordnung (Vokabular `/brand/README.md`):** **Horizont** = Hero-Header · **Ridges** =
+  Unterseiten-Header · **Contours** = Logomark/Daten-Textur. _Weitere Landschaften_ = Extension für später.
 
-### Runde 3 — Base-Asset-Sets für beide Motivrichtungen (✔)
-Pro Richtung ein konsistentes Asset-System (Logomark · Favicon · Wordmark-Lockup · Header-Band ·
-Empty-State-Glyph/Daten-Textur · Mono/KO-Variante) + Standalone-Header-Bänder + ein
-System-Übersichtsblatt. Abgelegt unter **`/brand/exploration/`** (Brand-Kit auf Repo-Ebene; siehe
-`/brand/README.md` + dortige `README.md`):
+### Runde 3 — Base-Asset-Sets + Kit-Struktur (✔)
+Pro Anwendung ein konsistentes Asset-Set + Grundprinzip-Blatt, einsortiert in das Brand-Kit auf
+Repo-Ebene (**`/brand/`**, Format JPG; finale SVGs später). Struktur und Vokabular: **`/brand/README.md`**.
 
-- `00-system-overview` · `01-asset-system-A-layered-ridges` · `02-asset-system-B-terrain-contours`
-- `03-header-band-ridges` · `04-header-band-contours` · `05-identity-sheet`
-- `06-wordmark-hero-ridges` · `07-before-after-overview` (echter Overview-Screen transformiert)
+- `guidelines/cartographic-system.jpg` (**Grundprinzip**) · `guidelines/identity-sheet.jpg`
+- `header/horizon/…` (Hero — Höhenzüge + Sonne) · `header/ridges/…` (Unterseiten — Höhenlinien-Bänder)
+- `illustration/landscapes/…` (**Extension**, für später) · `reference/before-after-overview.jpg`
 
 **Vorgehen:** Mockups sind _Orientierung_, nicht 1:1-Vorlage; verbindlich bleiben Tokens (`globals.css`)
-und Voice (`ux-ui-sprint.md`). **Nächster Schritt:** je ein finales Logomark (Ridges + Contours) und das
-primäre Header-Band als handgezeichnete **SVGs** in dieser Linien-DNA ableiten → Favicon → dann
-B-1 (Typo) umsetzen.
+und Voice (`ux-ui-sprint.md`). **Nächster Schritt (rote Linie):** zurück auf den Base-Plan — **B-1
+(Typo-Fundament)** umsetzen; finale Logo-/Header-**SVGs** folgen danach.
 
 ---
 
