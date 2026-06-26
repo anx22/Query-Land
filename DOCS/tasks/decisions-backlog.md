@@ -53,3 +53,12 @@
 - **Decision:** Use `https://queryland-mikadesign.vercel.app/` for manual browser checks, internal logs and deployment smoke tests until a dedicated staging URL exists.
 - **Reason:** Gives agents and humans a shared, stable URL for Vercel/runtime validation.
 - **Impact:** Future handoffs and QA notes should cite this target when asking for browser or runtime smoke validation.
+
+## DEC-008 — Mandanten-/User-Trennung & GSC-Connector-Ownership
+
+- **Status:** ready for decision
+- **Kontext (Ist-Zustand):** Die GSC-OAuth-App ist **global** (eine Google-Cloud-App; `GOOGLE_CLIENT_ID/SECRET` als Env-Vars identifizieren die Anwendung gegenüber Google). Die OAuth-Tokens werden dagegen **pro Projekt** AES-256-GCM-verschlüsselt in `integration_accounts.auth_config` gespeichert (eindeutig je `project_id` + Provider). Jedes Projekt verbindet sein eigenes Google-Konto und sieht nur seine eigene Property — niemand nutzt fremde Tokens.
+- **Offene Frage:** Das Datenmodell ist **projekt**-basiert, **nicht** streng pro Login-User. Wer Zugriff auf ein Projekt hat, sieht/nutzt dessen GSC-Verbindung. Es fehlt echte Mandanten-/User-Isolation: Wem „gehört" ein Connector, wer darf ihn anlegen/sehen/trennen, und wie werden Projekte Usern/Organisationen zugeordnet (Rollen/Memberships)?
+- **Options:** (a) Status quo belassen (projekt-scoped, intern/Single-Org); (b) User↔Projekt-Membership + Rollen (Owner/Member) einführen und Connector-Sichtbarkeit daran binden; (c) volle Mehrmandanten-Architektur (Organisationen, Einladungen, Datentrennung).
+- **Impact:** Betrifft Auth-/Rollenmodell (`apps/api` auth-store, sessions), Settings-/Connector-Sichtbarkeit und ggf. die Veröffentlichung/Verifizierung des **Google-OAuth-Consent-Screens** (nötig, sobald sich fremde Endnutzer mit ihrem eigenen Google-Konto verbinden sollen — sonst nur eingetragene Testnutzer).
+- **Decide by:** Bevor die App für externe/mehrere Nutzer oder als gehostetes Mehrmandanten-Produkt geöffnet wird.
