@@ -259,6 +259,15 @@ import { createApp, createStore, type Store } from "@seo-tool/api";
 import type { CrawlWorkerApiClient } from "../src/index.js";
 import { runCrawlWorkerCycle } from "../src/index.js";
 
+// Self-provisions a real project + site (the demo seed no longer exists) and returns the app
+// plus the generated ids to thread through job payloads, GET assertions and route paths.
+async function setupSite(store: Store): Promise<{ app: ReturnType<typeof createApp>; projectId: string; siteId: string }> {
+  const app = createApp(store);
+  const project = envelopeData<{ id: string }>(await app("POST", "/projects", { name: "Crawler Test", slug: `crawler-${Math.random().toString(36).slice(2)}` }));
+  const site = envelopeData<{ id: string }>(await app("POST", `/projects/${project.id}/sites`, { baseUrl: "https://example.com", scopeType: "domain" }));
+  return { app, projectId: project.id, siteId: site.id };
+}
+
 function apiClientForStore(store: Store): CrawlWorkerApiClient {
   const app = createApp(store);
   const post = async <T>(path: string, body?: unknown): Promise<T> => {
@@ -281,12 +290,12 @@ function apiClientForStore(store: Store): CrawlWorkerApiClient {
 
 test("crawl worker creates a crawl run when legacy crawl_seed payload has no crawlRunId", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
+  const { app, projectId, siteId } = await setupSite(store);
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const result = await runCrawlWorkerCycle({
@@ -303,7 +312,7 @@ test("crawl worker creates a crawl run when legacy crawl_seed payload has no cra
 
   assert.equal(result.status, "succeeded");
   assert.equal(typeof result.crawlRunId, "string");
-  const runs = envelopeData<Array<{ id: string; status: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/crawl-runs"));
+  const runs = envelopeData<Array<{ id: string; status: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs`));
   assert.equal(runs[0]?.id, result.crawlRunId);
   assert.equal(runs[0]?.status, "succeeded");
   await store.close();
@@ -311,13 +320,13 @@ test("crawl worker creates a crawl run when legacy crawl_seed payload has no cra
 
 test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const fetchImpl = async (url: string | URL | Request) => {
@@ -337,7 +346,7 @@ test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end
   assert.equal(result.discoveredUrls, 3);
   assert.equal(result.fetchedUrls, 3);
 
-  const runs = envelopeData<Array<{ status: string; summary: { discoveredUrls: number; fetchedUrls: number; indexabilityAssessments: number; openIssues: number; healthScore: number | null } }>>(await app("GET", "/projects/proj-demo/sites/site-demo/crawl-runs"));
+  const runs = envelopeData<Array<{ status: string; summary: { discoveredUrls: number; fetchedUrls: number; indexabilityAssessments: number; openIssues: number; healthScore: number | null } }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs`));
   assert.equal(runs[0]?.status, "succeeded");
   assert.equal(runs[0]?.summary.discoveredUrls, 3);
   assert.equal(runs[0]?.summary.fetchedUrls, 3);
@@ -345,20 +354,20 @@ test("crawl worker claims crawl_seed job and persists crawl artifacts end-to-end
   assert.equal((runs[0]?.summary.openIssues ?? 0) > 0, true);
   assert.equal(runs[0]?.summary.healthScore !== null, true);
 
-  const issues = envelopeData<Array<{ rule: string; severity: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues"));
+  const issues = envelopeData<Array<{ rule: string; severity: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
   assert.equal(issues.some((issue) => issue.rule === "http_error" && issue.severity === "critical"), true);
   await store.close();
 });
 
 test("crawl worker checks limited in-scope outgoing links and records broken_link issues", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const fetched: string[] = [];
@@ -384,20 +393,20 @@ test("crawl worker checks limited in-scope outgoing links and records broken_lin
   assert.equal(fetched.includes("https://example.com/missing"), true);
   assert.equal(fetched.includes("https://outside.example/missing"), false);
 
-  const issues = envelopeData<Array<{ rule: string; url: string; message: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues"));
+  const issues = envelopeData<Array<{ rule: string; url: string; message: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
   assert.equal(issues.some((issue) => issue.rule === "broken_link" && issue.url === "https://example.com/" && issue.message.includes("https://example.com/missing")), true);
   await store.close();
 });
 
 test("crawl worker accepts a valid sitemap that only contains the seed URL", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const fetched: string[] = [];
@@ -427,13 +436,13 @@ test("crawl worker accepts a valid sitemap that only contains the seed URL", asy
 
 test("crawl worker marks invalid successful sitemap jobs as failed", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const result = await runCrawlWorkerCycle({
@@ -452,13 +461,13 @@ test("crawl worker marks invalid successful sitemap jobs as failed", async () =>
 
 test("crawl worker resolves in-scope sitemap indexes into persisted page URLs", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const fetched: string[] = [];
@@ -480,7 +489,7 @@ test("crawl worker resolves in-scope sitemap indexes into persisted page URLs", 
   assert.equal(fetched.includes("https://example.com/content-sitemap.xml"), true);
   assert.equal(fetched.includes("https://outside.example/private.xml"), false);
 
-  const urls = envelopeData<Array<{ normalizedUrl: string; discoveredFrom: string | null }>>(await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls"));
+  const urls = envelopeData<Array<{ normalizedUrl: string; discoveredFrom: string | null }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/discovered-urls`));
   assert.deepEqual(urls.map((url) => url.normalizedUrl), ["https://example.com/", "https://example.com/features", "https://example.com/pricing"]);
   assert.equal(urls[1]?.discoveredFrom, "https://example.com/content-sitemap.xml");
   await store.close();
@@ -488,13 +497,13 @@ test("crawl worker resolves in-scope sitemap indexes into persisted page URLs", 
 
 test("crawl worker keeps out-of-scope sitemap URLs out of the persisted crawl", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const fetched: string[] = [];
@@ -512,20 +521,20 @@ test("crawl worker keeps out-of-scope sitemap URLs out of the persisted crawl", 
   assert.equal(result.discoveredUrls, 1);
   assert.equal(fetched.includes("https://outside.example/private"), false);
 
-  const urls = envelopeData<Array<{ normalizedUrl: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls"));
+  const urls = envelopeData<Array<{ normalizedUrl: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/discovered-urls`));
   assert.deepEqual(urls.map((url) => url.normalizedUrl), ["https://example.com/"]);
   await store.close();
 });
 
 test("crawl worker persists network-error fetches and keeps the run explainable", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const fetchImpl = async (url: string | URL | Request) => {
@@ -542,14 +551,14 @@ test("crawl worker persists network-error fetches and keeps the run explainable"
   const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, retry: { maxAttempts: 2 }, now: () => "2026-06-03T10:00:00.000Z" });
   assert.equal(result.status, "succeeded");
 
-  const urls = envelopeData<Array<{ id: string; normalizedUrl: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls"));
+  const urls = envelopeData<Array<{ id: string; normalizedUrl: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/discovered-urls`));
   const downUrl = urls.find((url) => url.normalizedUrl === "https://example.com/down");
   assert.ok(downUrl);
-  const fetches = envelopeData<Array<{ statusClass: string; errorMessage?: string }>>(await app("GET", `/projects/proj-demo/sites/site-demo/discovered-urls/${downUrl.id}/fetch-results`));
+  const fetches = envelopeData<Array<{ statusClass: string; errorMessage?: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/discovered-urls/${downUrl.id}/fetch-results`));
   assert.equal(fetches[0]?.statusClass, "network_error");
   assert.match(fetches[0]?.errorMessage ?? "", /after 2 attempts/);
 
-  const issues = envelopeData<Array<{ rule: string; url: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues"));
+  const issues = envelopeData<Array<{ rule: string; url: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
   assert.equal(issues.some((issue) => issue.rule === "http_error" && issue.url === "https://example.com/down"), true);
   await store.close();
 });
@@ -557,13 +566,13 @@ test("crawl worker persists network-error fetches and keeps the run explainable"
 
 test("crawl worker records robots-blocked URLs as non-indexable without fetching the page", async () => {
   const store = await createStore("sqlite::memory:");
-  const app = createApp(store);
-  const run = envelopeData<{ id: string }>(await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" }));
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
   await app("POST", "/jobs", {
-    projectId: "proj-demo",
+    projectId,
     type: "crawl_seed",
     subject: "https://example.com",
-    payload: { siteId: "site-demo", baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
+    payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" }
   });
 
   const fetched: string[] = [];
@@ -585,10 +594,10 @@ test("crawl worker records robots-blocked URLs as non-indexable without fetching
   assert.equal(result.fetchedUrls, 1);
   assert.equal(fetched.includes("https://example.com/blocked/page"), false);
 
-  const urls = envelopeData<Array<{ id: string; normalizedUrl: string }>>(await app("GET", "/projects/proj-demo/sites/site-demo/discovered-urls"));
+  const urls = envelopeData<Array<{ id: string; normalizedUrl: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/discovered-urls`));
   const blockedUrl = urls.find((url) => url.normalizedUrl === "https://example.com/blocked/page");
   assert.ok(blockedUrl);
-  const assessments = envelopeData<Array<{ state: string; isIndexable: boolean; fetchResultId: string | null }>>(await app("GET", `/projects/proj-demo/sites/site-demo/discovered-urls/${blockedUrl.id}/indexability`));
+  const assessments = envelopeData<Array<{ state: string; isIndexable: boolean; fetchResultId: string | null }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/discovered-urls/${blockedUrl.id}/indexability`));
   assert.equal(assessments[0]?.state, "blocked_by_robots");
   assert.equal(assessments[0]?.isIndexable, false);
   assert.equal(assessments[0]?.fetchResultId, null);

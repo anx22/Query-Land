@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sourceConfidenceForProvider, validateBusinessValue, type IntegrationAccount, type IntegrationProvider, type Project, type Site } from "@seo-tool/domain-model";
 import { getConnector, type ConnectorContract } from "../connectors/index.js";
-import { encryptJson } from "../oauth/token-crypto.js";
+import { encryptJson, decryptJson } from "../oauth/token-crypto.js";
 import { mapIntegration, mapProject, mapSite } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
@@ -160,6 +160,35 @@ class SQLiteProjectStore implements ProjectStore {
     return Boolean(parsed) && typeof parsed === "object" && Object.keys(parsed as Record<string, unknown>).length > 0;
   }
 
+  /**
+   * Best-effort decode of auth_config into a plain object the connector adapter can read.
+   * Handles encrypted blobs (real OAuth credentials) and plain JSON (stub). Never throws and
+   * never logs token values; returns null when nothing usable is present.
+   */
+  private decodeAuthConfig(raw: unknown): unknown {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw !== "string") return raw;
+    // Encrypted blobs are produced by encryptJson() ("v1:gcm:..."); try that first.
+    if (raw.startsWith("v1:gcm:")) {
+      try {
+        return decryptJson<unknown>(raw);
+      } catch {
+        return null;
+      }
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Primary site base_url for a project (used as the GSC property / PSI target when set). */
+  private async primarySiteUrl(projectId: string): Promise<string | null> {
+    const row = await this.db.prepare(`SELECT base_url FROM sites WHERE project_id = ? ORDER BY created_at ASC LIMIT 1`).get(projectId);
+    return row ? String((row as Record<string, unknown>).base_url) : null;
+  }
+
   private async lastEvidenceAt(integrationId: string): Promise<string | null> {
     const row = await this.db.prepare(`SELECT fetched_at FROM raw_events WHERE integration_account_id = ? ORDER BY fetched_at DESC LIMIT 1`).get(integrationId);
     return row ? String(row.fetched_at) : null;
@@ -172,7 +201,12 @@ class SQLiteProjectStore implements ProjectStore {
     const lastSyncedAt = integration.freshness;
     const lastEvidenceAt = await this.lastEvidenceAt(integration.id);
     const contract = connector
-      ? connector.describe({ hasCredentials: this.hasCredentials(row), lastSyncedAt, lastEvidenceAt })
+      ? connector.describe({
+          hasCredentials: this.hasCredentials(row),
+          lastSyncedAt,
+          lastEvidenceAt,
+          authConfig: this.decodeAuthConfig(row.auth_config)
+        })
       : null;
     return { ...integration, contract, lastSyncedAt, lastEvidenceAt };
   }
@@ -254,9 +288,15 @@ class SQLiteProjectStore implements ProjectStore {
 
     const now = new Date().toISOString();
     const hasCredentials = this.hasCredentials(row as Record<string, unknown>);
-    const ctx = { projectId: integration.projectId, integrationId, now, entityType, entityId, hasCredentials };
+    // Real-adapter inputs: decrypted auth_config (may carry tokens/keys) + the site URL to query.
+    // The site-scoped entity wins; otherwise the project's primary site base_url.
+    const authConfig = this.decodeAuthConfig((row as Record<string, unknown>).auth_config);
+    const siteUrl = options.siteId
+      ? String((await this.db.prepare(`SELECT base_url FROM sites WHERE id = ?`).get(options.siteId) as Record<string, unknown> | undefined)?.base_url ?? "") || null
+      : await this.primarySiteUrl(integration.projectId);
+    const ctx = { projectId: integration.projectId, integrationId, now, entityType, entityId, hasCredentials, authConfig, siteUrl };
     try {
-      const fetched = connector.fetch(ctx);
+      const fetched = await connector.fetch(ctx);
 
       // Fehlermodi (missing_credentials/quota_exceeded/expired/degraded) sind KEIN Crash:
       // sie werden als sichtbarer, abfragbarer degraded-Status persistiert und als typisiertes

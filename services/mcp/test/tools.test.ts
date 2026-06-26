@@ -237,13 +237,14 @@ async function seedBacklinks(t: TestContext): Promise<BacklinkSeeded> {
   t.after(async () => { await store.close(); });
   const project = await store.createProject({ name: "Backlink Test", slug: `bl-test-${Math.random().toString(36).slice(2)}` });
   await store.createSite(project.id, { baseUrl: "https://bl.example", scopeType: "domain", businessValue: 50 });
-  // Two imports to produce a meaningful diff.
+  // Two imports to record two snapshots (a meaningful diff once a provider is connected). With no
+  // links provider connected, each import records an honest-empty snapshot (no backlinks).
   await store.importBacklinks(project.id);
   await store.importBacklinks(project.id);
   return { store, projectId: project.id };
 }
 
-test("get_authority_summary returns totalBacklinks > 0 and a followRatio", async (t) => {
+test("get_authority_summary reports the honest-empty authority contract without a connected provider", async (t) => {
   const { store, projectId } = await seedBacklinks(t);
   const tools = createSeoMcpTools(store);
   const summary = (await callTool(tools, "get_authority_summary", { projectId })) as {
@@ -252,20 +253,21 @@ test("get_authority_summary returns totalBacklinks > 0 and a followRatio", async
     followRatio: number;
   };
 
-  assert.ok(summary.totalBacklinks > 0, "totalBacklinks should be > 0 after import");
+  // No links provider is connected, so the import records a snapshot with zero backlinks
+  // (honest-empty state) rather than fabricated stub data.
+  assert.equal(summary.totalBacklinks, 0, "totalBacklinks should be 0 with no connected provider");
+  assert.equal(summary.referringDomains, 0, "referringDomains should be 0 with no connected provider");
   assert.ok(typeof summary.followRatio === "number", "followRatio should be a number");
-  assert.ok(summary.referringDomains >= 0, "referringDomains should be >= 0");
 });
 
-test("list_referring_domains returns a non-empty array after import", async (t) => {
+test("list_referring_domains returns an empty array without a connected provider", async (t) => {
   const { store, projectId } = await seedBacklinks(t);
   const tools = createSeoMcpTools(store);
   const domains = (await callTool(tools, "list_referring_domains", { projectId })) as Array<{ domain: string; backlinks: number }>;
 
   assert.ok(Array.isArray(domains), "result should be an array");
-  assert.ok(domains.length > 0, "should have at least one referring domain after import");
-  assert.ok(typeof domains[0].domain === "string", "each entry should have a domain string");
-  assert.ok(typeof domains[0].backlinks === "number", "each entry should have a backlinks count");
+  // Honest-empty state: an import without a connected links provider yields no referring domains.
+  assert.equal(domains.length, 0, "should have no referring domains with no connected provider");
 });
 
 test("get_backlink_changes returns newReferringDomains and lostReferringDomains arrays", async (t) => {
