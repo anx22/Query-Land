@@ -244,6 +244,13 @@ export interface TechnicalAuditOverviewData {
   errorMessage?: string;
   apiBaseUrl: string;
 
+  /**
+   * Sections whose API fetch FAILED (vs. genuinely empty). Lets the page show an
+   * honest error notice instead of an indistinguishable empty/healthy state
+   * (archetype B — see DOCS/architecture/archetypal-bug-audit.md).
+   */
+  loadErrors: string[];
+
   project: FoundationProject | null;
   site: FoundationSite | null;
   /** Setup-waterfall state, so the crawl-start control can lock/unlock. */
@@ -314,6 +321,7 @@ function emptyData(
 ): TechnicalAuditOverviewData {
   return {
     ...opts,
+    loadErrors: [],
     project,
     site,
     funnelStages: deriveFunnelStages({ discovered: null, fetched: null, indexable: null }),
@@ -459,20 +467,23 @@ export async function loadTechnicalAuditOverview(
   const runOffset = resolveOffset(options.runOffset, RUN_PAGE_SIZE);
   const requestedUrlOffset = resolveOffset(options.urlOffset, URL_EXPLORER_PAGE_SIZE);
 
+  // Empty ≠ Error: a failed fetch records its section here so the page can show an
+  // honest error notice instead of a silent empty/healthy state (archetype B).
+  const loadErrors: string[] = [];
   const [runsEnv, healthScores, issuesEnv, urlsEnv, urlExplorerEnv] = await Promise.all([
     apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=${RUN_PAGE_SIZE}&offset=${runOffset}`)
       .then((env) => env)
-      .catch(() => ({ data: [] as CrawlRun[], meta: undefined })),
-    apiGet<CrawlHealthScore[]>(`${base}/health-scores`).catch(() => [] as CrawlHealthScore[]),
+      .catch(() => { loadErrors.push("Crawl-Läufe"); return { data: [] as CrawlRun[], meta: undefined }; }),
+    apiGet<CrawlHealthScore[]>(`${base}/health-scores`).catch(() => { loadErrors.push("Health-Scores"); return [] as CrawlHealthScore[]; }),
     apiGetEnvelope<AuditIssueRecord[]>(`${base}/audit-issues?status=open&limit=${ISSUE_SAMPLE_LIMIT}`)
       .then((env) => env)
-      .catch(() => ({ data: [] as AuditIssueRecord[] })),
+      .catch(() => { loadErrors.push("Issues"); return { data: [] as AuditIssueRecord[] }; }),
     apiGetEnvelope<DiscoveredUrl[]>(`${base}/discovered-urls?limit=${URL_SAMPLE_LIMIT}`)
       .then((env) => env)
-      .catch(() => ({ data: [] as DiscoveredUrl[], meta: undefined })),
+      .catch(() => { loadErrors.push("Discovered URLs"); return { data: [] as DiscoveredUrl[], meta: undefined }; }),
     apiGetEnvelope<UrlExplorerRow[]>(`${base}/url-explorer?${buildUrlExplorerQuery(requestedUrlOffset, activeUrlFilter)}`)
       .then((env) => env)
-      .catch(() => ({ data: [] as UrlExplorerRow[], meta: undefined })),
+      .catch(() => { loadErrors.push("URL-Explorer"); return { data: [] as UrlExplorerRow[], meta: undefined }; }),
   ]);
 
   // --- Crawl runs (active page, latest first) ---
@@ -487,7 +498,7 @@ export async function loadTechnicalAuditOverview(
   if (runOffset > 0) {
     latestRun = await apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=1`)
       .then((env) => env.data?.[0] ?? null)
-      .catch(() => null);
+      .catch(() => { if (!loadErrors.includes("Crawl-Läufe")) loadErrors.push("Crawl-Läufe"); return null; });
   }
 
   // --- Health scores ---
@@ -514,7 +525,7 @@ export async function loadTechnicalAuditOverview(
     if (activeIssueFilter.rule !== "all") issueParams.set("rule", activeIssueFilter.rule);
     displayedEnv = await apiGetEnvelope<AuditIssueRecord[]>(`${base}/audit-issues?${issueParams.toString()}`)
       .then((env) => env)
-      .catch(() => ({ data: [] as AuditIssueRecord[] }));
+      .catch(() => { if (!loadErrors.includes("Issues")) loadErrors.push("Issues"); return { data: [] as AuditIssueRecord[] }; });
   }
   const displayedIssues = (Array.isArray(displayedEnv.data) ? displayedEnv.data : []).filter(
     (i) => matchesStatus(i, activeIssueFilter.status) && matchesRule(i, activeIssueFilter.rule)
@@ -590,6 +601,7 @@ export async function loadTechnicalAuditOverview(
   return {
     connected: true,
     apiBaseUrl,
+    loadErrors,
     project,
     site,
     readiness,
