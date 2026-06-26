@@ -98,6 +98,12 @@ select {
   letter-spacing: -0.03em;
 }
 
+/* B-2 brand lockup: the one surgical orange gesture in the wordmark —           */
+/* the hyphen and the final period carry the accent (brand-identity.md §2.1).    */
+.brand-title__accent {
+  color: var(--primary);
+}
+
 .brand-claim {
   margin: 0.25rem 0 0;
   color: var(--muted);

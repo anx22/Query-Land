@@ -15,7 +15,9 @@ export function Navigation({ activePath, projects, activeProjectId, readiness }:
   return (
     <aside className="sidebar">
       <div>
-        <h1 className="brand-title">Query-Land</h1>
+        <h1 className="brand-title">
+          Query<span className="brand-title__accent">-</span>Land<span className="brand-title__accent">.</span>
+        </h1>
         <p className="brand-claim">Sichtbarkeit, die sich belegen lässt.</p>
       </div>
 
