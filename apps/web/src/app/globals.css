@@ -33,6 +33,12 @@
   --inactive-surface: #f0ece7;   /* flat fill for inactive chips/icons           */
   --inactive-line:    #e8dfd6;   /* border for inactive controls                 */
   --inactive-opacity: 0.55;      /* applied to fully-disabled action buttons     */
+
+  /* Editorial Tech typography (B-1) — wired in layout.tsx via next/font.          */
+  /* Erzählung serif · Bedienung sans · Messwert mono. brand-identity.md §4.       */
+  --font-serif: "Literata", Georgia, "Times New Roman", serif;
+  --font-sans:  "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
 * {
@@ -45,7 +51,7 @@ body {
     radial-gradient(circle at top right, rgba(255, 92, 0, 0.12), transparent 32rem),
     var(--background);
   color: var(--ink);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
 }
 
 a {
@@ -86,8 +92,10 @@ select {
 
 .brand-title {
   margin: 0.35rem 0 0;
+  font-family: var(--font-serif);
+  font-weight: 700;
   font-size: 1.55rem;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
 }
 
 .brand-claim {
@@ -219,17 +227,31 @@ p {
   margin-top: 0;
 }
 
+/* Editorial Tech: headlines are serif (Literata) — the broadsheet voice. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+
 h1 {
   max-width: 52rem;
   margin-bottom: 0.85rem;
   font-size: clamp(1.75rem, 3.2vw, 2.85rem);
   line-height: 1.08;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.035em;
 }
 
 h2 {
-  font-size: 1.1rem;
-  letter-spacing: -0.02em;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 p {
@@ -257,12 +279,27 @@ p {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* Editorial Tech: measured values are monospace (JetBrains Mono), tabular —      */
+/* "the numbers look like a terminal, the headlines like a newspaper."            */
 .metric-value {
   display: block;
   margin-top: 0.3rem;
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.05em;
+  font-family: var(--font-mono);
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shared data-mono utility for raw values, URLs, HTTP status, IDs, metrics. */
+.data-mono,
+.metric-value {
+  font-feature-settings: "tnum" 1;
+}
+
+.data-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .badge-row {
