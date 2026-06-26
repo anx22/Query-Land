@@ -726,7 +726,10 @@ select:disabled {
 }
 
 .delta-chip__value {
-  /* always rendered — direction is not color-only */
+  /* B-3: measured delta → monospace, tabular (matches .metric-value signature) */
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .delta-chip--up {
@@ -837,6 +840,17 @@ select:disabled {
   color: var(--primary);
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+/* B-3 Mono-Daten-Pass: every Recharts axis tick label is a measured number, so */
+/* it renders in JetBrains Mono / tabular — consistent with .metric-value.       */
+.recharts-cartesian-axis-tick-value,
+.recharts-cartesian-axis-tick-value tspan,
+.recharts-label,
+.recharts-tooltip-label,
+.recharts-tooltip-item-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Screen-reader-only utility (shared by DeltaChip sr text) */
