@@ -28,7 +28,8 @@
 | Connector-Contract + Lighthouse + Failure-Modes | ✅ (credential-gated) | PR #42 (T5) |
 | Issue-Lifecycle (distinct Dismiss/Actor/Historie) | ✅ | PR #43 (T4) |
 | Crawl-Diff (As-of-Lifecycle-Diff + Vergleichs-UI) | ✅ | PR #45/#46 (UX-6b) |
-| Tests | ✅ **164 node + 267 web**, grün | `npm run check`, `@seo-tool/web test` |
+| Content Workspace (Refresh-Board, Brief-Editor, Linkvorschläge, MCP-Bridge) | ✅ | PR #49/#50 (UX-7) |
+| Tests | ✅ **173 node + 306 web**, grün | `npm run check`, `@seo-tool/web test` |
 | Produktion | ✅ live, Health ok | `queryland-mikadesign.vercel.app` |
 
 **Damit geschlossen:** GAP-PERSIST-001 (Neon statt Turso), die „Sync-Store"-Strukturblockade, GAP-REPORT-003-Cron-Trigger (Mechanik vorhanden), und mit Welle 0+1 der Großteil von WP-Z.1 (AuthZ) sowie Sprint A/B/C (siehe unten).
@@ -85,13 +86,13 @@
 ## 5. UX/Backend-Tiefe (Roadmap-Reste)  →  [`../design/ux-ui-sprint.md`](../design/ux-ui-sprint.md)
 
 - **UX-6b Crawl-Diff** (neues Backend) — ✅ **erledigt** (PR #45 Backend, #46 UI). As-of-Lifecycle-Diff zweier Runs + Vergleichs-UI. *(Bewusste Lücke: „entfernte URLs" nicht ableitbar ohne Per-Run-Snapshot.)*
-- **UX-7 Content Workspace** (net-new, Scope-Entscheidung) — offen.
+- **UX-7 Content Workspace** — ✅ **erledigt** (PR #49 Backend, #50 UI). `/content-workspace`: Refresh-Kandidaten-Board, Content-Score-Gauge, manueller Brief-Editor (kein LLM-Auto-Gen — credential-gated), Term-Checkliste, interne Linkvorschläge (echter Linkgraph), Brief→Ticket/PR via MCP, Drill-down vom Opportunity Board. *(Bewusste Lücke: Auto-Brief-Generierung + echte GSC-Metriken folgen mit LLM/GSC-Credentials.)*
 
 ---
 
 ## 6. Hygiene & Querschnitt
 
-- **GAP-SEC-001** — Next/PostCSS Dependency-Audit (moderate Findings) bewusst entscheiden. *(offen)*
+- **GAP-SEC-001** — Dependency-Audit: ✅ `undici` (2× high) per non-breaking `npm audit fix` behoben (→ 7.28.0). Verbleibend: 2× **moderate** `postcss <8.5.10` (transitiv via `next`). **Bewusst akzeptiertes Restrisiko:** PostCSS läuft nur build-time, kein untrusted CSS-Input → keine reale Exposure; der `--force`-Fix (`next@9.3.3`) ist ein breaking Downgrade und tabu. Echter Fix kommt automatisch mit dem nächsten regulären Next-Upgrade.
 - **Code-Hygiene:** ✅ Legacy-SQLite-Namen umbenannt (PR #38). Rest-Notiz: `stackDecision.database`-String in `packages/shared-config` nennt noch „SQLite embedded".
 - **Doku-Hygiene:** ✅ abgeschlossen (URL-Drift, SQLite-Default-Sprache, Wave-Status, Handoff→Roadmap).
 
