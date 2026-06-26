@@ -74,7 +74,7 @@ class SQLiteBacklinkStore implements BacklinkStore {
     const { baseUrl } = await this.requireProjectSite(projectId);
     const round = Number((await this.db.prepare(`SELECT COUNT(*) AS c FROM backlink_snapshots WHERE project_id = ?`).get(projectId) as { c: number }).c);
     const provider = getBacklinkProvider();
-    const rows = provider.fetch({ baseUrl, round });
+    const rows = await provider.fetch({ baseUrl, round });
     const capturedAt = new Date().toISOString();
     const snapshotId = `blsnap-${randomUUID()}`;
     const referringDomains = new Set(rows.map((row) => row.sourceDomain)).size;
