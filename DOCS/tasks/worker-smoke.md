@@ -49,74 +49,70 @@ Diese prüfen u. a.:
 
 ## Manueller Smoke gegen eine echte Test-Site
 
-> Kein netzwerkabhängiger automatisierter Test — CI bleibt deterministisch. Diesen Smoke nur manuell ausführen.
+> Kein netzwerkabhängiger automatisierter Test — CI bleibt deterministisch. Der
+> Runner ist ein **Script** (`services/crawler/src/smoke.ts`), kein `*.test.ts`,
+> und wird daher von `npm test` / `npm run check` **nicht** ausgeführt. Diesen
+> Smoke nur manuell ausführen.
 
-### TARGET (Platzhalter)
+### Sicherheit / Berechtigung
 
-Eine eigene, crawlbare Site mit gültiger `robots.txt` und `sitemap.xml` setzen:
+Niemals fremde Sites ohne Erlaubnis crawlen — nur Sites, die euch gehören bzw.
+für die ihr Crawl-Berechtigung habt. Der Crawler sendet den User-Agent
+`SeoToolBot/1.0 (+https://github.com/seo-tool)` (überschreibbar via
+`CRAWLER_USER_AGENT`) und respektiert `robots.txt`.
 
-```bash
-export SMOKE_BASE_URL="https://deine-test-site.example/"
-export SMOKE_SITEMAP_URL="https://deine-test-site.example/sitemap.xml"
-export SMOKE_PROJECT_ID="proj-smoke"
-export SMOKE_SITE_ID="site-smoke"
-```
+### Ausführen
 
-Empfehlung: eine kleine eigene Content-/Marketing-Site (wenige Dutzend URLs), bei der ihr Crawl-Berechtigung habt. Niemals fremde Sites ohne Erlaubnis crawlen — der Crawler sendet den User-Agent `SeoToolBot/1.0 (+https://github.com/seo-tool)` (überschreibbar via `CRAWLER_USER_AGENT`) und respektiert `robots.txt`.
-
-### Voraussetzungen
-
-1. Neon-Postgres erreichbar; `DATABASE_URL` / Neon-Connection-String gesetzt.
-2. `CRON_SECRET` gesetzt (für die Cron-Route).
-3. Web-App lokal gebaut/gestartet.
-
-### Befehle (manuell)
+Ein einziges Kommando führt den kompletten realen End-to-End-`crawl_seed`-Zyklus
+gegen `SMOKE_BASE_URL` aus (echtes `fetch`, robots.txt + User-Agent), persistiert
+die Artefakte, prüft die Erfolgskriterien und gibt einen PASS/FAIL-Report aus.
+Exit-Code 0 nur, wenn **alle** Kriterien bestehen.
 
 ```bash
-# 1. Build
-npm run build
+# Minimal — gegen eine 1-seitige Site (kein Sitemap/keine Links nötig):
+SMOKE_BASE_URL="https://example.com/" npm run smoke:crawl
 
-# 2. Web-App lokal starten (lädt .env mit DATABASE_URL + CRON_SECRET)
-npm run build:web && npm --workspace @seo-tool/web run start &
-
-# 3. crawl_seed-Job über die interne API anlegen (Payload siehe unten)
-curl -sS -X POST "http://localhost:3000/api/internal/jobs" \
-  -H "content-type: application/json" \
-  -d "{\"projectId\":\"$SMOKE_PROJECT_ID\",\"type\":\"crawl_seed\",\"subject\":\"$SMOKE_BASE_URL\",\"payload\":{\"siteId\":\"$SMOKE_SITE_ID\",\"baseUrl\":\"$SMOKE_BASE_URL\",\"sitemapUrl\":\"$SMOKE_SITEMAP_URL\"}}"
-
-# 4. Cron-Route einmal triggern (drained die Queue)
-curl -sS "http://localhost:3000/api/cron/crawl" \
-  -H "authorization: Bearer $CRON_SECRET" | jq
-
-# 5. Crawl-Run-Status / Artefakte prüfen
-curl -sS "http://localhost:3000/api/internal/projects/$SMOKE_PROJECT_ID/sites/$SMOKE_SITE_ID/crawl-runs" | jq
+# Eigene Test-Site mit Sitemap:
+SMOKE_BASE_URL="https://deine-test-site.example/" \
+SMOKE_SITEMAP_URL="https://deine-test-site.example/sitemap.xml" \
+npm run smoke:crawl
 ```
 
-Job-Payload:
+Ohne `SMOKE_BASE_URL` druckt der Runner eine Usage-Hilfe und beendet sich mit
+Exit-Code 0 (sicherer No-Op bei versehentlicher CI-/Invocation).
 
-```json
-{
-  "siteId": "site-smoke",
-  "baseUrl": "https://deine-test-site.example/",
-  "sitemapUrl": "https://deine-test-site.example/sitemap.xml"
-}
-```
+### Environment-Vertrag
 
-> Hinweis: Die konkreten internen API-Pfade können je nach Routing variieren — maßgeblich ist, dass ein `crawl_seed`-Job angelegt und anschließend `/api/cron/crawl` mit gültigem `CRON_SECRET` aufgerufen wird.
+| Variable | Pflicht | Default | Bedeutung |
+| --- | --- | --- | --- |
+| `SMOKE_BASE_URL` | ja | — | Basis-URL der zu crawlenden Site (ohne → No-Op, Exit 0) |
+| `SMOKE_SITEMAP_URL` | nein | `<baseUrl>/sitemap.xml` | Sitemap-URL |
+| `SMOKE_MAX_URLS` | nein | `25` | Obergrenze gefetchter URLs |
+| `SMOKE_PROJECT_ID` | nein | `proj-smoke` | Projekt-ID |
+| `SMOKE_SITE_ID` | nein | `site-smoke` | Site-ID |
+| `DATABASE_URL` | nein | Wegwerf-PGlite (in `os.tmpdir()`, danach gelöscht) | Store-URL (z. B. Neon-Postgres) |
+| `CRAWLER_USER_AGENT` | nein | `SeoToolBot/1.0 (+https://github.com/seo-tool)` | gesendeter User-Agent |
+
+Ist `DATABASE_URL` gesetzt, schreibt der Runner dorthin; sonst legt er eine
+Wegwerf-PGlite-Datei in `os.tmpdir()` an und löscht sie am Ende wieder.
 
 ## Erfolgskriterien (CRITERIA)
 
-Der manuelle Site-Smoke gilt als bestanden, wenn:
+Der Runner prüft die folgenden Kriterien und druckt jedes als `PASS`/`FAIL`.
+Die Schwellen sind bewusst lenient, damit eine minimale 1-seitige Site (z. B.
+`example.com`, ohne Sitemap, ohne Links) besteht (`discovered>=1`,
+`fetched>=1`). Exit 0 nur, wenn alle bestehen:
 
-- die Cron-Antwort `ok: true` liefert und `crawl.processed >= 1` ist,
-- pro gedraintem Zyklus eine `crawl_drain_cycle`-Logzeile mit `jobId` + `crawlRunId` erscheint,
-- der `crawl_seed`-Job `succeeded` ist (oder bei bewusstem Fehler nachvollziehbar `failed` mit `errorMessage`),
-- ein Crawl Run mit Summary vorhanden ist (`discoveredUrls`, `fetchedUrls`, `healthScore !== null`),
-- `discovered_urls`, Fetch Results und Indexability Assessments persistiert wurden,
-- Sitemap-Index-Dateien nur in-scope verfolgt wurden,
-- Redirect-Loops als erklärbarer `network_error` statt als Endloslauf sichtbar werden,
-- robots-blockierte URLs als `blocked_by_robots` ohne Page-Fetch erfasst werden,
-- die Requests den erwarteten `User-Agent` an die Zielsite gesendet haben.
+1. `job_claimed_and_succeeded` — der `crawl_seed`-Job wurde geclaimt und endet `succeeded`.
+2. `discovered_urls` — `>= 1` discovered URL persistiert.
+3. `fetch_results` — `>= 1` Fetch-Result persistiert.
+4. `indexability_assessed` — für jede gefetchte URL existiert eine Indexability-Bewertung.
+5. `crawl_run_completed_with_summary` — Crawl Run abgeschlossen mit Summary.
+6. `health_score_computed` — Health Score wurde berechnet (`!== null`).
+
+> Die reine Kriterien-Logik (`evaluateSmokeCriteria`) ist netzwerkfrei extrahiert
+> und durch `services/crawler/test/smoke-criteria.test.ts` unit-getestet — so
+> bleibt die Coverage erhalten, während der Runner selbst network-only/manuell ist.
 
 ## Einschränkungen
 
