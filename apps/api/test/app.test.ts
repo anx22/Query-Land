@@ -400,6 +400,13 @@ test("limited crawl list endpoints expose pagination, filters, and URL explorer 
   assert.equal((urls.body as { data: Array<{ id: string }> }).data[0]?.id, "url-page-two");
   assert.equal((urls.body as { meta: { total: number } }).meta.total, 1);
 
+  // URL substring search (C3): case-insensitive LIKE over the URL.
+  const urlSearchHit = await app("GET", "/projects/proj-demo/sites/site-demo/url-explorer?q=EXAMPLE.COM");
+  assert.equal(urlSearchHit.status, 200);
+  assert.equal((urlSearchHit.body as { meta: { total: number } }).meta.total, 2);
+  const urlSearchMiss = await app("GET", "/projects/proj-demo/sites/site-demo/url-explorer?q=zzz-no-such-url");
+  assert.equal((urlSearchMiss.body as { meta: { total: number } }).meta.total, 0);
+
   const issues = await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues?limit=5&status=open&severity=critical&rule=http_error");
   assert.equal(issues.status, 200);
   assert.equal((issues.body as { data: Array<{ id: string }> }).data[0]?.id, "issue-page-one");
