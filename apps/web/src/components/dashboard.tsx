@@ -17,6 +17,7 @@
  */
 
 import type { OverviewData } from "../lib/overview-api";
+import { OverviewHeader } from "./overview-header";
 import { ConfidenceBadge } from "./confidence-badge";
 import { DeltaChip } from "./delta-chip";
 import { WhyItMatters } from "./why-it-matters";
@@ -149,6 +150,11 @@ export function Dashboard({ data }: { data: OverviewData }) {
   return (
     <>
       {/* ------------------------------------------------------------------ */}
+      {/* O-1 Editorial page header — serif claim + Ridges contour band       */}
+      {/* ------------------------------------------------------------------ */}
+      <OverviewHeader projectName={project?.name ?? null} />
+
+      {/* ------------------------------------------------------------------ */}
       {/* Offline / API-not-reachable notice                                  */}
       {/* ------------------------------------------------------------------ */}
       {!connected && (
@@ -164,11 +170,10 @@ export function Dashboard({ data }: { data: OverviewData }) {
         <div className="card overview-hero__trend">
           <div className="overview-section-header">
             <div>
-              <p className="kicker">Übersicht · {project?.name ?? "Kein Projekt"}</p>
-              <h1 id="overview-hero-heading">
+              <h2 id="overview-hero-heading">
                 <TermTooltip term="Visibility-Index">Visibility</TermTooltip>
                 {"-Verlauf"}
-              </h1>
+              </h2>
               <WhyItMatters>
                 Zeigt, wie sich Ihre positionsgewichtete Sichtbarkeit über die Zeit entwickelt — Grundlage jeder Priorisierungsentscheidung.
               </WhyItMatters>

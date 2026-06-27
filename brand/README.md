@@ -11,7 +11,17 @@ Heimat **aller** Marken- und Website-Assets. Bewusst auf Repo-Ebene neben `apps/
 
 ---
 
-## Vokabular (verbindlich, damit wir nichts mehr verwechseln)
+## Motiv-Zuordnung pro Screen (mit dir bestätigt)
+
+> **Regel:** Vor jeder Umsetzung wird die exakte Bildvorlage gezeigt und freigegeben — keine
+> Asset-Wahl „aus dem Gedächtnis".
+
+| Screen | Bestätigtes Motiv | Asset |
+|---|---|---|
+| **Overview / Hero** | **Höhenlinien-Band** (topografisch, mit Gipfel + orangem Ring) | `header/ridges/ridges-band-01.jpg` → `apps/web/public/brand/overview-header.jpg` |
+| weitere Screens | _offen_ — je Screen einzeln bestätigen | — |
+
+## Vokabular (Bild-Familien, damit wir nichts mehr verwechseln)
 
 | Begriff | Was | Einsatz |
 |---|---|---|
