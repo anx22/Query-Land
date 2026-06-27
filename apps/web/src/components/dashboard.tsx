@@ -164,6 +164,70 @@ export function Dashboard({ data }: { data: OverviewData }) {
       )}
 
       {/* ------------------------------------------------------------------ */}
+      {/* O-2 KPI Bento — measured headline numbers (mono), real data only    */}
+      {/* ------------------------------------------------------------------ */}
+      {connected && project && (
+        <section className="kpi-bento" aria-label="Kennzahlen im Überblick">
+          <article className="kpi-card">
+            <p className="kpi-card__label">
+              <TermTooltip term="Visibility-Index">Visibility-Index</TermTooltip>
+              <InfoTip label="Visibility-Index erklären">
+                Positionsgewichtete Sichtbarkeit (0–100) auf dem eigenen Keyword-Set. Mehr im{" "}
+                <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
+              </InfoTip>
+            </p>
+            <span className="metric-value kpi-card__value">
+              {latestVisibility !== null ? latestVisibility.score.toLocaleString("de-DE") : "—"}
+            </span>
+            <div className="kpi-card__foot">
+              {visibilityDelta !== null && <DeltaChip value={visibilityDelta} />}
+              {latestVisibility !== null && <ConfidenceBadge level="C" />}
+            </div>
+          </article>
+
+          <article className="kpi-card">
+            <p className="kpi-card__label">
+              <TermTooltip term="Health Score">Health Score</TermTooltip>
+            </p>
+            <span className="metric-value kpi-card__value">
+              {latestHealthScore !== null ? latestHealthScore.score.toLocaleString("de-DE") : "—"}
+            </span>
+            <div className="kpi-card__foot">
+              {healthDelta !== null && <DeltaChip value={healthDelta} />}
+              {latestHealthScore !== null && <ConfidenceBadge level="A" />}
+            </div>
+          </article>
+
+          <article className="kpi-card">
+            <p className="kpi-card__label">
+              <TermTooltip term="Keyword / Intent">Keywords getrackt</TermTooltip>
+            </p>
+            <span className="metric-value kpi-card__value">
+              {positionBuckets.total > 0 ? positionBuckets.total.toLocaleString("de-DE") : "—"}
+            </span>
+            <div className="kpi-card__foot">
+              {positionBuckets.total > 0 && <ConfidenceBadge level="B" />}
+            </div>
+          </article>
+
+          <article className="kpi-card">
+            <p className="kpi-card__label">
+              <TermTooltip term="Striking Distance">Striking Distance</TermTooltip>
+              <InfoTip label="Striking Distance erklären">
+                Keywords auf Position 11–20 — die günstigsten Hebel für schnelle Sichtbarkeitsgewinne.
+              </InfoTip>
+            </p>
+            <span className="metric-value kpi-card__value">
+              {positionBuckets.total > 0 ? positionBuckets.strikingDist.toLocaleString("de-DE") : "—"}
+            </span>
+            <div className="kpi-card__foot">
+              {positionBuckets.total > 0 && <ConfidenceBadge level="C" />}
+            </div>
+          </article>
+        </section>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
       {/* Hero: Visibility TrendChart + Health ScoreGauge                     */}
       {/* ------------------------------------------------------------------ */}
       <section className="overview-hero" aria-labelledby="overview-hero-heading">
@@ -177,32 +241,6 @@ export function Dashboard({ data }: { data: OverviewData }) {
               <WhyItMatters>
                 Zeigt, wie sich Ihre positionsgewichtete Sichtbarkeit über die Zeit entwickelt — Grundlage jeder Priorisierungsentscheidung.
               </WhyItMatters>
-            </div>
-            {/* KPI chips inline with hero header */}
-            <div className="overview-kpi-row">
-              {latestVisibility !== null ? (
-                <div className="overview-kpi-chip">
-                  <span className="overview-kpi-chip__label">
-                    <TermTooltip term="Visibility-Index">Visibility-Index</TermTooltip>
-                    <InfoTip label="Visibility-Index erklären">
-                      Positionsgewichtete Sichtbarkeit (0–100) auf dem eigenen Keyword-Set. Mehr im{" "}
-                      <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
-                    </InfoTip>
-                  </span>
-                  <span className="metric-value overview-kpi-chip__value">
-                    {latestVisibility.score.toLocaleString("de-DE")}
-                  </span>
-                  {visibilityDelta !== null && (
-                    <DeltaChip value={visibilityDelta} />
-                  )}
-                  <ConfidenceBadge level="C" />
-                </div>
-              ) : (
-                <div className="overview-kpi-chip overview-kpi-chip--empty">
-                  <span className="overview-kpi-chip__label">Visibility-Index</span>
-                  <span className="metric-value overview-kpi-chip__value">—</span>
-                </div>
-              )}
             </div>
           </div>
 
