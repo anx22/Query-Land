@@ -1,6 +1,7 @@
 import "../../features/backlinks/backlinks.css";
 
 import { AppShell } from "../../components/app-shell";
+import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -51,6 +52,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         {/* Intro + import action                                             */}
         {/* ----------------------------------------------------------------- */}
         <section className="card hero-card">
+          <HeroBand src="/brand/hdr-backlinks.jpg" />
           <p className="kicker">Verlinkung von anderen Websites</p>
           <h1>Backlink-Profil</h1>
           <p>

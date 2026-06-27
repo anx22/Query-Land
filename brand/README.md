@@ -16,10 +16,22 @@ Heimat **aller** Marken- und Website-Assets. Bewusst auf Repo-Ebene neben `apps/
 > **Regel:** Vor jeder Umsetzung wird die exakte Bildvorlage gezeigt und freigegeben — keine
 > Asset-Wahl „aus dem Gedächtnis".
 
-| Screen | Bestätigtes Motiv | Asset |
-|---|---|---|
-| **Overview / Hero** | **Höhenlinien-Band** (topografisch, mit Gipfel + orangem Ring) | `header/ridges/ridges-band-01.jpg` → `apps/web/public/brand/overview-header.jpg` |
-| weitere Screens | _offen_ — je Screen einzeln bestätigen | — |
+Alle Header nutzen denselben **luftigen Höhenlinien-Stil** (mittlerer Linienabstand, ein oranger
+Gipfelring), pro Screen eine eigene Komposition — vom Nutzer bestätigt.
+
+| Screen | Asset (Quelle / serviert) |
+|---|---|
+| **Overview / Hero** | `header/ridges/screen-overview.jpg` → `public/brand/overview-header.jpg` |
+| **Technical Audit** | `header/ridges/screen-technical-audit.jpg` → `public/brand/hdr-technical-audit.jpg` |
+| **Keywords & Rankings** | `screen-keywords-rank.jpg` → `hdr-keywords-rank.jpg` |
+| **Content & Chancen** | `screen-content-opportunities.jpg` → `hdr-content-opportunities.jpg` |
+| **Backlinks** | `screen-backlinks.jpg` → `hdr-backlinks.jpg` |
+| **KI-Sichtbarkeit** | `screen-ai-visibility.jpg` → `hdr-ai-visibility.jpg` |
+| **Reports** | `screen-reports.jpg` → `hdr-reports.jpg` |
+| **URL-Dossier** | `screen-url-dossier.jpg` → `hdr-url-dossier.jpg` |
+
+> Eingebaut via `<HeroBand src>` in der `.hero-card` (maskiert, links freigehalten). Overview via
+> `OverviewHeader`. Die ältere dichte Linien-Variante wurde verworfen (zu dichte Abstände).
 
 ## Vokabular (Bild-Familien, damit wir nichts mehr verwechseln)
 

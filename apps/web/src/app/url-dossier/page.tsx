@@ -1,6 +1,7 @@
 import "../../features/url-dossier/dossier.css";
 
 import { AppShell } from "../../components/app-shell";
+import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -29,6 +30,7 @@ export default async function Page({
   return (
     <AppShell activePath="/url-dossier">
       <section className="card hero-card">
+        <HeroBand src="/brand/hdr-url-dossier.jpg" />
         <p className="kicker">Eine Seite, alle SEO-Infos</p>
         <h1>URL-Dossier</h1>
         <p>

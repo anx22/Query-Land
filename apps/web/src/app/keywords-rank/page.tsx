@@ -1,6 +1,7 @@
 import "../../features/keyword-rank/keywords.css";
 
 import { AppShell } from "../../components/app-shell";
+import { HeroBand } from "../../components/hero-band";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -34,6 +35,7 @@ export default async function Page({
   return (
     <AppShell activePath="/keywords-rank">
       <section className="card hero-card">
+        <HeroBand src="/brand/hdr-keywords-rank.jpg" />
         <p className="kicker">Suchbegriffe &amp; Platzierungen</p>
         <h1>Keywords &amp; Rankings</h1>
         <p>

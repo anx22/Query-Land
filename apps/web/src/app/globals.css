@@ -257,7 +257,33 @@ select {
 }
 
 .hero-card {
+  position: relative;
+  overflow: hidden;
   padding: 2rem;
+}
+
+/* Per-screen Höhenlinien band inside the hero card (decorative, masked left). */
+.hero-card > *:not(.hero-card__band) {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-card__band {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-position: right center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  mix-blend-mode: multiply;
+  opacity: 0.85;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 30%, rgba(0, 0, 0, 0.6) 56%, #000 95%);
+  mask-image: linear-gradient(to right, transparent 0%, transparent 30%, rgba(0, 0, 0, 0.6) 56%, #000 95%);
+}
+
+@media (max-width: 980px) {
+  .hero-card__band { opacity: 0.4; }
 }
 
 h1,
