@@ -11,10 +11,11 @@
  * an onClose callback. Closes on Escape and on backdrop click.
  */
 
-import { useEffect } from "react";
+import { useRef } from "react";
 import type { Evidence, Opportunity, SourceConfidence } from "@seo-tool/domain-model";
 import { ConfidenceBadge, confidenceMeta, type ConfidenceLevel } from "../../components/confidence-badge";
 import { confidenceToLevel, opportunityTypeLabel } from "../../lib/board-logic";
+import { useFocusTrap } from "../../lib/use-focus-trap";
 
 export interface EvidenceChainDrawerProps {
   opportunity: Opportunity | null;
@@ -44,14 +45,8 @@ function workspaceDrillHref(opportunity: Opportunity): string {
 }
 
 export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawerProps) {
-  useEffect(() => {
-    if (!opportunity) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [opportunity, onClose]);
+  const drawerRef = useRef<HTMLElement>(null);
+  useFocusTrap(drawerRef, opportunity !== null, onClose);
 
   if (!opportunity) return null;
 
@@ -60,6 +55,7 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
   return (
     <div className="board-drawer-backdrop" onClick={onClose} role="presentation">
       <aside
+        ref={drawerRef}
         className="board-drawer"
         role="dialog"
         aria-modal="true"

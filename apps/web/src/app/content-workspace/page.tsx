@@ -1,6 +1,7 @@
 import "../../features/content-workspace/workspace.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -105,12 +106,7 @@ export default async function Page({
             {data.connected ? "API verbunden" : "API offline"}
           </span>
         </div>
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage ?? "Content-Daten konnten nicht geladen werden."} · Erwartete API:{" "}
-            {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
         {data.connected && (!data.project || !data.site) ? (
           <p className="notice">
             Lege zuerst ein Projekt und eine Site an, um Refresh-Kandidaten und Briefs zu sehen.
@@ -134,7 +130,7 @@ export default async function Page({
           <p className="kicker">Refresh-Kandidaten</p>
           <p className="muted">
             Seiten mit fallendem Klick-Trend, gewichtet nach geschätztem Traffic und offenen Problemen.
-            Die Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="E" />
+            Die Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="B" />
           </p>
           {data.refreshCandidates.length > 0 ? (
             <div className="cw-candidates">
@@ -179,7 +175,7 @@ export default async function Page({
           <p className="kicker">Content-Score</p>
           <p className="muted">
             Für {data.selectedUrl ? <strong>{data.selectedUrl}</strong> : "die gewählte URL"} — blendet
-            Crawl-Health, offene Issues und Metrik-Trend. <ConfidenceBadge level="E" />
+            Crawl-Health, offene Issues und Metrik-Trend. <ConfidenceBadge level="B" />
           </p>
           <ScoreGauge value={score?.score ?? null} label="Content" />
           <div className="cw-score-row">

@@ -1,4 +1,5 @@
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { createSiteAction, createWebsiteAction, setActiveProjectAction } from "./actions";
 import { loadProjectControlData } from "../../lib/foundation-api";
 
@@ -27,8 +28,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <span className="badge primary">{data.projects.length} {data.projects.length === 1 ? "Website" : "Websites"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Verbunden" : "Nicht erreichbar"}</span>
         </div>
-        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+        {feedback ? (
+          <div className={`notice ${feedback.kind} notice--cta`}>
+            <span>{feedback.message}</span>
+            {feedback.cta ? <a className="button" href={feedback.cta.href}>{feedback.cta.label}</a> : null}
+          </div>
+        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
       </section>
 
       {hasProjects && (
@@ -54,7 +60,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <>
                     <div className="facts">
                       <span className="fact"><span className="fact__label">Umfang</span><span className="fact__value">{SCOPE_LABEL[site.scopeType] ?? site.scopeType}</span></span>
-                      <span className="fact"><span className="fact__label">Prüfung</span><span className="fact__value">{FREQ_LABEL[site.crawlFrequency] ?? site.crawlFrequency}</span></span>
+                      <span className="fact"><span className="fact__label">Analyse</span><span className="fact__value">{FREQ_LABEL[site.crawlFrequency] ?? site.crawlFrequency}</span></span>
                       <span className="fact"><span className="fact__label">Wichtigkeit</span><span className="fact__value">{site.businessValue}/100</span></span>
                     </div>
                     <div className="cluster">
@@ -136,11 +142,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 function feedbackMessage(
   created: string | string[] | undefined,
   error: string | string[] | undefined,
-): { kind: "success" | "danger"; message: string } | null {
+): { kind: "success" | "danger"; message: string; cta?: { href: string; label: string } } | null {
   const errorValue = Array.isArray(error) ? error[0] : error;
   if (errorValue) return { kind: "danger", message: errorValue };
   const createdValue = Array.isArray(created) ? created[0] : created;
-  if (createdValue === "website") return { kind: "success", message: "Website hinzugefügt und aktiviert. Starten Sie jetzt die erste Analyse." };
-  if (createdValue === "site") return { kind: "success", message: "Adresse gespeichert. Starten Sie jetzt die erste Analyse." };
+  const startAnalysis = { href: "/technical-audit#crawl-start", label: "Erste Analyse starten →" };
+  if (createdValue === "website") return { kind: "success", message: "Website hinzugefügt und aktiviert.", cta: startAnalysis };
+  if (createdValue === "site") return { kind: "success", message: "Adresse gespeichert.", cta: startAnalysis };
   return null;
 }

@@ -45,48 +45,53 @@ export function CitationMatrix({ rows }: CitationMatrixProps) {
   }
 
   return (
-    <div className="ai-matrix" role="table" aria-label="Citation-Matrix: Prompts × zitiert">
-      <div className="ai-matrix__head" role="row">
-        <span role="columnheader">Prompt</span>
-        <span role="columnheader">Zitiert?</span>
-        <span role="columnheader">Status</span>
-        <span role="columnheader">Zitierte Domains</span>
-        <span role="columnheader">Letzter Snapshot</span>
-      </div>
+    <div className="ai-matrix-scroll">
+      <table className="ai-matrix" aria-label="Citation-Matrix: Prompts × zitiert">
+        <thead>
+          <tr>
+            <th scope="col">Prompt</th>
+            <th scope="col">Zitiert?</th>
+            <th scope="col">Status</th>
+            <th scope="col">Zitierte Domains</th>
+            <th scope="col">Letzter Snapshot</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const label = citationStatusLabel(row.status);
+            return (
+              <tr key={row.promptId}>
+                <td className="ai-matrix__prompt">
+                  <span className="ai-matrix__prompt-text">{row.prompt}</span>
+                  {row.market ? <span className="ai-matrix__market">Markt: {row.market}</span> : null}
+                </td>
 
-      {rows.map((row) => {
-        const label = citationStatusLabel(row.status);
-        return (
-          <div className="ai-matrix__row" role="row" key={row.promptId}>
-            <span className="ai-matrix__prompt" role="cell">
-              <span className="ai-matrix__prompt-text">{row.prompt}</span>
-              {row.market ? <span className="ai-matrix__market">Markt: {row.market}</span> : null}
-            </span>
+                <td>
+                  <span className={`ai-glyph ai-glyph--${row.status}`}>
+                    <span className="ai-glyph__mark" aria-hidden="true">
+                      {citationGlyph(row.status)}
+                    </span>
+                    <span className="sr-only">{label}</span>
+                  </span>
+                </td>
 
-            <span className={`ai-glyph ai-glyph--${row.status}`} role="cell">
-              <span className="ai-glyph__mark" aria-hidden="true">
-                {citationGlyph(row.status)}
-              </span>
-              <span className="sr-only">{label}</span>
-            </span>
+                <td>
+                  <span className="muted">{label}</span>
+                  {row.snapshotCount > 0 ? (
+                    <span className="muted"> · {row.snapshotCount} Snapshot(s)</span>
+                  ) : null}
+                </td>
 
-            <span role="cell">
-              <span className="muted">{label}</span>
-              {row.snapshotCount > 0 ? (
-                <span className="muted"> · {row.snapshotCount} Snapshot(s)</span>
-              ) : null}
-            </span>
+                <td className="ai-matrix__domains">
+                  {row.citedDomains.length > 0 ? row.citedDomains.join(", ") : "—"}
+                </td>
 
-            <span className="ai-matrix__domains" role="cell">
-              {row.citedDomains.length > 0 ? row.citedDomains.join(", ") : "—"}
-            </span>
-
-            <span className="muted" role="cell">
-              {formatDate(row.capturedAt)}
-            </span>
-          </div>
-        );
-      })}
+                <td className="muted">{formatDate(row.capturedAt)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

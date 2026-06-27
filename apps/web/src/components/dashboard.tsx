@@ -249,7 +249,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           )}
           {latestHealthScore === null && (
             <p className="overview-empty-hint">
-              Noch kein Health Score berechnet. Starten Sie einen Crawl im Technical Audit.
+              Noch kein Health Score berechnet. Starten Sie eine Analyse im Technical Audit.
             </p>
           )}
         </div>
@@ -287,7 +287,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           {topOpportunities.length === 0 ? (
             <div className="overview-empty-state">
               <p className="overview-empty-state__text">
-                Noch kein Terrain kartiert — starten Sie eine Analyse (Crawl) und lassen Sie daraus im Content-&-Chancen-Board priorisierte Optimierungschancen erzeugen.
+                Noch kein Terrain kartiert — starten Sie eine Analyse und lassen Sie daraus im Content-&-Chancen-Board priorisierte Optimierungschancen erzeugen.
               </p>
               <a className="button secondary overview-cta" href="/content-opportunities">
                 Chancen ansehen
@@ -331,7 +331,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
             <div className="overview-empty-state">
               <p className="overview-empty-state__text">
                 Keine offenen kritischen Issues.
-                {!site && " Starten Sie einen Crawl, um technische Probleme zu erkennen."}
+                {!site && " Starten Sie eine Analyse, um technische Probleme zu erkennen."}
               </p>
             </div>
           ) : (
@@ -358,13 +358,13 @@ export function Dashboard({ data }: { data: OverviewData }) {
         {/* Crawl runs + Reports */}
         <div className="card">
           <h2>Letzte Aktivitäten</h2>
-          <WhyItMatters text="Aktuelle Crawl-Ergebnisse und Reports geben Auskunft über den Stand der Daten." />
+          <WhyItMatters text="Aktuelle Analyse-Ergebnisse und Reports geben Auskunft über den Stand der Daten." />
 
           {/* Crawl runs */}
-          <p className="kicker overview-subhead">Crawl-Runs</p>
+          <p className="kicker overview-subhead">Analysen</p>
           {recentCrawlRuns.length === 0 ? (
             <p className="overview-empty-hint">
-              Noch kein Crawl gestartet.{" "}
+              Noch keine Analyse gestartet.{" "}
               <a href="/technical-audit">Jetzt starten →</a>
             </p>
           ) : (

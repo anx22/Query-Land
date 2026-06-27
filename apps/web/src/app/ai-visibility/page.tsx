@@ -3,6 +3,8 @@ import "../../features/ai-visibility/ai-visibility.css";
 import type { AeoAssessment } from "@seo-tool/domain-model";
 import { PROPOSAL_KINDS } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
+import { Icon } from "../../components/icon";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -85,11 +87,7 @@ export default async function Page({
           </div>
 
           {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-          {!data.connected ? (
-            <p className="notice danger">
-              {data.errorMessage} · Erwartete API: {data.apiBaseUrl}
-            </p>
-          ) : null}
+          {!data.connected ? <OfflineNotice /> : null}
         </section>
 
         {/* Score + facts */}
@@ -189,22 +187,36 @@ export default async function Page({
               <input type="hidden" name="siteId" value={data.selectedSite.id} />
               <div className="form-row">
                 <label>
-                  URL
-                  <input type="text" name="url" placeholder="https://example.com/seite" required />
+                  URL der Seite
+                  <input type="url" name="url" placeholder="https://example.com/seite" required />
                 </label>
               </div>
-              <label>
-                Seiteninhalt (HTML der Seite)
-                <textarea
-                  name="content"
-                  rows={4}
-                  placeholder="Quelltext der Seite hier einfügen…"
-                  required
-                />
-              </label>
-              <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
-                Seite analysieren
-              </button>
+              <p className="form-hint muted">
+                Wir rufen den Seiteninhalt automatisch ab und prüfen die KI-Tauglichkeit — kein Kopieren nötig.
+              </p>
+              <details className="advanced-section">
+                <summary>
+                  <span className="advanced-section__title">Erweitert</span>
+                  <span className="advanced-section__hint">
+                    Inhalt manuell einfügen — nur nötig für Seiten mit Login oder reinem JavaScript.
+                  </span>
+                </summary>
+                <label>
+                  Seiteninhalt (optional)
+                  <textarea name="content" rows={4} placeholder="Quelltext der Seite hier einfügen…" />
+                </label>
+              </details>
+              <div className="locked-action">
+                <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
+                  Seite analysieren
+                </button>
+                {!data.connected || !data.selectedProject ? (
+                  <span className="locked-action__reason">
+                    <Icon name="lock" />
+                    {!data.connected ? "API nicht erreichbar." : "Zuerst eine Website anlegen."}
+                  </span>
+                ) : null}
+              </div>
             </form>
           ) : (
             <p className="notice warning">
@@ -301,7 +313,7 @@ function feedbackMessage(
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.created)) return { kind: "success", message: "Prompt aufgenommen." };
   if (singleParam(params?.snapshot)) return { kind: "success", message: "Snapshot erfasst (Klasse E — Signal, kein Beleg)." };
-  if (singleParam(params?.scanned)) return { kind: "success", message: "AEO-Scan abgeschlossen (Klasse A)." };
+  if (singleParam(params?.scanned)) return { kind: "success", message: "AEO-Analyse abgeschlossen (Klasse A)." };
   if (singleParam(params?.proposed)) return { kind: "success", message: "Proposal erstellt — wartet auf Review." };
   const transition = singleParam(params?.transition);
   if (transition) return { kind: "success", message: `Proposal-Status gewechselt zu ${transition}.` };

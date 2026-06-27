@@ -35,13 +35,45 @@ export async function scanAeoAction(formData: FormData) {
     const projectId = requiredString(formData, "projectId");
     const siteId = requiredString(formData, "siteId");
     const url = requiredString(formData, "url");
-    const content = requiredString(formData, "content");
+    // The page content is fetched automatically from the URL; a manually pasted body (advanced,
+    // e.g. for login-gated or JS-only pages) takes precedence so the user can still override.
+    const content = optionalString(formData, "content") ?? (await fetchPageContent(url));
     await scanAeo(projectId, siteId, url, content);
   } catch (error) {
     redirect(`/ai-visibility?error=${encodeURIComponent(messageFor(error))}`);
   }
   revalidateAiVisibilityViews();
   redirect("/ai-visibility?scanned=1");
+}
+
+/** Fetch a page's HTML server-side so a non-expert never has to paste raw source. */
+async function fetchPageContent(url: string): Promise<string> {
+  let target: URL;
+  try {
+    target = new URL(url);
+  } catch {
+    throw new Error("Bitte eine gültige Adresse eingeben (inklusive https://).");
+  }
+  if (target.protocol !== "http:" && target.protocol !== "https:") {
+    throw new Error("Es werden nur http- und https-Adressen unterstützt.");
+  }
+  let response: Response;
+  try {
+    response = await fetch(target, {
+      headers: { "user-agent": "SEO-Tool AEO-Check", accept: "text/html" },
+      redirect: "follow",
+    });
+  } catch {
+    throw new Error("Die Seite konnte nicht abgerufen werden. Bitte prüfen Sie die Adresse und versuchen Sie es erneut.");
+  }
+  if (!response.ok) {
+    throw new Error(`Die Seite antwortete mit Status ${response.status}. Bitte prüfen Sie die Adresse.`);
+  }
+  const html = (await response.text()).trim();
+  if (!html) {
+    throw new Error("Die Seite lieferte keinen Inhalt zum Prüfen.");
+  }
+  return html;
 }
 
 export async function createProposalAction(formData: FormData) {

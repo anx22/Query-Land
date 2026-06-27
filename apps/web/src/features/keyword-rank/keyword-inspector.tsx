@@ -14,7 +14,8 @@
  * Serious-zone: factual, no metaphor.
  */
 
-import { useEffect } from "react";
+import { useRef } from "react";
+import { useFocusTrap } from "../../lib/use-focus-trap";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -42,14 +43,8 @@ function formatDate(iso: string): string {
 }
 
 export function KeywordInspector({ row, inspector, onClose }: KeywordInspectorProps) {
-  useEffect(() => {
-    if (!row) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [row, onClose]);
+  const drawerRef = useRef<HTMLElement>(null);
+  useFocusTrap(drawerRef, row !== null, onClose);
 
   if (!row) return null;
 
@@ -63,6 +58,7 @@ export function KeywordInspector({ row, inspector, onClose }: KeywordInspectorPr
   return (
     <div className="kw-drawer-backdrop" onClick={onClose} role="presentation">
       <aside
+        ref={drawerRef}
         className="kw-drawer"
         role="dialog"
         aria-modal="true"

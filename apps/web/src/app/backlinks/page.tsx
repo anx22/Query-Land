@@ -1,6 +1,7 @@
 import "../../features/backlinks/backlinks.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -8,7 +9,6 @@ import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
 import { GlossarLink } from "../../components/glossar-link";
 import { Icon } from "../../components/icon";
-import { PREREQUISITE_META } from "../../lib/readiness";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
 import { loadBacklinksScreenData } from "../../lib/backlinks-api";
@@ -23,7 +23,6 @@ import {
 import { BacklinkTrendCard } from "../../features/backlinks/backlink-trend-card";
 import { ReferringDomainsTable } from "../../features/backlinks/referring-domains-table";
 import { AnchorDistribution, FollowDistribution } from "../../features/backlinks/distribution-bars";
-import { importBacklinksAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -66,22 +65,20 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
           </div>
           {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-          {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+          {!data.connected ? <OfflineNotice /> : null}
           {data.connected && !hasData ? (
-            <p className="notice">Noch keine Backlink-Daten. Mit „Backlinks importieren“ legen Sie den ersten Snapshot an.</p>
+            <p className="notice">
+              Noch keine Backlink-Daten. Eine echte Backlink-Quelle ist noch nicht angebunden —
+              Google Search Console stellt Backlinks nicht über die Schnittstelle bereit.
+            </p>
           ) : null}
           <div className="action-row">
             <div className="locked-action">
-              <form action={importBacklinksAction}>
-                <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-                <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Backlinks importieren</button>
-              </form>
-              {!data.connected || !data.selectedProject ? (
-                <span className="locked-action__reason">
-                  <Icon name="lock" />
-                  {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
-                </span>
-              ) : null}
+              <button className="button" type="button" disabled>Backlinks importieren</button>
+              <span className="locked-action__reason">
+                <Icon name="lock" />
+                Backlinks-Quelle noch nicht verfügbar — Google liefert keine Backlinks per API.
+              </span>
             </div>
           </div>
         </section>

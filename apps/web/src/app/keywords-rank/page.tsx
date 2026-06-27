@@ -1,6 +1,7 @@
 import "../../features/keyword-rank/keywords.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -51,11 +52,7 @@ export default async function Page({
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage ?? "API nicht erreichbar."} · Erwartete API: {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
         <div className="action-row">
           <div className="locked-action">
             <form action={computeVisibilityAction}>
@@ -166,9 +163,17 @@ export default async function Page({
               Brand-Begriffe (kommagetrennt, optional)
               <input name="brandTerms" placeholder="query-land, acme" />
             </label>
-            <button className="button" type="submit" disabled={!data.connected || !data.project}>
-              Klassifizieren &amp; speichern
-            </button>
+            <div className="locked-action">
+              <button className="button" type="submit" disabled={!data.connected || !data.project}>
+                Klassifizieren &amp; speichern
+              </button>
+              {!data.connected || !data.project ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+                </span>
+              ) : null}
+            </div>
           </form>
         </div>
         <div className="card">
@@ -180,9 +185,17 @@ export default async function Page({
             <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
             <label>Name<input name="name" placeholder="Pricing" required /></label>
             <label>Thema (optional)<input name="topic" placeholder="Money pages" /></label>
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
-              Cluster anlegen
-            </button>
+            <div className="locked-action">
+              <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+                Cluster anlegen
+              </button>
+              {!data.connected || !data.project ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+                </span>
+              ) : null}
+            </div>
           </form>
         </div>
       </section>

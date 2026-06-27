@@ -1,6 +1,7 @@
 import "../../features/content-opportunities/board.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { Icon } from "../../components/icon";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -63,18 +64,14 @@ export default async function Page({
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage ?? "API nicht erreichbar."} · Erwartete API: {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
         <div className="action-row">
           <div className="locked-action">
             <form action={generateOpportunitiesAction}>
               <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
               <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
               <button className="button" type="submit" disabled={heroDisabled}>
-                Alle Opportunity-Klassen generieren
+                Alle Optimierungschancen erzeugen
               </button>
             </form>
             <form action={syncSearchPerformanceAction}>

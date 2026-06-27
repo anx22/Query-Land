@@ -8,6 +8,7 @@ import {
   REPORT_TYPES,
 } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -77,14 +78,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </h1>
         <p>
           Berichte als Momentaufnahme Ihrer wichtigsten Kennzahlen (Health, Sichtbarkeit, Chancen,
-          Backlinks) — mit automatischer Lieferung per E-Mail und Warnungen, sobald ein Wert eine
-          festgelegte Schwelle über- oder unterschreitet.
+          Backlinks) — sofort als CSV, HTML oder PDF exportierbar, mit Warnungen, sobald ein Wert
+          eine festgelegte Schwelle über- oder unterschreitet.
         </p>
         <div className="badge-row">
           <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+        {!data.connected ? <OfflineNotice /> : null}
         {data.connected && !data.selectedProject ? (
           <p className="notice">Kein Projekt ausgewählt. Legen Sie zuerst ein Projekt an, um Reports zu erzeugen.</p>
         ) : null}
@@ -232,8 +233,19 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 Ziel (E-Mail / Webhook)
                 <input type="text" name="target" placeholder="z. B. team@example.com" />
               </label>
-              <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
+              <div className="locked-action">
+                <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
+                {!data.connected ? (
+                  <span className="locked-action__reason">
+                    <Icon name="lock" />
+                    API nicht erreichbar.
+                  </span>
+                ) : null}
+              </div>
             </form>
+            <p className="form-hint muted">
+              Der Versand wird protokolliert; die tatsächliche Zustellung per E-Mail/Webhook folgt noch.
+            </p>
           </div>
         ) : null}
       </section>
@@ -244,6 +256,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <p className="kicker">Automatische Lieferung</p>
           <h2>Geplante Lieferungen</h2>
           <WhyItMatters>Automatische Lieferungen halten alle Beteiligten ohne manuelles Nachfassen auf dem Laufenden.</WhyItMatters>
+          <p className="notice">
+            Hinweis: Der automatische Versand (E-Mail/Webhook) ist noch in Entwicklung. Zeitpläne werden
+            gespeichert und erzeugen Berichte, stellen sie aber noch nicht automatisch zu — laden Sie
+            Berichte oben als Export (CSV/HTML/PDF) herunter.
+          </p>
 
           {data.schedules.length > 0 ? (
             <div className="table-list">

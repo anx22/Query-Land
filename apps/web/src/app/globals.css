@@ -1612,3 +1612,25 @@ select:disabled {
 .overview-issue-list { margin-top: var(--space-3); }
 .overview-issue-rule { display: flex; align-items: center; gap: var(--space-2); }
 .overview-issue-url { color: var(--muted); font-size: 0.78rem; word-break: break-all; }
+
+/* ------------------------------------------------------------------ */
+/* Generic route loading skeleton (shared by per-route loading.tsx via */
+/* <PageSkeleton/>) + root error page (app/error.tsx).                 */
+/* ------------------------------------------------------------------ */
+.page-skeleton { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5); }
+.page-skeleton__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.skeleton-line, .skeleton-block { background: var(--line); border-radius: 0.5rem; opacity: 0.6; }
+.skeleton-line { height: 0.9rem; margin: 0.4rem 0; width: 100%; }
+.skeleton-line--kicker { width: 30%; height: 0.75rem; }
+.skeleton-line--title { width: 60%; height: 1.6rem; }
+.skeleton-line--half { width: 50%; }
+.skeleton-block { height: 8rem; margin-top: 0.5rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-line, .skeleton-block { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+}
+@keyframes skeleton-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.75; } }
+
+.error-page { max-width: 32rem; margin: 0 auto; padding: var(--space-6) var(--space-5); }
+
+/* Notice that carries a follow-up CTA button (e.g. "Erste Analyse starten →" after website creation). */
+.notice--cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }

@@ -30,7 +30,7 @@ export function resolveActionBanner(input: {
   if (input.started === "1") {
     return {
       tone: "success",
-      message: "Crawl gestartet. Ergebnisse erscheinen, sobald der Lauf abgeschlossen ist.",
+      message: "Analyse gestartet. Ergebnisse erscheinen, sobald der Lauf abgeschlossen ist.",
       role: "status",
     };
   }

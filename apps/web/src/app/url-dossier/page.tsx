@@ -1,6 +1,7 @@
 import "../../features/url-dossier/dossier.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -43,11 +44,7 @@ export default async function Page({
             {data.connected ? "API verbunden" : "API offline"}
           </span>
         </div>
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage} · Erwartete API: {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
         {data.urlOptions.length > 0 ? (
           <form className="filter-row" action="/url-dossier">
             <label>

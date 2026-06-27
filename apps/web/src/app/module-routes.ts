@@ -3,7 +3,7 @@ import type { IconName } from "../components/icon";
 export type ModuleRouteStatus = "active" | "planned";
 
 /** Navigation grouping — conveys the natural order/priority of the product. */
-export type ModuleSection = "Start" | "Analyse" | "Wachstum" | "Erweitert" | "System";
+export type ModuleSection = "Start" | "Analyse" | "Detailanalyse" | "Wachstum" | "Erweitert" | "System";
 
 /** Skill level hint for newcomers: prio-first vs. advanced. */
 export type ModuleTier = "basic" | "advanced";
@@ -28,11 +28,11 @@ export interface ModuleRoute {
 }
 
 export const moduleRoutes = [
-  { label: "Projekte", path: "/projects", icon: "folder", description: "Projekte, Sites, Märkte und Business-Werte verwalten.", status: "active", plannedWave: 1, section: "Start", tier: "basic", dataStatus: "live" },
+  { label: "Websites", path: "/projects", icon: "folder", description: "Ihre Websites verwalten — Adresse, Analyse-Umfang und -Rhythmus. Eine Website = ein Projekt.", status: "active", plannedWave: 1, section: "Start", tier: "basic", dataStatus: "live" },
   { label: "Übersicht", path: "/", icon: "dashboard", description: "Sichtbarkeit, Health Score und offene Optimierungschancen auf einen Blick.", status: "active", plannedWave: 1, section: "Start", tier: "basic", dataStatus: "live" },
   { label: "Technical Audit", path: "/technical-audit", icon: "troubleshoot", description: "Technische SEO-Analyse — Crawl-Runs, Health Score, Indexierbarkeit und offene Issues.", status: "active", plannedWave: 2, section: "Analyse", tier: "basic", dataStatus: "live" },
-  { label: "URL-Dossier", path: "/url-dossier", icon: "description", description: "Eine URL als vollständiges SEO-Objekt: Crawl-Status, Indexierbarkeit, Rankings und Backlinks.", status: "active", plannedWave: 2, section: "Analyse", tier: "advanced", dataStatus: "live" },
-  { label: "Keywords & Rankings", path: "/keywords-rank", icon: "key", description: "Kuratiertes Keyword-Universum mit Rankings, Sichtbarkeit und SERP-Analyse.", status: "active", plannedWave: 3, section: "Analyse", tier: "basic", dataStatus: "live" },
+  { label: "URL-Dossier", path: "/url-dossier", icon: "description", description: "Eine URL als vollständiges SEO-Objekt: Crawl-Status, Indexierbarkeit, Rankings und Backlinks.", status: "active", plannedWave: 2, section: "Detailanalyse", tier: "advanced", dataStatus: "live" },
+  { label: "Keywords & Rankings", path: "/keywords-rank", icon: "key", description: "Kuratiertes Keyword-Universum mit Rankings, Sichtbarkeit und SERP-Analyse.", status: "active", plannedWave: 3, section: "Detailanalyse", tier: "basic", dataStatus: "live" },
   { label: "Content & Chancen", path: "/content-opportunities", icon: "lightbulb", description: "Priorisierte Optimierungschancen mit Evidenz, Maßnahmen und Validierung.", status: "active", plannedWave: 4, section: "Wachstum", tier: "basic", dataStatus: "live" },
   { label: "Content Workspace", path: "/content-workspace", icon: "description", description: "Refresh-Kandidaten, Content-Score und manuell editierbare Content-Briefs mit Ticket-/PR-Übergabe.", status: "active", plannedWave: 4, section: "Wachstum", tier: "basic", dataStatus: "live" },
   { label: "Backlinks", path: "/backlinks", icon: "link", description: "Verweisende Domains, Link-Aufbau und Authority-Entwicklung im Zeitverlauf.", status: "active", plannedWave: 5, section: "Wachstum", tier: "advanced", dataStatus: "live" },
@@ -44,7 +44,7 @@ export const moduleRoutes = [
 export type ModulePath = (typeof moduleRoutes)[number]["path"];
 
 /** Sections in display order. */
-export const MODULE_SECTIONS: ModuleSection[] = ["Start", "Analyse", "Wachstum", "Erweitert", "System"];
+export const MODULE_SECTIONS: ModuleSection[] = ["Start", "Analyse", "Detailanalyse", "Wachstum", "Erweitert", "System"];
 
 export function findModuleRoute(path: ModulePath): ModuleRoute {
   const route = moduleRoutes.find((item) => item.path === path);

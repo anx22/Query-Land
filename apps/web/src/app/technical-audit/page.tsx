@@ -1,6 +1,7 @@
 import "../../features/technical-audit/audit.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
 import { SectionTreemap } from "../../components/charts/section-treemap";
@@ -359,12 +360,7 @@ export default async function Page({
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage ?? "Audit-Daten konnten nicht geladen werden."} · Erwartete API:{" "}
-            {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
       </section>
 
       {/* Primary action: start a crawl (the entry point of the whole loop) */}
@@ -517,6 +513,22 @@ export default async function Page({
         <UrlExplorerTable rows={data.urlExplorerRows} />
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
       </section>
+
+      {/* Next-step guidance — only once there is at least one analysis to act on. */}
+      {data.recentCrawlRuns.length > 0 ? (
+        <section className="card">
+          <p className="kicker">Nächster Schritt</p>
+          <h2>Aus den Befunden Wirkung machen</h2>
+          <p className="muted">
+            Die Analyse liegt vor — so geht es weiter: Verbesserungschancen priorisieren oder eine
+            einzelne Seite im Detail prüfen.
+          </p>
+          <div className="cluster">
+            <a className="button" href="/content-opportunities">Chancen ansehen →</a>
+            <a className="button secondary" href="/url-dossier">Einzelne Seite prüfen →</a>
+          </div>
+        </section>
+      ) : null}
 
       {/* Crawl-Vergleich (crawl-diff) */}
       <CrawlDiffSection data={data} currentParams={currentParams} />
