@@ -36,14 +36,51 @@ nicht-leeren `auth_config` am `integration_account` ab.
 
 Alle Antworten folgen der Standard-Hülle `{ data: ... }`.
 
-## Stub → Real-Seam
+## Stub → Real-Seam (B3: echte Adapter)
 
-Welle 1 verbindet keine produktiven OAuth-Flows. Connectoren sind deterministische Stubs.
-Der einzige fehlende Baustein für den Live-Betrieb ist **der reale Netzwerk-Call plus echte
-Credentials**: Ein echter Provider-Adapter ersetzt nur den `ok`-Zweig von `fetch()` durch den
-HTTP-Aufruf. Auth-Gate, Quota-, Freshness- und Capability-Logik sowie `validate`/`normalize`
-bleiben unverändert. Solange `auth_config` leer ist, liefert `fetch()` deterministisch
-`missing_credentials` statt eines echten Calls.
+`fetch(ctx)` ist **async** (`Promise<ConnectorFetchResult>`); alle Aufrufer awaiten es. Der
+einzige Baustein, der durch B3 real wurde, ist der Netzwerk-Call: Ein echter Provider-Adapter
+ersetzt nur den `ok`-Zweig von `fetch()` durch einen echten HTTPS-`fetch()`. Auth-Gate, Quota-,
+Freshness- und Capability-Logik sowie `validate`/`normalize` bleiben unverändert.
+
+Der Adapter läuft **nur**, wenn echte Provider-Credentials/Env aufgelöst werden können
+(`apps/api/src/connectors/credential-resolution.ts`). Andernfalls — insbesondere bei
+Stub-`auth_config` wie in Produktion — fällt `fetch()` auf den deterministischen Stub zurück.
+Ist `auth_config` ganz leer, liefert `fetch()` weiterhin `missing_credentials`. **Ohne echte
+Credentials ist das Verhalten byte-für-byte unverändert.**
+
+Implementierung: `apps/api/src/connectors/adapters.ts` (Netzwerk-Calls + reine Mapper),
+`apps/api/src/connectors/credential-resolution.ts` (Credential/Env-Auflösung).
+
+### Reale Adapter & Datenfluss
+
+| Provider | Live-Quelle | Mapping (normalisierte Rows) |
+| --- | --- | --- |
+| `gsc` | Search Console **Search Analytics** API (POST `…/searchAnalytics/query`, 28-Tage-Fenster) | `clicks`, `impressions`, `ctr`, `position` |
+| `pagespeed` | **PageSpeed Insights** v5 (`runPagespeed`) | `lcp_ms`, `cls`, `inp_ms`, `ttfb_ms` (aus `lighthouseResult.audits`) |
+| `lighthouse` | derselbe PSI-Call (`lighthouseResult.categories`) | `performance`, `accessibility`, `best_practices`, `seo` |
+
+Die `fetchImpl` ist injizierbar (Default `globalThis.fetch`, das `HTTPS_PROXY` respektiert),
+sodass Adapter vollständig offline testbar sind.
+
+### Credential-/Env-Auflösung
+
+| Provider | Quelle (Reihenfolge) |
+| --- | --- |
+| `gsc` | `auth_config.accessToken` (entschlüsselt) → `GSC_ACCESS_TOKEN`; Property aus `auth_config.property` → `GSC_PROPERTY` → Site-`base_url` |
+| `pagespeed` | `auth_config.apiKey` → `PAGESPEED_API_KEY`; Ziel-URL aus der Site-`base_url` |
+| `lighthouse` | teilt den PSI-Key (`PAGESPEED_API_KEY` / `auth_config.apiKey`) |
+
+`describe()` bekommt die entschlüsselte `auth_config` und meldet `authStatus = connected`,
+sobald entweder eine (Stub- oder echte) `auth_config` hinterlegt ist **oder** echte
+Env-Credentials konfiguriert sind — so spiegelt der Status (und die Quota) die Realität wider.
+
+### Fehlerbehandlung im Live-Pfad
+
+Netzwerkfehler, non-2xx und Quota werfen **nie** roh am Connector-Seam, sondern werden in
+typisierte Outcomes mit klarer `reason` übersetzt: `401 → expired`, `429 → quota_exceeded`,
+alles andere/Netzwerkfehler → `degraded`. Der Sync persistiert diese als sichtbaren
+`degraded`-Status (siehe Failure-mode-Abschnitt unten).
 
 ## Fehlermodi (Failure-mode visibility)
 

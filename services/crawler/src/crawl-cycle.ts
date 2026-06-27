@@ -35,7 +35,13 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     sitemapUrl = payload.sitemapUrl ?? normalizeCrawlUrl("/sitemap.xml", baseUrl);
     crawlRunId = payload.crawlRunId ?? "";
     if (!crawlRunId) {
-      crawlRunId = (await options.apiClient.createCrawlRun(job.projectId, siteId, "manual")).id;
+      const createdRun = await options.apiClient.createCrawlRun(job.projectId, siteId, "manual");
+      // Guard the transport: a 2xx without a usable body must fail loudly here, not
+      // surface later as "Cannot read properties of undefined (reading 'id')".
+      if (!createdRun?.id) {
+        throw new Error(`createCrawlRun returned no crawl run id for project ${job.projectId} / site ${siteId}`);
+      }
+      crawlRunId = createdRun.id;
     }
 
     const now = options.now ?? (() => new Date().toISOString());

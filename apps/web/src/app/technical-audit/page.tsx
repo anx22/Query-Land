@@ -290,6 +290,7 @@ export default async function Page({
     issueRule: firstParam(params.issueRule),
     urlStatus: firstParam(params.urlStatus),
     urlSource: firstParam(params.urlSource),
+    urlQ: firstParam(params.urlQ),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
     diffBase: firstParam(params.diffBase),
@@ -309,6 +310,7 @@ export default async function Page({
     issueRule: firstParam(params.issueRule),
     urlStatus: firstParam(params.urlStatus),
     urlSource: firstParam(params.urlSource),
+    urlQ: firstParam(params.urlQ),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
     diffBase: firstParam(params.diffBase),
@@ -341,6 +343,13 @@ export default async function Page({
       {actionBanner ? (
         <p className={`notice ${actionBanner.tone}`} role={actionBanner.role}>
           {actionBanner.message}
+        </p>
+      ) : null}
+
+      {data.loadErrors.length > 0 ? (
+        <p className="notice danger" role="alert">
+          Einige Bereiche konnten nicht geladen werden ({data.loadErrors.join(", ")}). Die Anzeige ist
+          deshalb unvollständig — das ist ein Ladefehler, kein „leerer" Zustand. Bitte neu laden.
         </p>
       ) : null}
 
@@ -506,9 +515,27 @@ export default async function Page({
               );
             })}
           </div>
+          <form method="GET" action="/technical-audit" className="badge-row" role="search" aria-label="URLs nach Adresse durchsuchen">
+            <span className="muted issue-filter-bar__label">Suche</span>
+            {/* Preserve other filters/params; omit urlQ (this field) and urlOffset (reset on search). */}
+            {Object.entries(currentParams)
+              .filter(([key, value]) => value != null && value !== "" && key !== "urlQ" && key !== "urlOffset")
+              .map(([key, value]) => (
+                <input key={key} type="hidden" name={key} value={value} />
+              ))}
+            <input
+              type="search"
+              name="urlQ"
+              defaultValue={data.activeUrlFilter.q}
+              placeholder="URL enthält…"
+              className="input compact"
+              aria-label="URL-Substring"
+            />
+            <button type="submit" className="button compact">Suchen</button>
+          </form>
         </div>
         {data.urlExplorerRows.length === 0 && !isDefaultUrlExplorerFilter(data.activeUrlFilter) ? (
-          <p className="muted">Keine URLs für den aktiven Filter.</p>
+          <p className="muted">Keine URLs für den aktiven Filter{data.activeUrlFilter.q ? ` / die Suche „${data.activeUrlFilter.q}"` : ""}.</p>
         ) : null}
         <UrlExplorerTable rows={data.urlExplorerRows} />
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
