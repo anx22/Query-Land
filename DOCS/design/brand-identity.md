@@ -240,6 +240,11 @@ Marken-Wort; Metapher nur im Rahmen; Zahlen/Status/Validierung immer rein sachli
 
 ## 9. Umsetzungs-Lücke & Roadmap (Direction → Code)
 
+> **Stand (umgesetzt):** ✅ B-1 Typo · ✅ B-2 Wortmarke-Lockup · ✅ B-3 Mono-Daten · B-4 Tabellen schon
+> per-Feature editorial (kein globaler Umbau) · ✅ B-5 Grain + Aktiv-Punkt · ✅ B-6 Favicon/Logomark
+> (`app/icon.svg`, Contours-Mark) + per-Screen Höhenlinien-Header (`<HeroBand>`, raster JPG; finale Logo-/
+> Wortmarken-SVGs offen) · ✅ B-7 DESIGN-Resync. **Screen-Umbau:** ✅ O-1 Overview-Header · ✅ O-2 KPI-Bento.
+
 Reihenfolge nach Sichtbarkeit/Aufwand. Jeder Schritt nutzt CSS-Tokens, kein Hardcoding.
 
 | # | Schnitt | Aufwand | Wirkung |

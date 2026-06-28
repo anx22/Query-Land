@@ -117,13 +117,21 @@ spacing:
   bento-gap: 16px
 ---
 
+> **Implementierungsstand (B-1…B-7, umgesetzt):** Das System ist im Code verdrahtet — Literata/Inter/
+> JetBrains Mono via `next/font`, Serif-Headlines, Mono-Messwerte (`tabular-nums`), Wortmarke `Query-Land.`
+> mit orangem Bindestrich/Punkt, Papier-Grain-Overlay, Aktiv-Punkt-Nav, per-Screen Höhenlinien-Header
+> (`<HeroBand>`), Favicon (`app/icon.svg`). **Token-Quelle bleibt `apps/web/src/app/globals.css`** (warme
+> Paper-&-Ink-Werte, s. u.). Marken-Direction & Assets: `brand-identity.md` + `/brand/`.
+
 ## Brand & Style
 The design system embodies a sophisticated fusion of high-end editorial aesthetics and precision technology. It is designed for SEO professionals and marketers who value both deep analytical clarity and a premium, curated experience. The personality is authoritative yet vibrant—balancing the scholarly weight of a broadsheet newspaper with the sleek, high-performance feel of a modern developer tool.
 
 The visual style leverages **Minimalism** with a heavy emphasis on **High-Contrast** accents. It utilizes generous whitespace to reduce cognitive load during complex data analysis, while incorporating "haptic" digital textures—such as subtle grain and noise—to provide a tactile, physical quality to the interface. The goal is to make data feel like a high-end print publication: permanent, credible, and meticulously crafted.
 
 ## Colors
-The palette is built on a foundation of "Paper and Ink." The primary background uses a crisp white or a soft grey (#F9F9F9), layered with a subtle noise texture to prevent screen fatigue and add organic depth. 
+The palette is built on a foundation of "Paper and Ink." **Implemented (warm) values govern — `globals.css`:**
+background `#fcfcfb`, ink `#211b17`, hairline `#e8dfd6`, primary `#ff5c00` (the cool `#F9F9F9/#121212/#E5E5E5`
+below are the original cooler reference). A subtle fractal-noise overlay (~4%) adds print tactility. 
 
 **Accent Orange (#FF5C00):** This is used sparingly but aggressively for primary calls to action, critical data highlights, and editorial accents. It represents the "High-Tech" energy within the "Editorial" structure.
 **Deep Charcoal (#121212):** Used for primary typography and iconography to ensure maximum legibility and a grounded, authoritative feel.
