@@ -149,11 +149,19 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <BacklinkFlowChart data={flowBars} title="Neue vs. verlorene Links und Domains" />
             </div>
             {data.diff ? (
-              <p className="muted">
-                Netto {data.diff.netBacklinkChange >= 0 ? `+${data.diff.netBacklinkChange}` : data.diff.netBacklinkChange} Links ·{" "}
-                {data.diff.netReferringDomainChange >= 0 ? `+${data.diff.netReferringDomainChange}` : data.diff.netReferringDomainChange} Domains
-                {" "}seit dem letzten Snapshot.
-              </p>
+              <>
+                <div className="facts">
+                  <span className="fact">
+                    <span className="fact__label">Netto Links</span>
+                    <span className="fact__value"><DeltaChip value={data.diff.netBacklinkChange} /></span>
+                  </span>
+                  <span className="fact">
+                    <span className="fact__label">Netto Domains</span>
+                    <span className="fact__value"><DeltaChip value={data.diff.netReferringDomainChange} /></span>
+                  </span>
+                </div>
+                <p className="muted">seit dem letzten Snapshot.</p>
+              </>
             ) : (
               <p className="muted">Vergleich erscheint ab dem zweiten Snapshot.</p>
             )}

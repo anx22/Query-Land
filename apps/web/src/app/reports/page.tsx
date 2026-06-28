@@ -415,8 +415,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <article key={event.id} className="reports-row">
                     <strong className="reports-row__title">{labelForMetric(event.metric)}</strong>
                     <span className={`badge ${severityBadge(severity)}`}>{severityLabel(severity)}</span>
-                    <span className="reports-row__meta">
-                      Beobachtet {formatMetricValue(event.observedValue)} · Schwelle {labelForComparator(event.comparator)} {formatMetricValue(event.threshold)}
+                    <span className="facts">
+                      <span className="fact">
+                        <span className="fact__label">Beobachtet</span>
+                        <span className="fact__value">{formatMetricValue(event.observedValue)}</span>
+                      </span>
+                      <span className="fact">
+                        <span className="fact__label">Schwelle</span>
+                        <span className="fact__value">{labelForComparator(event.comparator)} {formatMetricValue(event.threshold)}</span>
+                      </span>
                     </span>
                     <span className="reports-row__spacer" />
                     <span className="reports-row__meta">{formatTimestamp(event.evaluatedAt)}</span>

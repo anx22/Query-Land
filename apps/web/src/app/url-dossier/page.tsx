@@ -85,25 +85,25 @@ export default async function Page({
               <div className="table-list">
                 <article>
                   <strong className="dossier-mono">{data.selectedUrl}</strong>
-                  <span className="dossier-muted">
-                    {data.discoveredUrl
-                      ? `${data.discoveredUrl.source} · Tiefe ${data.discoveredUrl.depth} · entdeckt ${formatDateTime(
-                          data.discoveredUrl.discoveredAt
-                        )}`
-                      : "keine Discovery-Daten"}
-                  </span>
+                  {data.discoveredUrl ? (
+                    <div className="facts">
+                      <span className="fact"><span className="fact__label">Quelle</span><span className="fact__value">{data.discoveredUrl.source}</span></span>
+                      <span className="fact"><span className="fact__label">Tiefe</span><span className="fact__value">{data.discoveredUrl.depth}</span></span>
+                      <span className="fact"><span className="fact__label">Entdeckt</span><span className="fact__value">{formatDateTime(data.discoveredUrl.discoveredAt)}</span></span>
+                    </div>
+                  ) : (
+                    <span className="dossier-muted">keine Discovery-Daten</span>
+                  )}
                 </article>
                 <article>
                   <strong>Quell-Verknüpfung</strong>
                   {data.sourceAnchor ? (
-                    <>
-                      <span>
-                        {data.sourceAnchor.template} · {data.sourceAnchor.component}
-                      </span>
-                      <span className="dossier-muted dossier-mono">
-                        {data.sourceAnchor.repoPath} · Confidence {data.sourceAnchor.confidence}
-                      </span>
-                    </>
+                    <div className="facts">
+                      <span className="fact"><span className="fact__label">Vorlage</span><span className="fact__value">{data.sourceAnchor.template}</span></span>
+                      <span className="fact"><span className="fact__label">Komponente</span><span className="fact__value">{data.sourceAnchor.component}</span></span>
+                      <span className="fact"><span className="fact__label">Datei</span><span className="fact__value dossier-mono">{data.sourceAnchor.repoPath}</span></span>
+                      <span className="fact"><span className="fact__label">Konfidenz</span><span className="fact__value">{data.sourceAnchor.confidence}</span></span>
+                    </div>
                   ) : (
                     <EmptyLine>
                       Noch keiner Code-Stelle zugeordnet. <a href="/settings">In den Einstellungen
@@ -237,9 +237,10 @@ export default async function Page({
                           ) : null}
                         </span>
                       </div>
-                      <span className="dossier-muted">
-                        {row.keyword.intent} · {row.keyword.market}
-                      </span>
+                      <div className="facts">
+                        <span className="fact"><span className="fact__label">Intent</span><span className="fact__value">{row.keyword.intent}</span></span>
+                        <span className="fact"><span className="fact__label">Markt</span><span className="fact__value">{row.keyword.market}</span></span>
+                      </div>
                     </article>
                   ))}
                 </div>

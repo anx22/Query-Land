@@ -101,7 +101,7 @@ export default async function Page({
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.project?.name ?? "kein Projekt"}</span>
-          <span className="badge">{data.site?.baseUrl ?? "keine Site"}</span>
+          <span className="badge">{data.site?.baseUrl ?? "keine Website"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
             {data.connected ? "API verbunden" : "API offline"}
           </span>
@@ -109,7 +109,7 @@ export default async function Page({
         {!data.connected ? <OfflineNotice /> : null}
         {data.connected && (!data.project || !data.site) ? (
           <p className="notice">
-            Lege zuerst ein Projekt und eine Site an, um Refresh-Kandidaten und Briefs zu sehen.
+            Fügen Sie zuerst eine Website hinzu, um Refresh-Kandidaten und Briefs zu sehen.
           </p>
         ) : null}
       </section>
@@ -144,19 +144,26 @@ export default async function Page({
                     aria-current={active ? "true" : undefined}
                   >
                     <span className="cw-candidate__url">{candidate.url}</span>
-                    <span className="cw-candidate__meta">
-                      <span
-                        className={
-                          candidate.clicksTrend < 0
-                            ? "cw-candidate__trend--down"
-                            : "cw-candidate__trend--up"
-                        }
-                      >
-                        Trend {candidate.clicksTrend > 0 ? "+" : ""}
-                        {candidate.clicksTrend}
+                    <span className="facts">
+                      <span className="fact">
+                        <span className="fact__label">Klick-Trend</span>
+                        <span
+                          className={`fact__value ${
+                            candidate.clicksTrend < 0 ? "cw-candidate__trend--down" : "cw-candidate__trend--up"
+                          }`}
+                        >
+                          {candidate.clicksTrend > 0 ? "+" : ""}
+                          {candidate.clicksTrend}
+                        </span>
                       </span>
-                      <span>{candidate.openIssues} Issues</span>
-                      <span className="cw-candidate__score">Score {candidate.refreshScore}</span>
+                      <span className="fact">
+                        <span className="fact__label">Probleme</span>
+                        <span className="fact__value">{candidate.openIssues}</span>
+                      </span>
+                      <span className="fact">
+                        <span className="fact__label">Score</span>
+                        <span className="fact__value">{candidate.refreshScore}</span>
+                      </span>
                     </span>
                   </a>
                 );
@@ -260,9 +267,12 @@ export default async function Page({
       <section className="card">
         <p className="kicker">Briefs</p>
         <p className="muted">
-          Manuell gepflegte Content-Briefs für diese Site, nach Status filterbar. Briefs sind echte,
+          Manuell gepflegte Content-Briefs für diese Website, nach Status filterbar. Briefs sind echte,
           persistierte Artefakte. <ConfidenceBadge level="A" />
         </p>
+        <div className="cluster">
+          <a className="button secondary compact" href="#brief-erstellen">+ Neuen Brief erstellen</a>
+        </div>
         <div className="cw-filter" role="group" aria-label="Briefs nach Status filtern">
           {BRIEF_STATUS_FILTERS.map((status) => {
             const selected = status === data.activeStatus;
@@ -400,7 +410,7 @@ export default async function Page({
             </div>
           </form>
         ) : (
-          <p className="muted">Projekt + Site + erreichbare API erforderlich.</p>
+          <p className="muted">Website + erreichbare API erforderlich.</p>
         )}
       </section>
     </AppShell>

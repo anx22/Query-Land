@@ -211,7 +211,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           {/* Site context */}
           {site && (
             <p className="overview-site-context">
-              Site: <strong>{site.baseUrl}</strong>
+              Website: <strong>{site.baseUrl}</strong>
             </p>
           )}
         </div>

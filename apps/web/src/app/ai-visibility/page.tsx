@@ -290,10 +290,20 @@ function AeoRow({ assessment }: { assessment: AeoAssessment }) {
   return (
     <article>
       <strong>{assessment.url}</strong>
-      <span className={`badge ${variant}`}>Score: {assessment.score}%</span>
-      <span>
-        {passedChecks}/{assessment.checks.length} Checks bestanden
-      </span>
+      <div className="facts">
+        <span className="fact">
+          <span className="fact__label">Score</span>
+          <span className="fact__value"><span className={`badge ${variant}`}>{assessment.score}%</span></span>
+        </span>
+        <span className="fact">
+          <span className="fact__label">Checks bestanden</span>
+          <span className="fact__value">{passedChecks}/{assessment.checks.length}</span>
+        </span>
+        <span className="fact">
+          <span className="fact__label">Geprüft am</span>
+          <span className="fact__value">{new Date(assessment.assessedAt).toLocaleDateString("de-DE")}</span>
+        </span>
+      </div>
       <span className="muted">
         {assessment.checks.map((check) => (
           <span key={check.check} className={check.passed ? "check-pass" : "check-fail"}>
@@ -301,7 +311,6 @@ function AeoRow({ assessment }: { assessment: AeoAssessment }) {
           </span>
         ))}
       </span>
-      <span className="muted">{new Date(assessment.assessedAt).toLocaleDateString("de-DE")}</span>
     </article>
   );
 }

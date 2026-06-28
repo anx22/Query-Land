@@ -161,8 +161,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 {data.sourceMap.map((entry) => (
                   <article key={entry.id}>
                     <strong>{entry.urlPattern}</strong>
-                    <span>{entry.template} · {entry.repoPath}</span>
-                    <span className="muted">Confidence: {entry.confidence}</span>
+                    <div className="facts">
+                      <span className="fact"><span className="fact__label">Vorlage</span><span className="fact__value">{entry.template}</span></span>
+                      <span className="fact"><span className="fact__label">Datei</span><span className="fact__value">{entry.repoPath}</span></span>
+                      <span className="fact"><span className="fact__label">Konfidenz</span><span className="fact__value">{entry.confidence}</span></span>
+                    </div>
                   </article>
                 ))}
               </div>

@@ -46,25 +46,14 @@
   word-break: break-all;
 }
 
-.cw-candidate__meta {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
+/* Trend value keeps its directional colour even inside the .facts/.fact__value structure
+   (class specificity overrides .fact__value's default ink colour). */
 .cw-candidate__trend--down {
   color: var(--danger);
 }
 
 .cw-candidate__trend--up {
   color: var(--success);
-}
-
-.cw-candidate__score {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
 }
 
 /* Score gauge + reasons */
