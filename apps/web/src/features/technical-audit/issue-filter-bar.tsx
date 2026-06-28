@@ -7,7 +7,7 @@ import {
   type IssueSeverityFilter,
   type IssueStatusFilter,
 } from "../../lib/audit-api";
-import { ruleLabel } from "./issue-groups";
+import { ruleLabel } from "./issue-labels";
 
 const STATUS_LABEL: Record<IssueStatusFilter, string> = { open: "Offen", resolved: "Gelöst", all: "Alle" };
 const SEVERITY_LABEL: Record<IssueSeverityFilter, string> = {
