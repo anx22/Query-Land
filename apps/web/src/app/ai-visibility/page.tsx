@@ -5,6 +5,7 @@ import { PROPOSAL_KINDS } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { Icon } from "../../components/icon";
+import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -56,6 +57,7 @@ export default async function Page({
       <div className="ai-root">
         {/* Hero */}
         <section className="card hero-card">
+          <HeroBand src="/brand/hdr-ai-visibility.jpg" />
           <p className="kicker">KI-Suche · Sichtbarkeit</p>
           <h1>
             <TermTooltip term="AI-Visibility / Citation">KI-Sichtbarkeit</TermTooltip> &amp;{" "}

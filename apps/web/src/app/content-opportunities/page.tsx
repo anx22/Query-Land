@@ -2,6 +2,7 @@ import "../../features/content-opportunities/board.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { HeroBand } from "../../components/hero-band";
 import { Icon } from "../../components/icon";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -49,6 +50,7 @@ export default async function Page({
   return (
     <AppShell activePath="/content-opportunities">
       <section className="card hero-card">
+        <HeroBand src="/brand/hdr-content-opportunities.jpg" />
         <p className="kicker">Content &amp; Chancen</p>
         <h1>Optimierungschancen</h1>
         <p>

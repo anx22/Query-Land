@@ -2,6 +2,7 @@ import "../../features/technical-audit/audit.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { HeroBand } from "../../components/hero-band";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
 import { SectionTreemap } from "../../components/charts/section-treemap";
@@ -354,6 +355,7 @@ export default async function Page({
       ) : null}
 
       <section className="card hero-card">
+        <HeroBand src="/brand/hdr-technical-audit.jpg" />
         <p className="kicker">Technical Audit</p>
         <h1>
           <TermTooltip term="crawl">Crawl</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues

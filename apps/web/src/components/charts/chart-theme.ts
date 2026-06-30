@@ -40,6 +40,8 @@ export const chrome = {
   axisText: "var(--muted)",
   /** Axis tick font size (rem string for SVG text). */
   axisFontSize: "0.75rem",
+  /** Axis tick font family — measured numbers render monospace (B-3). */
+  axisFontFamily: "var(--font-mono)",
   /** Tooltip background: matches .card surface. */
   tooltipBackground: "var(--surface)",
   /** Tooltip border. */

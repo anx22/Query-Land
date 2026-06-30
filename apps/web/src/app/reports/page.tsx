@@ -8,6 +8,7 @@ import {
 } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -71,6 +72,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
     <AppShell activePath="/reports">
       {/* Hero — metaphor lives only in the framing copy (Serious-Zone elsewhere). */}
       <section className="card hero-card">
+        <HeroBand src="/brand/hdr-reports.jpg" />
         <p className="kicker">Berichte &amp; Warnungen</p>
         <h1>
           <TermTooltip term="report">Reports</TermTooltip> &amp; <TermTooltip term="alert">Alarme</TermTooltip>
