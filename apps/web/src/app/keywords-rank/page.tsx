@@ -89,7 +89,7 @@ export default async function Page({
             hasVisibility
               ? `${data.latestVisibility!.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility!.averagePosition ?? "—"}${
                   visDelta != null ? ` · ${visDelta > 0 ? "+" : ""}${visDelta} Pkt` : ""
-                }`
+                } · Konfidenz C (SERP-Stichprobe)`
               : "erscheint nach der ersten Ranking-Messung"
           }
         />

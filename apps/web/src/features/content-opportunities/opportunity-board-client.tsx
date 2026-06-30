@@ -501,8 +501,8 @@ function TableView({
                   {opportunityTypeLabel(op.type)}
                 </span>
                 <span role="cell">{op.priority}</span>
-                <span role="cell">{op.expectedImpact}</span>
-                <span role="cell">{op.effort}</span>
+                <span role="cell">{op.expectedImpact}/5</span>
+                <span role="cell">{op.effort}/5</span>
                 <span role="cell"><ConfidenceBadge level={confidenceToLevel(op.confidence)} showLabel={false} /></span>
                 <span role="cell" className="board-table__spark">
                   <Sparkline data={evidenceSparkline(op)} ariaLabel="Vorher/Nachher-Trend" height={28} />

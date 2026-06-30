@@ -32,6 +32,8 @@ export interface OpportunityBoardData {
   selectedSite: FoundationSite | null;
   /** Whether the active project has run a crawl — opportunities are generated from crawl data. */
   hasCrawl: boolean;
+  /** Whether a real data source (GSC) is connected — Search-Performance sync needs this. */
+  hasIntegration: boolean;
   opportunities: Opportunity[];
   meta: ListMeta;
 }
@@ -56,6 +58,7 @@ export async function loadOpportunityBoard(): Promise<OpportunityBoardData> {
     selectedProject: dashboard.selectedProject,
     selectedSite,
     hasCrawl: readiness.hasCrawl,
+    hasIntegration: readiness.hasIntegration,
   };
 
   if (!dashboard.connected || !dashboard.selectedProject) {

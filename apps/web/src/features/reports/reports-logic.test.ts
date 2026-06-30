@@ -65,7 +65,7 @@ function makeRule(overrides: Partial<AlertRule> = {}): AlertRule {
 
 describe("labels", () => {
   it("maps report types, cadence, metric, comparator, channel", () => {
-    expect(labelForReportType("authority_report")).toBe("Authority-Report");
+    expect(labelForReportType("authority_report")).toBe("Backlink-/Autoritäts-Bericht");
     expect(labelForCadence("monthly")).toBe("Monatlich");
     expect(labelForMetric("referring_domains")).toBe("Verweisende Domains");
     expect(labelForComparator("gte")).toBe("≥");

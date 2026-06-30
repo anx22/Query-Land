@@ -29,6 +29,7 @@ export function ReferringDomainsTable({ domains, limit = 50 }: ReferringDomainsT
         <span className="backlinks-empty__hint">
           Verbinden Sie Google Search Console, um eingehende Links und ihre Quell-Domains auszuwerten.
         </span>
+        <a className="button secondary compact" href="/settings">Google Search Console verbinden →</a>
       </div>
     );
   }

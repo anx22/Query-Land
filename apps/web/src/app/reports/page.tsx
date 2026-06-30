@@ -354,7 +354,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <p className="muted">
                       {model.observedValue !== null
                         ? `Zuletzt beobachtet: ${formatMetricValue(model.observedValue)}`
-                        : "Noch nicht ausgewertet — Schwelle definiert, aber keine Messung."}
+                        : "Noch nicht ausgewertet — Schwelle definiert, aber keine Messung. Klicken Sie „Warnungen prüfen“, um auszuwerten."}
                     </p>
                   )}
 

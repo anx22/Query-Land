@@ -28,9 +28,9 @@ export function labelForReportType(type: ReportType): string {
     case "weekly_summary":
       return "Wochenzusammenfassung";
     case "opportunity_digest":
-      return "Opportunity-Digest";
+      return "Chancen-Übersicht";
     case "authority_report":
-      return "Authority-Report";
+      return "Backlink-/Autoritäts-Bericht";
     default:
       return type;
   }
@@ -54,7 +54,7 @@ export function labelForMetric(metric: AlertMetric): string {
     case "health_score":
       return "Health-Score";
     case "open_opportunities":
-      return "Offene Opportunities";
+      return "Offene Chancen";
     case "referring_domains":
       return "Verweisende Domains";
     default:

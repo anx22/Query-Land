@@ -31,7 +31,9 @@ export default async function Page({
     (o) => !["validated", "dismissed", "expired"].includes(o.status)
   ).length;
   const validatedCount = opportunities.filter((o) => o.status === "validated").length;
-  const quickWins = opportunities.filter((o) => o.expectedImpact >= 4 && o.effort <= 2).length;
+  // Same boundary as the PriorityMatrix "Quick Wins" quadrant (impact ≥ 3, effort < 3) so the
+  // KPI count matches the highlighted bubbles.
+  const quickWins = opportunities.filter((o) => o.expectedImpact >= 3 && o.effort <= 2).length;
   const topPriority = [...opportunities].sort((a, b) => b.priority - a.priority)[0] ?? null;
 
   // Action gating: opportunities are generated from crawl data, so the hero actions need a
@@ -76,13 +78,23 @@ export default async function Page({
                 Alle Optimierungschancen erzeugen
               </button>
             </form>
-            <form action={syncSearchPerformanceAction}>
-              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-              <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-              <button className="button secondary" type="submit" disabled={heroDisabled}>
-                Search Performance synchronisieren
-              </button>
-            </form>
+            <div className="locked-action">
+              <form action={syncSearchPerformanceAction}>
+                <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+                <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+                <button className="button secondary" type="submit" disabled={heroDisabled || !data.hasIntegration}>
+                  Search Performance synchronisieren
+                </button>
+              </form>
+              {/* Search-Performance sync pulls clicks/impressions from GSC — without a connected source it
+                  would do nothing, so gate it honestly instead of offering a silent no-op. */}
+              {!heroDisabled && !data.hasIntegration ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  Zuerst Google Search Console verbinden — dann liefert die Synchronisierung echte Klick- und Ranking-Daten.
+                </span>
+              ) : null}
+            </div>
             {heroDisabled && lockReason ? (
               <span className="locked-action__reason">
                 <Icon name="lock" />

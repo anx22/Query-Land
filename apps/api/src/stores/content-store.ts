@@ -385,7 +385,7 @@ class SQLiteContentStore implements ContentStore {
         if (target === url || suggestions.has(target)) continue;
         // Suggest linking the target to a sibling that the shared hub already links to.
         if (!(await this.edgeExists(siteId, url, target))) {
-          suggestions.set(target, { url: target, anchor: null, reason: `co-linked from hub ${source.from_url}` });
+          suggestions.set(target, { url: target, anchor: null, reason: `Gemeinsam verlinkt vom Hub ${source.from_url}` });
         }
       }
     }
@@ -398,7 +398,7 @@ class SQLiteContentStore implements ContentStore {
         const candidate = String(hub.from_url);
         if (candidate === url || suggestions.has(candidate)) continue;
         if (!(await this.edgeExists(siteId, candidate, url))) {
-          suggestions.set(candidate, { url: candidate, anchor: hub.anchor === null ? null : String(hub.anchor), reason: `links to related page ${String(out.to_url)} but not to this URL` });
+          suggestions.set(candidate, { url: candidate, anchor: hub.anchor === null ? null : String(hub.anchor), reason: `Verlinkt eine verwandte Seite (${String(out.to_url)}), aber nicht diese URL` });
         }
       }
     }

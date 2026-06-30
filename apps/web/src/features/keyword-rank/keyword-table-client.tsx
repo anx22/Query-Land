@@ -233,8 +233,11 @@ function KeywordTableEmpty({ hasRows }: { hasRows: boolean }) {
       <span className="muted">
         {hasRows
           ? "Passen Sie die Filter an, um andere Keywords zu sehen."
-          : "Fügen Sie unten Keywords hinzu. Positionen und Trends erscheinen, sobald eine Ranking-Quelle (z. B. Google Search Console) verbunden ist."}
+          : "Fügen Sie unten Keywords hinzu. Positionen und Trends erscheinen, sobald eine Ranking-Quelle verbunden ist."}
       </span>
+      {!hasRows ? (
+        <a className="button secondary compact" href="/settings">Google Search Console verbinden →</a>
+      ) : null}
     </div>
   );
 }

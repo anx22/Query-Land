@@ -75,8 +75,8 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
         <div className="board-drawer__badges">
           <span className={`status ${opportunity.status}`}>{opportunityStatusLabel(opportunity.status)}</span>
           <ConfidenceBadge level={overallLevel} />
-          <span className="badge">Wirkung {opportunity.expectedImpact}</span>
-          <span className="badge">Aufwand {opportunity.effort}</span>
+          <span className="badge" title="Erwartete Wirkung auf einer Skala von 1 (gering) bis 5 (hoch)">Wirkung {opportunity.expectedImpact}/5</span>
+          <span className="badge" title="Geschätzter Aufwand auf einer Skala von 1 (gering) bis 5 (hoch)">Aufwand {opportunity.effort}/5</span>
         </div>
 
         <ol className="board-chain">

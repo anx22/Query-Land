@@ -168,14 +168,19 @@ export default async function Page({
             <div className="locked-action">
               <form action={recordSnapshotAction} className="inline-actions">
                 <input type="hidden" name="projectId" value={projectId} />
-                <input type="hidden" name="promptId" value={data.prompts[0]?.id ?? ""} />
+                <label className="visually-hidden" htmlFor="snapshot-prompt">Prompt für Snapshot</label>
+                <select id="snapshot-prompt" name="promptId" defaultValue={data.prompts[0]?.id ?? ""}>
+                  {data.prompts.map((prompt) => (
+                    <option key={prompt.id} value={prompt.id}>{prompt.prompt}</option>
+                  ))}
+                </select>
                 <button
                   className="button secondary compact"
                   type="submit"
                   disabled={!data.connected || !data.aiConfigured}
-                  title="Erfasst einen neuen Snapshot für den zuletzt aufgenommenen Prompt"
+                  title="Erfasst einen neuen Snapshot für den gewählten Prompt"
                 >
-                  Snapshot erfassen (neuester Prompt)
+                  Snapshot erfassen
                 </button>
               </form>
               {!data.aiConfigured ? (
