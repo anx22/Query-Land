@@ -8,7 +8,7 @@ import "../../features/technical-audit/audit.css";
 export default function Loading() {
   return (
     <div className="audit-skeleton" aria-busy="true" aria-live="polite">
-      <span className="audit-skeleton__sr">Technical Audit wird geladen …</span>
+      <span className="audit-skeleton__sr">Technische Prüfung wird geladen …</span>
 
       <section className="card">
         <div className="audit-skeleton__line audit-skeleton__line--kicker" />

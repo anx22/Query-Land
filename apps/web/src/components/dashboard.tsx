@@ -326,7 +326,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           )}
           {latestHealthScore === null && (
             <p className="overview-empty-hint">
-              Noch kein Health Score berechnet. Starten Sie eine Analyse im Technical Audit.
+              Noch kein Health Score berechnet. Starten Sie eine Analyse in der Technischen Prüfung.
             </p>
           )}
         </div>
@@ -426,7 +426,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
               ))}
               {criticalIssues.length > 8 && (
                 <a href="/technical-audit" className="overview-link-more">
-                  + {criticalIssues.length - 8} weitere → Technical Audit
+                  + {criticalIssues.length - 8} weitere → Technische Prüfung
                 </a>
               )}
             </div>

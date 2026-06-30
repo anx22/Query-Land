@@ -290,7 +290,7 @@ export default async function Page({
   const params = (await searchParams) ?? {};
   return (
     <AppShell activePath="/technical-audit">
-      <Suspense fallback={<PageSkeleton label="Technical Audit wird geladen …" />}>
+      <Suspense fallback={<PageSkeleton label="Technische Prüfung wird geladen …" />}>
         <TechnicalAuditBody params={params} />
       </Suspense>
     </AppShell>
@@ -377,7 +377,7 @@ async function TechnicalAuditBody({
 
       <section className="card hero-card">
         <HeroBand src="/brand/hdr-technical-audit.jpg" />
-        <p className="kicker">Technical Audit</p>
+        <p className="kicker">Technische Prüfung</p>
         <h1>
           <TermTooltip term="crawl">Analyse</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
         </h1>
@@ -405,7 +405,7 @@ async function TechnicalAuditBody({
       />
 
       {/* Help zone — layout-separated from the productive panels below */}
-      <HelpPanel title="So lesen Sie das Technical Audit">
+      <HelpPanel title="So lesen Sie die Technische Prüfung">
         <p>
           Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt,
           wo URLs auf dem Weg in den Google-Index verloren gehen. Der{" "}
