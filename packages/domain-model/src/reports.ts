@@ -3,12 +3,12 @@
 // Export (CSV/HTML) sind reine, testbare Funktionen — dependency-frei (echtes Binär-PDF = Follow-up).
 
 export type ReportType = "weekly_summary" | "opportunity_digest" | "authority_report";
-export type DeliveryChannel = "email" | "slack";
+export type DeliveryChannel = "email" | "webhook" | "slack";
 export type ReportCadence = "weekly" | "monthly";
 export type ReportExportFormat = "csv" | "html" | "pdf";
 
 export const REPORT_TYPES: readonly ReportType[] = ["weekly_summary", "opportunity_digest", "authority_report"];
-export const DELIVERY_CHANNELS: readonly DeliveryChannel[] = ["email", "slack"];
+export const DELIVERY_CHANNELS: readonly DeliveryChannel[] = ["email", "webhook", "slack"];
 export const REPORT_CADENCES: readonly ReportCadence[] = ["weekly", "monthly"];
 
 export interface ReportSectionRow {

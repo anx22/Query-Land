@@ -244,7 +244,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               </div>
             </form>
             <p className="form-hint muted">
-              Der Versand wird protokolliert; die tatsächliche Zustellung per E-Mail/Webhook folgt noch.
+              Webhook wird sofort zugestellt. E-Mail braucht einen konfigurierten Versand
+              (<code>RESEND_API_KEY</code>) — sonst wird die Lieferung ehrlich als „übersprungen“ vermerkt.
             </p>
           </div>
         ) : null}
@@ -257,9 +258,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <h2>Geplante Lieferungen</h2>
           <WhyItMatters>Automatische Lieferungen halten alle Beteiligten ohne manuelles Nachfassen auf dem Laufenden.</WhyItMatters>
           <p className="notice">
-            Hinweis: Der automatische Versand (E-Mail/Webhook) ist noch in Entwicklung. Zeitpläne werden
-            gespeichert und erzeugen Berichte, stellen sie aber noch nicht automatisch zu — laden Sie
-            Berichte oben als Export (CSV/HTML/PDF) herunter.
+            Fällige Zeitpläne werden täglich automatisch erzeugt und zugestellt: <strong>Webhook</strong>{" "}
+            sofort, <strong>E-Mail</strong> sobald ein Versand konfiguriert ist (<code>RESEND_API_KEY</code>).
+            Ohne Konfiguration bleibt die E-Mail-Zustellung ehrlich „übersprungen“ — Berichte stehen
+            jederzeit als Export (CSV/HTML/PDF) bereit.
           </p>
 
           {data.schedules.length > 0 ? (

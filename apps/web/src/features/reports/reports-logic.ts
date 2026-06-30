@@ -81,6 +81,8 @@ export function labelForChannel(channel: string | null | undefined): string {
   switch (channel) {
     case "email":
       return "E-Mail";
+    case "webhook":
+      return "Webhook";
     case "slack":
       return "Slack";
     case null:

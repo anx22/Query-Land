@@ -3,6 +3,7 @@ import test from "node:test";
 import { compareAlert, reportToCsv, reportToHtml, reportToPdf, type Report } from "@seo-tool/domain-model";
 import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
+import { __resetReportDeliveryHooksForTests, __setReportDeliveryHooksForTests } from "../src/reports/delivery.js";
 
 // WP-5.1..5.4: Reporting & Alerts (Welle 6). Report-Generierung/Export/Versand/Schedules und
 // Alert-Regeln/Auswertung. Export-Funktionen sind reine, dependency-freie Serialisierer.
@@ -98,11 +99,52 @@ test("weekly report aggregates four sections and exports/delivers", async () => 
     assert.equal(pdf.contentType, "application/pdf");
     assert.ok(pdf.content.startsWith("%PDF-1.4"));
 
+    // Email delivery via a mocked Resend call (configured provider → real "sent" path).
+    __setReportDeliveryHooksForTests({
+      fetchImpl: async () => ({ ok: true, status: 200 }),
+      readConfig: () => ({ resendApiKey: "test-key", from: "reports@test" })
+    });
     const delivery = data<{ status: string; channel: string }>(await app("POST", `/reports/${report.id}/deliver`, { channel: "email", target: "team@acme.test" }));
     assert.equal(delivery.status, "sent");
     assert.equal(delivery.channel, "email");
     const deliveries = data<unknown[]>(await app("GET", `/reports/${report.id}/deliveries`));
     assert.equal(deliveries.length, 1);
+  } finally {
+    __resetReportDeliveryHooksForTests();
+    await store.close();
+  }
+});
+
+test("webhook delivery POSTs the report to the target URL", async () => {
+  const { app, store } = await testApp();
+  const calls: string[] = [];
+  __setReportDeliveryHooksForTests({
+    fetchImpl: async (url) => {
+      calls.push(url);
+      return { ok: true, status: 200 };
+    }
+  });
+  try {
+    const projectId = await seedProject(app, "webhook");
+    const report = data<Report>(await app("POST", `/projects/${projectId}/reports`, { type: "weekly_summary" }));
+    const delivery = data<{ status: string; channel: string }>(await app("POST", `/reports/${report.id}/deliver`, { channel: "webhook", target: "https://hooks.test/report" }));
+    assert.equal(delivery.status, "sent");
+    assert.equal(delivery.channel, "webhook");
+    assert.deepEqual(calls, ["https://hooks.test/report"]);
+  } finally {
+    __resetReportDeliveryHooksForTests();
+    await store.close();
+  }
+});
+
+test("email delivery is honestly skipped when no provider is configured", async () => {
+  const { app, store } = await testApp();
+  __resetReportDeliveryHooksForTests(); // real env config; RESEND_API_KEY is unset under test
+  try {
+    const projectId = await seedProject(app, "noprovider");
+    const report = data<Report>(await app("POST", `/projects/${projectId}/reports`, { type: "weekly_summary" }));
+    const delivery = data<{ status: string }>(await app("POST", `/reports/${report.id}/deliver`, { channel: "email", target: "x@test" }));
+    assert.equal(delivery.status, "skipped");
   } finally {
     await store.close();
   }
