@@ -38,3 +38,12 @@ const emptyProvider: AiProvider = {
 export function getAiProvider(): AiProvider {
   return emptyProvider;
 }
+
+/**
+ * Whether a real LLM answer-provider is wired. While false, KI-Citations are an honest empty
+ * state (all-zero), not a measurement — the UI must disclose this instead of showing "0 %" as
+ * if it were a result.
+ */
+export function isAiProviderConfigured(): boolean {
+  return getAiProvider().name !== "unconfigured-llm";
+}

@@ -203,7 +203,8 @@ export function Dashboard({ data }: { data: OverviewData }) {
               {positionBuckets.total > 0 ? positionBuckets.total.toLocaleString("de-DE") : "—"}
             </span>
             <div className="kpi-card__foot">
-              {positionBuckets.total > 0 && <ConfidenceBadge level="B" />}
+              {/* Same SERP-sample source as Visibility/Striking → grade C, not B (consistency + honesty). */}
+              {positionBuckets.total > 0 && <ConfidenceBadge level="C" />}
             </div>
           </article>
 
@@ -327,10 +328,11 @@ export function Dashboard({ data }: { data: OverviewData }) {
           {topOpportunities.length === 0 ? (
             <div className="overview-empty-state">
               <p className="overview-empty-state__text">
-                Noch kein Terrain kartiert — starten Sie eine Analyse und lassen Sie daraus im Content-&-Chancen-Board priorisierte Optimierungschancen erzeugen.
+                Noch keine Chancen — starten Sie zuerst eine Analyse Ihrer Website. Daraus entstehen
+                anschließend priorisierte Optimierungschancen.
               </p>
-              <a className="button secondary overview-cta" href="/content-opportunities">
-                Chancen ansehen
+              <a className="button overview-cta" href="/technical-audit#crawl-start">
+                Analyse starten →
               </a>
             </div>
           ) : (

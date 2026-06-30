@@ -162,17 +162,16 @@ function CrawlDiffSection({
   return (
     <section className="card">
       <p className="kicker">
-        <TermTooltip term="crawl">Crawl</TermTooltip>-Vergleich
+        <TermTooltip term="crawl">Analyse</TermTooltip>-Vergleich
       </p>
       <p className="muted">
-        Zwei Crawl-Läufe gegenüberstellen: was kam hinzu, was wurde behoben und wie haben sich
+        Zwei Analysen gegenüberstellen: was kam hinzu, was wurde behoben und wie haben sich
         Health-Score, offene Issues und entdeckte URLs verändert.
-        <ConfidenceBadge level="A" />
       </p>
 
       {runs.length < 2 ? (
         <p className="audit-diff-empty">
-          Für einen Vergleich werden mindestens zwei Crawl-Läufe benötigt. Starte weitere Crawls, um
+          Für einen Vergleich werden mindestens zwei Analysen benötigt. Starten Sie weitere Analysen, um
           Veränderungen über die Zeit zu sehen.
         </p>
       ) : (
@@ -358,7 +357,7 @@ export default async function Page({
         <HeroBand src="/brand/hdr-technical-audit.jpg" />
         <p className="kicker">Technical Audit</p>
         <h1>
-          <TermTooltip term="crawl">Crawl</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
+          <TermTooltip term="crawl">Analyse</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
         </h1>
         <p>
           Wo verlieren wir URLs auf dem Weg in den Index, wie gesund sind unsere Website-Bereiche und
@@ -406,7 +405,7 @@ export default async function Page({
           </p>
           <p className="muted">
             Wo verliert die Seite URLs auf dem Weg zu Google? Entdeckt → Gecrawlt → Indexierbar
-            (aus dem letzten Crawl-Lauf).
+            (aus der letzten Analyse).
           </p>
           <IndexabilityFunnel stages={data.funnelStages} />
           <WhyItMatters>
@@ -564,7 +563,7 @@ export default async function Page({
 
       {/* Recent crawl runs */}
       <section className="card">
-        <p className="kicker">Letzte Crawl-Läufe</p>
+        <p className="kicker">Letzte Analysen</p>
         {data.recentCrawlRuns.length > 0 ? (
           <div className="audit-runs">
             {data.recentCrawlRuns.map((run) => (
@@ -595,7 +594,7 @@ export default async function Page({
           </div>
         ) : (
           <p className="muted">
-            Noch kein Crawl-Lauf. Starten Sie einen Crawl, um Indexierbarkeit und Issues zu erfassen.
+            Noch keine Analyse. Starten Sie eine Analyse, um Indexierbarkeit und Issues zu erfassen.
           </p>
         )}
         <Pagination page={runPage} currentParams={currentParams} param="runOffset" />

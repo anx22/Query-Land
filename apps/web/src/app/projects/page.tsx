@@ -26,7 +26,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.projects.length} {data.projects.length === 1 ? "Website" : "Websites"}</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Verbunden" : "Nicht erreichbar"}</span>
+          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
         </div>
         {feedback ? (
           <div className={`notice ${feedback.kind} notice--cta`}>

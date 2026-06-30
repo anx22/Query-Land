@@ -27,7 +27,9 @@ export default async function Page({
   const feedback = feedbackMessage(params);
 
   const brandCount = data.rows.filter((r) => r.brand).length;
-  const visScore = data.latestVisibility?.score;
+  // A Visibility-Index computed over zero ranked keywords is a meaningless 0 — treat it as "no data".
+  const hasVisibility = data.latestVisibility != null && data.latestVisibility.trackedKeywords > 0;
+  const visScore = hasVisibility ? data.latestVisibility!.score : undefined;
   const visDelta =
     data.latestVisibility && data.previousVisibility
       ? data.latestVisibility.score - data.previousVisibility.score
@@ -84,11 +86,11 @@ export default async function Page({
             </>
           }
           note={
-            data.latestVisibility
-              ? `${data.latestVisibility.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility.averagePosition ?? "—"}${
+            hasVisibility
+              ? `${data.latestVisibility!.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility!.averagePosition ?? "—"}${
                   visDelta != null ? ` · ${visDelta > 0 ? "+" : ""}${visDelta} Pkt` : ""
                 }`
-              : "noch nicht berechnet"
+              : "erscheint nach der ersten Ranking-Messung"
           }
         />
         <MetricCard
@@ -139,7 +141,8 @@ export default async function Page({
         <div className="card">
           <p className="kicker">Keywords hinzufügen</p>
           <WhyItMatters showIcon={false}>
-            Neue Begriffe werden automatisch nach Intent, Brand und Funnel-Stage klassifiziert.
+            Neue Begriffe werden automatisch nach Intent, Brand und{" "}
+            <TermTooltip term="Funnel-Stage">Funnel-Stage</TermTooltip> klassifiziert.
           </WhyItMatters>
           <form className="form-card" action={addKeywordsAction}>
             <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
@@ -207,13 +210,17 @@ export default async function Page({
 
 function feedbackMessage(
   params: Record<string, string | string[] | undefined> | undefined
-): { kind: "success" | "danger"; message: string } | null {
+): { kind: "success" | "danger" | "warning"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.added)) return { kind: "success", message: "Keywords klassifiziert und gespeichert." };
   if (singleParam(params?.group)) return { kind: "success", message: "Keyword-Cluster angelegt." };
   if (singleParam(params?.ranked)) return { kind: "success", message: "Ranking-Messung erfasst. Echte Positionen folgen, sobald eine Ranking-Quelle verbunden ist." };
-  if (singleParam(params?.visibility)) return { kind: "success", message: "Visibility-Index neu berechnet." };
+  const visibility = singleParam(params?.visibility);
+  if (visibility === "empty") {
+    return { kind: "warning", message: "Noch keine Ranking-Daten — der Visibility-Index erscheint nach der ersten Positions-Messung." };
+  }
+  if (visibility) return { kind: "success", message: "Visibility-Index neu berechnet." };
   return null;
 }
 

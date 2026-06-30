@@ -88,6 +88,13 @@ export default async function Page({
             </p>
           </div>
 
+          {!data.aiConfigured ? (
+            <p className="notice warning">
+              Noch kein KI-Anbieter verbunden (z. B. ChatGPT oder Gemini). Die Werte unten sind daher
+              Platzhalter mit 0 % — <strong>kein Messergebnis</strong>. Sobald ein KI-Anbieter
+              eingerichtet ist, erscheinen hier echte Citation-Daten.
+            </p>
+          ) : null}
           {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
           {!data.connected ? <OfflineNotice /> : null}
         </section>
@@ -158,18 +165,26 @@ export default async function Page({
           <CitationMatrix rows={matrixRows} />
 
           {matrixRows.length > 0 ? (
-            <form action={recordSnapshotAction} className="inline-actions">
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name="promptId" value={data.prompts[0]?.id ?? ""} />
-              <button
-                className="button secondary compact"
-                type="submit"
-                disabled={!data.connected}
-                title="Erfasst einen neuen Snapshot für den zuletzt aufgenommenen Prompt"
-              >
-                Snapshot erfassen (neuester Prompt)
-              </button>
-            </form>
+            <div className="locked-action">
+              <form action={recordSnapshotAction} className="inline-actions">
+                <input type="hidden" name="projectId" value={projectId} />
+                <input type="hidden" name="promptId" value={data.prompts[0]?.id ?? ""} />
+                <button
+                  className="button secondary compact"
+                  type="submit"
+                  disabled={!data.connected || !data.aiConfigured}
+                  title="Erfasst einen neuen Snapshot für den zuletzt aufgenommenen Prompt"
+                >
+                  Snapshot erfassen (neuester Prompt)
+                </button>
+              </form>
+              {!data.aiConfigured ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  Noch kein KI-Anbieter verbunden — ein Snapshot würde nur Platzhalter (0) erfassen.
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </section>
 

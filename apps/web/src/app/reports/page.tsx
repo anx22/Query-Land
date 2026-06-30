@@ -75,7 +75,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <HeroBand src="/brand/hdr-reports.jpg" />
         <p className="kicker">Berichte &amp; Warnungen</p>
         <h1>
-          <TermTooltip term="report">Reports</TermTooltip> &amp; <TermTooltip term="alert">Alarme</TermTooltip>
+          <TermTooltip term="Report / Alert">Reports</TermTooltip> &amp; <TermTooltip term="Report / Alert">Alarme</TermTooltip>
         </h1>
         <p>
           Berichte als Momentaufnahme Ihrer wichtigsten Kennzahlen (Health, Sichtbarkeit, Chancen,
@@ -329,7 +329,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <div className="card">
           <p className="kicker">Warnungen</p>
           <h2>
-            <TermTooltip term="alert">Warn</TermTooltip>-Regeln &amp; Auslösungen
+            <TermTooltip term="Report / Alert">Warn</TermTooltip>-Regeln &amp; Auslösungen
           </h2>
           <WhyItMatters>Schwellen-Warnungen melden Einbrüche, bevor sie unbemerkt Traffic kosten.</WhyItMatters>
 

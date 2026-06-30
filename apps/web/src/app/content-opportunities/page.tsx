@@ -55,7 +55,7 @@ export default async function Page({
         <h1>Optimierungschancen</h1>
         <p>
           Konkrete Verbesserungen für Ihre Website, nach Wirkung sortiert. Jede Chance folgt dem
-          Muster: Beobachtung → Ursache → Maßnahme → messbares Ergebnis.
+          Muster: Beobachtung → Evidenz → Maßnahme → messbares Ergebnis.
         </p>
         <WhyItMatters>
           Die Wirkung-/Aufwand-Matrix zeigt die günstigsten Hebel zuerst — schnelle Erfolge vor großen Projekten.

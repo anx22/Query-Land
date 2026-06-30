@@ -24,6 +24,25 @@ import { opportunityTypeLabel, opportunityStatusLabel } from "../../lib/board-lo
 // follow/nofollow is borderline jargon — present it title-cased and human.
 const LINK_TYPE_LABEL: Record<string, string> = { follow: "Follow", nofollow: "Nofollow" };
 
+// Small German maps so internal enum tokens never reach a non-expert user.
+const URL_SOURCE_LABEL: Record<string, string> = {
+  sitemap: "Sitemap", internal_link: "Interner Link", external_link: "Externer Link",
+  gsc: "Search Console", manual: "Manuell", seed: "Startpunkt", redirect: "Weiterleitung",
+};
+const FETCH_STATUS_LABEL: Record<string, string> = {
+  success: "Erfolgreich", redirect: "Weiterleitung", client_error: "Client-Fehler (4xx)",
+  server_error: "Server-Fehler (5xx)", network: "Netzwerkfehler", timeout: "Zeitüberschreitung",
+};
+const INDEX_STATE_LABEL: Record<string, string> = {
+  indexable: "Indexierbar", blocked: "Blockiert", noindex: "Noindex",
+  canonicalized: "Kanonisiert", unknown: "Unbekannt",
+};
+const CONFIDENCE_WORD_LABEL: Record<string, string> = { high: "Hoch", medium: "Mittel", low: "Niedrig" };
+
+function labelFor(map: Record<string, string>, value: string): string {
+  return map[value] ?? value;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function Page({
@@ -96,7 +115,7 @@ export default async function Page({
                   <strong className="dossier-mono">{data.selectedUrl}</strong>
                   {data.discoveredUrl ? (
                     <div className="facts">
-                      <span className="fact"><span className="fact__label">Quelle</span><span className="fact__value">{data.discoveredUrl.source}</span></span>
+                      <span className="fact"><span className="fact__label">Quelle</span><span className="fact__value">{labelFor(URL_SOURCE_LABEL, data.discoveredUrl.source)}</span></span>
                       <span className="fact"><span className="fact__label">Tiefe</span><span className="fact__value">{data.discoveredUrl.depth}</span></span>
                       <span className="fact"><span className="fact__label">Entdeckt</span><span className="fact__value">{formatDateTime(data.discoveredUrl.discoveredAt)}</span></span>
                     </div>
@@ -111,7 +130,7 @@ export default async function Page({
                       <span className="fact"><span className="fact__label">Vorlage</span><span className="fact__value">{data.sourceAnchor.template}</span></span>
                       <span className="fact"><span className="fact__label">Komponente</span><span className="fact__value">{data.sourceAnchor.component}</span></span>
                       <span className="fact"><span className="fact__label">Datei</span><span className="fact__value dossier-mono">{data.sourceAnchor.repoPath}</span></span>
-                      <span className="fact"><span className="fact__label">Konfidenz</span><span className="fact__value">{data.sourceAnchor.confidence}</span></span>
+                      <span className="fact"><span className="fact__label">Konfidenz</span><span className="fact__value">{labelFor(CONFIDENCE_WORD_LABEL, data.sourceAnchor.confidence)}</span></span>
                     </div>
                   ) : (
                     <EmptyLine>
@@ -160,7 +179,7 @@ export default async function Page({
                       className={record.statusClass === "success" || record.statusClass === "redirect" ? "dossier-tl-ok" : "dossier-tl-bad"}
                     >
                       <strong>
-                        Fetch · {record.statusClass} · {record.statusCode ?? "network"}
+                        Abruf · {labelFor(FETCH_STATUS_LABEL, record.statusClass)} · {record.statusCode ?? "Netzwerk"}
                       </strong>
                       <span className="dossier-timeline-when">{formatDateTime(record.fetchedAt)}</span>
                       {record.errorMessage ? <span className="dossier-muted">{record.errorMessage}</span> : null}
@@ -169,7 +188,7 @@ export default async function Page({
                   {data.indexabilityHistory.slice(0, 5).map((record) => (
                     <li key={`i-${record.id}`} className={record.isIndexable ? "dossier-tl-ok" : "dossier-tl-bad"}>
                       <strong>
-                        Indexierbarkeit · {record.state} · {record.isIndexable ? "indexierbar" : "blockiert"}
+                        Indexierbarkeit · {labelFor(INDEX_STATE_LABEL, record.state)} · {record.isIndexable ? "indexierbar" : "blockiert"}
                       </strong>
                       <span className="dossier-timeline-when">{formatDateTime(record.assessedAt)}</span>
                     </li>

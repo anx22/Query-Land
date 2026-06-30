@@ -59,14 +59,17 @@ export async function recordRankAction(formData: FormData) {
 }
 
 export async function computeVisibilityAction(formData: FormData) {
+  let trackedKeywords = 0;
   try {
     const projectId = requiredString(formData, "projectId");
-    await apiPost(`/projects/${projectId}/visibility/compute`, {});
+    const result = await apiPost<{ trackedKeywords?: number }>(`/projects/${projectId}/visibility/compute`, {});
+    trackedKeywords = result?.trackedKeywords ?? 0;
   } catch (error) {
     redirect(`/keywords-rank?error=${encodeURIComponent(messageFor(error))}`);
   }
   revalidateKeywordViews();
-  redirect("/keywords-rank?visibility=1");
+  // Honest feedback: a Visibility-Index over zero ranked keywords is a meaningless 0, not a result.
+  redirect(trackedKeywords > 0 ? "/keywords-rank?visibility=1" : "/keywords-rank?visibility=empty");
 }
 
 function revalidateKeywordViews(): void {

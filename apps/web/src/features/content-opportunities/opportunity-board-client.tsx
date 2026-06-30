@@ -526,7 +526,8 @@ function BoardEmpty() {
     <div className="board-empty">
       <strong>Keine Chancen im aktuellen Filter</strong>
       <span className="muted">
-        Passe die Filter an oder generiere Opportunities, um Quick Wins und Big Bets zu sehen.
+        Passen Sie die Filter an oder erzeugen Sie Optimierungschancen, um schnelle Erfolge
+        (hohe Wirkung, wenig Aufwand) und größere Projekte zu sehen.
       </span>
     </div>
   );

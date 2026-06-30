@@ -38,11 +38,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const flowBars = diffToFlowBars(data.diff);
   const deltas = snapshotDeltas(data.snapshots);
 
-  const followRatio = data.authority?.followRatio ?? null;
+  // The /authority endpoint always returns a (zeroed) summary even with no links, so guard on real
+  // volume — otherwise an unmeasured profile renders a confident "0 %" follow-ratio as if verified.
+  const totalBacklinks = data.authority?.totalBacklinks ?? 0;
+  const followRatio = totalBacklinks > 0 ? data.authority?.followRatio ?? null : null;
   // ScoreGauge expects a 0–100 value; follow-ratio is a 0–1 fraction.
   const followRatioGauge = followRatio !== null ? Math.round(followRatio * 100) : null;
 
-  const hasData = data.authority !== null || data.snapshots.length > 0;
+  const hasData = totalBacklinks > 0 || data.snapshots.length > 0;
 
   return (
     <AppShell activePath="/backlinks">
