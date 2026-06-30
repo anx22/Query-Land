@@ -7,6 +7,7 @@ import { Icon } from "../../components/icon";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { OpportunityBoardClient } from "../../features/content-opportunities";
+import { ModulesPending } from "../../components/modules-pending";
 import { loadOpportunityBoard } from "../../lib/board-api";
 import { actionLock, type ReadinessState } from "../../lib/readiness";
 import {
@@ -107,21 +108,35 @@ export default async function Page({
         </div>
       </section>
 
-      <section className="metric-grid">
-        <MetricCard label="Opportunities" value={String(data.meta.total)} note={`${opportunities.length} geladen`} />
-        <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
-        <MetricCard label="Quick Wins" value={String(quickWins)} note="hohe Wirkung, niedriger Aufwand" />
-        <MetricCard
-          label="Validiert"
-          value={String(validatedCount)}
-          note={topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt"}
+      {opportunities.length === 0 ? (
+        <ModulesPending
+          icon="lightbulb"
+          title="Noch keine Optimierungschancen"
+          text="Priorisierte Chancen mit Wirkung-/Aufwand-Matrix und Maßnahmen entstehen aus Ihrer Analyse. Starten Sie zuerst eine Analyse Ihrer Website."
+          ctaHref={heroDisabled ? "#" : "/technical-audit#crawl-start"}
+          ctaLabel="Analyse starten →"
+          ctaDisabled={heroDisabled}
+          disabledReason={lockReason ?? undefined}
         />
-      </section>
+      ) : (
+        <>
+          <section className="metric-grid">
+            <MetricCard label="Opportunities" value={String(data.meta.total)} note={`${opportunities.length} geladen`} />
+            <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
+            <MetricCard label="Quick Wins" value={String(quickWins)} note="hohe Wirkung, niedriger Aufwand" />
+            <MetricCard
+              label="Validiert"
+              value={String(validatedCount)}
+              note={topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt"}
+            />
+          </section>
 
-      <OpportunityBoardClient
-        opportunities={opportunities}
-        onBulkTransition={bulkTransitionOpportunitiesAction}
-      />
+          <OpportunityBoardClient
+            opportunities={opportunities}
+            onBulkTransition={bulkTransitionOpportunitiesAction}
+          />
+        </>
+      )}
     </AppShell>
   );
 }
