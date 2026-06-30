@@ -18,6 +18,7 @@
     "check": "npm run typecheck && npm run check:boundaries && npm run validate:openapi && npm test",
     "migrate:sqlite": "npm --workspace @seo-tool/api run build && node apps/api/dist/src/migrate-legacy.js",
     "smoke:crawl": "npm run build && node services/crawler/dist/src/smoke.js",
+    "audit:crawl": "npm run build && NODE_ENV=test node services/crawler/dist/src/audit-harness.js",
     "build:web": "npm --workspace @seo-tool/web run build"
   },
   "devDependencies": {
