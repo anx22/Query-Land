@@ -130,19 +130,19 @@ export interface PrerequisiteMeta {
 
 export const PREREQUISITE_META: Record<Prerequisite, PrerequisiteMeta> = {
   project: {
-    label: "Projekt",
+    label: "Website",
     banner:
-      "Legen Sie zuerst ein Projekt an — es klammert alle Auswertungen einer Website zusammen.",
-    reason: "Zuerst ein Projekt anlegen.",
-    ctaLabel: "Projekt anlegen",
+      "Legen Sie zuerst eine Website an — sie klammert alle Auswertungen zusammen.",
+    reason: "Zuerst eine Website anlegen.",
+    ctaLabel: "Website hinzufügen",
     ctaHref: "/projects",
   },
   site: {
-    label: "Website",
+    label: "Adresse",
     banner:
-      "Dieses Projekt hat noch keine Website. Tragen Sie die Adresse ein, damit die Analyse loslegen kann.",
-    reason: "Zuerst eine Website zum Projekt hinzufügen.",
-    ctaLabel: "Website hinzufügen",
+      "Diese Website hat noch keine Adresse. Tragen Sie die Adresse ein, damit die Analyse loslegen kann.",
+    reason: "Zuerst die Website-Adresse eintragen.",
+    ctaLabel: "Adresse eintragen",
     ctaHref: "/projects",
   },
   integration: {

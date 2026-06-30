@@ -202,13 +202,13 @@ describe("actionLock", () => {
   it("locks with the first unmet reason", () => {
     const lock = actionLock(empty, ["project", "site"]);
     expect(lock.locked).toBe(true);
-    expect(lock.reason).toMatch(/Projekt/);
+    expect(lock.reason).toMatch(/Website/);
   });
 
   it("advances the reason as prerequisites are met", () => {
     const lock = actionLock(withProject, ["project", "site"]);
     expect(lock.locked).toBe(true);
-    expect(lock.reason).toMatch(/Website/);
+    expect(lock.reason).toMatch(/Adresse/);
   });
 
   it("unlocks when all requirements are met", () => {

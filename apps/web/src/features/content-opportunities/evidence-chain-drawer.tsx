@@ -14,7 +14,7 @@
 import { useRef } from "react";
 import type { Evidence, Opportunity, SourceConfidence } from "@seo-tool/domain-model";
 import { ConfidenceBadge, confidenceMeta, type ConfidenceLevel } from "../../components/confidence-badge";
-import { confidenceToLevel, opportunityTypeLabel } from "../../lib/board-logic";
+import { confidenceToLevel, opportunityTypeLabel, opportunityStatusLabel } from "../../lib/board-logic";
 import { useFocusTrap } from "../../lib/use-focus-trap";
 
 export interface EvidenceChainDrawerProps {
@@ -73,7 +73,7 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
         </header>
 
         <div className="board-drawer__badges">
-          <span className={`status ${opportunity.status}`}>{opportunity.status}</span>
+          <span className={`status ${opportunity.status}`}>{opportunityStatusLabel(opportunity.status)}</span>
           <ConfidenceBadge level={overallLevel} />
           <span className="badge">Wirkung {opportunity.expectedImpact}</span>
           <span className="badge">Aufwand {opportunity.effort}</span>
@@ -146,7 +146,7 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
               <p className="board-chain__label">Validierung</p>
               <p className="board-chain__text">{opportunity.validationMetric || "Keine Validierungsmetrik definiert."}</p>
               <p className="board-chain__text muted">
-                Status: <span className={`status ${opportunity.status}`}>{opportunity.status}</span>
+                Status: <span className={`status ${opportunity.status}`}>{opportunityStatusLabel(opportunity.status)}</span>
               </p>
               {opportunity.affectedUrls.length > 0 ? (
                 <p className="board-chain__text muted">Betroffene URLs: {opportunity.affectedUrls.join(", ")}</p>

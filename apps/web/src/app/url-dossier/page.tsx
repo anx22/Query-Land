@@ -16,6 +16,13 @@ import {
   formatPosition,
   severityVariant
 } from "../../features/url-dossier/format";
+import { intentLabel } from "../../features/keyword-rank/keyword-logic";
+import { severityLabel } from "../../features/technical-audit/crawl-diff";
+import { ruleLabel } from "../../features/technical-audit/issue-labels";
+import { opportunityTypeLabel, opportunityStatusLabel } from "../../lib/board-logic";
+
+// follow/nofollow is borderline jargon — present it title-cased and human.
+const LINK_TYPE_LABEL: Record<string, string> = { follow: "Follow", nofollow: "Nofollow" };
 
 export const dynamic = "force-dynamic";
 
@@ -240,7 +247,7 @@ export default async function Page({
                         </span>
                       </div>
                       <div className="facts">
-                        <span className="fact"><span className="fact__label">Intent</span><span className="fact__value">{row.keyword.intent}</span></span>
+                        <span className="fact"><span className="fact__label">Intent</span><span className="fact__value">{intentLabel(row.keyword.intent)}</span></span>
                         <span className="fact"><span className="fact__label">Markt</span><span className="fact__value">{row.keyword.market}</span></span>
                       </div>
                     </article>
@@ -305,7 +312,7 @@ export default async function Page({
                       <div className="dossier-row">
                         <span className="dossier-row-main dossier-mono">{link.sourceDomain}</span>
                         <span className="dossier-row-metrics">
-                          <span className={`badge ${link.linkType === "follow" ? "success" : ""}`}>{link.linkType}</span>
+                          <span className={`badge ${link.linkType === "follow" ? "success" : ""}`}>{LINK_TYPE_LABEL[link.linkType] ?? link.linkType}</span>
                         </span>
                       </div>
                       <span className="dossier-muted">{link.anchorText || "(kein Ankertext)"}</span>
@@ -346,10 +353,10 @@ export default async function Page({
                   {data.issues.map((issue) => (
                     <article key={issue.id}>
                       <div className="dossier-row">
-                        <strong className="dossier-row-main">{issue.rule}</strong>
+                        <strong className="dossier-row-main">{ruleLabel(issue.rule)}</strong>
                         <span className="dossier-row-metrics">
                           <span className={`badge ${severityVariant(issue.severity) === "danger" ? "danger" : ""}`}>
-                            {issue.severity}
+                            {severityLabel(issue.severity)}
                           </span>
                           <span className={`status ${issue.resolvedAt ? "succeeded" : "running"}`}>
                             {issue.resolvedAt ? "behoben" : "offen"}
@@ -374,10 +381,10 @@ export default async function Page({
                   {data.opportunities.map((opportunity) => (
                     <article key={opportunity.id}>
                       <div className="dossier-row">
-                        <strong className="dossier-row-main">{opportunity.type}</strong>
+                        <strong className="dossier-row-main">{opportunityTypeLabel(opportunity.type)}</strong>
                         <span className="dossier-row-metrics">
                           <span>Prio {formatCount(opportunity.priority)}</span>
-                          <span className={`status ${opportunity.status}`}>{opportunity.status}</span>
+                          <span className={`status ${opportunity.status}`}>{opportunityStatusLabel(opportunity.status)}</span>
                           {opportunity.evidence[0] ? (
                             <ConfidenceBadge level={evidenceLevel(opportunity.evidence[0].sourceConfidence)} showLabel={false} />
                           ) : null}

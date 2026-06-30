@@ -30,6 +30,7 @@ import {
   filterOpportunities,
   opportunityTypeColorKey,
   opportunityTypeLabel,
+  opportunityStatusLabel,
   statusToColumn,
   type BoardFilter,
 } from "../../lib/board-logic";
@@ -195,7 +196,7 @@ export function OpportunityBoardClient({
   const activeChips = useMemo(() => {
     const chips: Array<{ key: string; label: string }> = [];
     if (filter.type && filter.type !== "all") chips.push({ key: "type", label: `Typ: ${opportunityTypeLabel(filter.type)}` });
-    if (filter.status && filter.status !== "all") chips.push({ key: "status", label: `Status: ${filter.status}` });
+    if (filter.status && filter.status !== "all") chips.push({ key: "status", label: `Status: ${opportunityStatusLabel(filter.status)}` });
     if (filter.minImpact) chips.push({ key: "minImpact", label: `Wirkung ≥ ${filter.minImpact}` });
     if (filter.maxEffort) chips.push({ key: "maxEffort", label: `Aufwand ≤ ${filter.maxEffort}` });
     return chips;
@@ -412,7 +413,7 @@ function TableView({
           <select value={filter.status ?? "all"} onChange={(e) => onParam("status", e.target.value)}>
             <option value="all">Alle</option>
             {BOARD_STATUSES.map((s: OpportunityStatus) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>{opportunityStatusLabel(s)}</option>
             ))}
           </select>
         </label>
@@ -506,7 +507,7 @@ function TableView({
                 <span role="cell" className="board-table__spark">
                   <Sparkline data={evidenceSparkline(op)} ariaLabel="Vorher/Nachher-Trend" height={28} />
                 </span>
-                <span role="cell"><span className={`status ${op.status}`}>{op.status}</span></span>
+                <span role="cell"><span className={`status ${op.status}`}>{opportunityStatusLabel(op.status)}</span></span>
               </button>
             </div>
           ))}

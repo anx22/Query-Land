@@ -130,7 +130,7 @@ export default async function Page({
           <p className="kicker">Refresh-Kandidaten</p>
           <p className="muted">
             Seiten mit fallendem Klick-Trend, gewichtet nach geschätztem Traffic und offenen Problemen.
-            Die Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="B" />
+            Die Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="E" />
           </p>
           {data.refreshCandidates.length > 0 ? (
             <div className="cw-candidates">
@@ -182,7 +182,7 @@ export default async function Page({
           <p className="kicker">Content-Score</p>
           <p className="muted">
             Für {data.selectedUrl ? <strong>{data.selectedUrl}</strong> : "die gewählte URL"} — blendet
-            Crawl-Health, offene Issues und Metrik-Trend. <ConfidenceBadge level="B" />
+            Crawl-Health, offene Issues und Metrik-Trend. <ConfidenceBadge level="E" />
           </p>
           <ScoreGauge value={score?.score ?? null} label="Content" />
           <div className="cw-score-row">

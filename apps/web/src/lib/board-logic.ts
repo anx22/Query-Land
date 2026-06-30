@@ -53,6 +53,21 @@ export function opportunityTypeLabel(type: OpportunityType): string {
   }
 }
 
+/** Human-readable German label for an opportunity status (never show the raw enum). */
+export function opportunityStatusLabel(status: OpportunityStatus): string {
+  switch (status) {
+    case "open":        return "Offen";
+    case "planned":     return "Geplant";
+    case "in_progress": return "In Arbeit";
+    case "implemented": return "Umgesetzt";
+    case "validated":   return "Validiert";
+    case "reopened":    return "Wieder geöffnet";
+    case "dismissed":   return "Verworfen";
+    case "expired":     return "Abgelaufen";
+    default:            return status;
+  }
+}
+
 /**
  * Map an opportunity type to its categorical chart-theme key.
  * (chartTheme.categorical keys: technical, keyword, cannibal, money, link, aeo)
