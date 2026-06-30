@@ -9,14 +9,13 @@ export const dynamic = "force-dynamic";
 type ConnectorProvider = {
   provider: "gsc" | "ga4";
   label: string;
-  confidence: string;
   available: boolean;
   description: string;
 };
 
 const connectorProviders: ConnectorProvider[] = [
-  { provider: "gsc", label: "Google Search Console", confidence: "B", available: true, description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
-  { provider: "ga4", label: "Google Analytics 4", confidence: "A", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." }
+  { provider: "gsc", label: "Google Search Console", available: true, description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
+  { provider: "ga4", label: "Google Analytics 4", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." }
 ];
 
 const sovereigntyItems = [

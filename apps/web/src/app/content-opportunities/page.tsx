@@ -14,6 +14,8 @@ import {
   generateOpportunitiesAction,
   syncSearchPerformanceAction,
 } from "./actions";
+import type { OpportunityStatus } from "@seo-tool/domain-model";
+import { opportunityStatusLabel } from "../../lib/board-logic";
 
 export const dynamic = "force-dynamic";
 
@@ -133,13 +135,13 @@ function feedbackMessage(
     return { kind: "success", message: "Optimierungschancen erzeugt." };
   }
   if (singleParam(params?.synced)) {
-    return { kind: "success", message: "Such-Performance abgeglichen. Echte Klick- und Ranking-Daten folgen, sobald die Google Search Console verbunden ist." };
+    return { kind: "success", message: "Such-Performance aus der Google Search Console abgeglichen. Neue Klick- und Ranking-Daten fließen in die Optimierungschancen ein." };
   }
   if (singleParam(params?.revalidated)) {
-    return { kind: "success", message: "Opportunity re-validiert (validated oder reopened)." };
+    return { kind: "success", message: "Chance erneut geprüft (validiert oder wieder geöffnet)." };
   }
   const transition = singleParam(params?.transition);
-  if (transition) return { kind: "success", message: `Status gewechselt zu ${transition}.` };
+  if (transition) return { kind: "success", message: `Status geändert: ${opportunityStatusLabel(transition as OpportunityStatus)}.` };
   return null;
 }
 

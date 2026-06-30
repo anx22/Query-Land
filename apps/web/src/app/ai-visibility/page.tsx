@@ -1,6 +1,6 @@
 import "../../features/ai-visibility/ai-visibility.css";
 
-import type { AeoAssessment } from "@seo-tool/domain-model";
+import type { AeoAssessment, ProposalStatus } from "@seo-tool/domain-model";
 import { PROPOSAL_KINDS } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
@@ -12,7 +12,7 @@ import { WhyItMatters } from "../../components/why-it-matters";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { CitationMatrix } from "../../features/ai-visibility/citation-matrix";
 import { ProposalsList } from "../../features/ai-visibility/proposals-list";
-import { toMatrixRow, proposalKindLabel, aeoCheckLabel } from "../../features/ai-visibility/ai-logic";
+import { toMatrixRow, proposalKindLabel, proposalStatusLabel, aeoCheckLabel } from "../../features/ai-visibility/ai-logic";
 import { loadAiVisibilityOverview } from "../../lib/ai-visibility-api";
 import {
   createPromptAction,
@@ -347,7 +347,7 @@ function feedbackMessage(
   if (singleParam(params?.scanned)) return { kind: "success", message: "AEO-Analyse abgeschlossen (Klasse A)." };
   if (singleParam(params?.proposed)) return { kind: "success", message: "Proposal erstellt — wartet auf Review." };
   const transition = singleParam(params?.transition);
-  if (transition) return { kind: "success", message: `Proposal-Status gewechselt zu ${transition}.` };
+  if (transition) return { kind: "success", message: `Vorschlag-Status geändert: ${proposalStatusLabel(transition as ProposalStatus)}.` };
   return null;
 }
 

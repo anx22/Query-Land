@@ -21,29 +21,6 @@ export async function setActiveProjectAction(formData: FormData) {
   redirect("/");
 }
 
-export async function createProjectAction(formData: FormData) {
-  let projectId: string;
-  try {
-    const name = requiredString(formData, "name");
-    // Slug is a technical detail — derive it from the name unless explicitly provided (advanced).
-    const slug = optionalSlug(formData, "slug") ?? deriveSlug(name);
-    const project = await createFoundationProject({
-      name,
-      slug,
-      status: "active",
-      defaultLocale: optionalString(formData, "defaultLocale") ?? "de-DE"
-    });
-    projectId = project.id;
-  } catch (error) {
-    redirect(`/projects?error=${encodeURIComponent(messageFor(error))}`);
-  }
-
-  // Activate the just-created project so the overview and wizard immediately reflect it
-  // (otherwise the user would keep onboarding the previously active project).
-  (await cookies()).set(ACTIVE_PROJECT_COOKIE, projectId, COOKIE_OPTIONS);
-  revalidateProjectViews();
-  redirect("/projects?created=project");
-}
 
 /**
  * Add a website in ONE step (the primary creation flow): one website = one project, so this creates
