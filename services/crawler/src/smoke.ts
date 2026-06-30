@@ -207,16 +207,20 @@ export async function runSmoke(): Promise<number> {
       userAgent
     });
 
-    // Read back persisted artifacts to build the snapshot.
+    // Read back persisted artifacts to build the snapshot. Fan the per-URL reads out in parallel
+    // (one Promise.all) rather than awaiting two GETs serially per discovered URL.
     const discovered = (await getData<Array<{ id: string }>>(app, `/projects/${projectId}/sites/${siteId}/discovered-urls`)) ?? [];
-    let fetchResults = 0;
-    let indexabilityAssessments = 0;
-    for (const url of discovered) {
-      const fetches = (await getData<unknown[]>(app, `/projects/${projectId}/sites/${siteId}/discovered-urls/${url.id}/fetch-results`)) ?? [];
-      const assessments = (await getData<unknown[]>(app, `/projects/${projectId}/sites/${siteId}/discovered-urls/${url.id}/indexability`)) ?? [];
-      fetchResults += fetches.length;
-      indexabilityAssessments += assessments.length;
-    }
+    const perUrlCounts = await Promise.all(
+      discovered.map(async (url) => {
+        const [fetches, assessments] = await Promise.all([
+          getData<unknown[]>(app, `/projects/${projectId}/sites/${siteId}/discovered-urls/${url.id}/fetch-results`),
+          getData<unknown[]>(app, `/projects/${projectId}/sites/${siteId}/discovered-urls/${url.id}/indexability`)
+        ]);
+        return { fetches: (fetches ?? []).length, assessments: (assessments ?? []).length };
+      })
+    );
+    const fetchResults = perUrlCounts.reduce((sum, c) => sum + c.fetches, 0);
+    const indexabilityAssessments = perUrlCounts.reduce((sum, c) => sum + c.assessments, 0);
 
     const runs = (await getData<CrawlRunRecord[]>(app, `/projects/${projectId}/sites/${siteId}/crawl-runs`)) ?? [];
     const run = runs.find((candidate) => candidate.id === crawlRunId) ?? runs[0];

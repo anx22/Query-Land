@@ -87,12 +87,25 @@ class SQLiteSearchPerformanceStore implements SearchPerformanceStore {
     const rows = await provider.fetch({ baseUrl: site.base_url, market });
     const capturedAt = new Date().toISOString();
 
-    await this.db.transaction(async (tx) => {
-      const insert = tx.prepare(`INSERT INTO search_performance_rows (id, project_id, site_id, query, page_url, clicks, impressions, ctr, position, market, captured_at, source_confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      for (const row of rows) {
-        await insert.run(`sp-${randomUUID()}`, projectId, siteId, row.query, row.pageUrl, row.clicks, row.impressions, row.ctr, row.position, market, capturedAt, provider.sourceConfidence);
-      }
-    });
+    if (rows.length > 0) {
+      // Batch the inserts into multi-row statements (one round-trip per chunk) instead of one
+      // INSERT per row. 12 columns/row; chunk so we stay well under Postgres' 65535-param ceiling.
+      const COLUMNS_PER_ROW = 12;
+      const CHUNK_SIZE = 500;
+      await this.db.transaction(async (tx) => {
+        for (let offset = 0; offset < rows.length; offset += CHUNK_SIZE) {
+          const chunk = rows.slice(offset, offset + CHUNK_SIZE);
+          const placeholders = chunk.map(() => `(${Array(COLUMNS_PER_ROW).fill("?").join(", ")})`).join(", ");
+          const params = chunk.flatMap((row) => [
+            `sp-${randomUUID()}`, projectId, siteId, row.query, row.pageUrl, row.clicks,
+            row.impressions, row.ctr, row.position, market, capturedAt, provider.sourceConfidence
+          ]);
+          await tx.prepare(
+            `INSERT INTO search_performance_rows (id, project_id, site_id, query, page_url, clicks, impressions, ctr, position, market, captured_at, source_confidence) VALUES ${placeholders}`
+          ).run(...params);
+        }
+      });
+    }
 
     await this.audit("system", "search_performance.sync", "site", siteId, { projectId, market, rows: rows.length });
     return { inserted: rows.length, capturedAt, market };

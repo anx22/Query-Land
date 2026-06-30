@@ -17,6 +17,7 @@ import { CONTENT_INTENTS } from "@seo-tool/domain-model";
 import {
   intentLabel,
   isBriefEditable,
+  parseTerms,
   serializeInternalLinks,
   serializeLines,
   serializeTerms,
@@ -30,10 +31,16 @@ export interface BriefEditorProps {
 
 export function BriefEditor({ brief, onSave }: BriefEditorProps) {
   const editable = isBriefEditable(brief.status);
+  // `terms` is the single source of truth (drives the checklist + the serialised hidden field).
+  // `termText` holds the textarea's raw text so in-progress typing (blank lines, half-typed terms)
+  // isn't clobbered by round-tripping through the lossy parse; both stay in sync on every edit.
   const [terms, setTerms] = useState(brief.terms);
+  const [termText, setTermText] = useState(() => serializeTerms(brief.terms));
 
   function toggleTerm(index: number) {
-    setTerms((prev) => prev.map((t, i) => (i === index ? { ...t, done: !t.done } : t)));
+    const next = terms.map((t, i) => (i === index ? { ...t, done: !t.done } : t));
+    setTerms(next);
+    setTermText(serializeTerms(next));
   }
 
   return (
@@ -123,19 +130,12 @@ export function BriefEditor({ brief, onSave }: BriefEditorProps) {
             <textarea
               className="cw-textarea"
               rows={3}
-              defaultValue={serializeTerms(brief.terms)}
+              value={termText}
               onChange={(event) => {
-                // Re-parse the textarea into the checklist so toggles + text edits stay in sync.
-                const lines = event.target.value.split(/\r?\n/);
-                const next = lines
-                  .map((line) => {
-                    const match = line.match(/^\s*\[\s*([xX ])?\s*\]\s*(.+)$/);
-                    const text = (match ? match[2] : line).trim();
-                    const done = match ? match[1]?.toLowerCase() === "x" : false;
-                    return text ? { term: text, done } : null;
-                  })
-                  .filter((t): t is { term: string; done: boolean } => t !== null);
-                setTerms(next);
+                // Keep the raw text controlled, and re-derive the checklist via the shared parser
+                // so toggles + text edits stay in sync without losing in-progress input.
+                setTermText(event.target.value);
+                setTerms(parseTerms(event.target.value));
               }}
             />
           </label>

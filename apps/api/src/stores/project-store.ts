@@ -146,7 +146,16 @@ class SQLiteProjectStore implements ProjectStore {
 
   async listIntegrations(): Promise<IntegrationStatusView[]> {
     const rows = await this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all();
-    return Promise.all(rows.map((row) => this.toStatusView(row)));
+    // One grouped query for the latest evidence timestamp per account, instead of a per-row lookup.
+    const evidenceRows = await this.db.prepare(
+      `SELECT integration_account_id AS id, MAX(fetched_at) AS fetched_at FROM raw_events GROUP BY integration_account_id`
+    ).all() as Array<{ id: string; fetched_at: string | null }>;
+    const lastEvidenceByAccount = new Map<string, string | null>(
+      evidenceRows.map((row) => [String(row.id), row.fetched_at === null ? null : String(row.fetched_at)])
+    );
+    return Promise.all(
+      rows.map((row) => this.toStatusView(row, lastEvidenceByAccount.get(String(row.id)) ?? null))
+    );
   }
 
   async getIntegration(integrationId: string): Promise<IntegrationStatusView> {
@@ -206,12 +215,16 @@ class SQLiteProjectStore implements ProjectStore {
     return row ? String(row.fetched_at) : null;
   }
 
-  /** Persistierten Account mit dem typisierten Connector-Vertrag zu einer Status-Sicht verbinden. */
-  private async toStatusView(row: Record<string, unknown>): Promise<IntegrationStatusView> {
+  /**
+   * Persistierten Account mit dem typisierten Connector-Vertrag zu einer Status-Sicht verbinden.
+   * `precomputedLastEvidenceAt` lets list callers batch the evidence lookup into one grouped query;
+   * when omitted (single-integration path) it falls back to a per-row query.
+   */
+  private async toStatusView(row: Record<string, unknown>, precomputedLastEvidenceAt?: string | null): Promise<IntegrationStatusView> {
     const integration = mapIntegration(row);
     const connector = getConnector(integration.provider);
     const lastSyncedAt = integration.freshness;
-    const lastEvidenceAt = await this.lastEvidenceAt(integration.id);
+    const lastEvidenceAt = precomputedLastEvidenceAt !== undefined ? precomputedLastEvidenceAt : await this.lastEvidenceAt(integration.id);
     const contract = connector
       ? connector.describe({
           hasCredentials: this.hasCredentials(row),
