@@ -49,7 +49,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
 
     // --- Resolve the effective base from the seed (follow non-www→www etc.) so
     // scope + link resolution use the site's real canonical host. ---
-    const seedFetch = await fetchUrl({ url: baseUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent });
+    const seedFetch = await fetchUrl({ url: baseUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent, maxBodyBytes: options.maxBodyBytes });
     const effectiveBase = seedFetch.finalUrl && /^https?:/i.test(seedFetch.finalUrl) ? seedFetch.finalUrl : baseUrl;
     fetchesByUrl.set(normalizeCrawlUrl(effectiveBase, effectiveBase), seedFetch);
 
@@ -114,7 +114,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
         }
 
         const fetchResult = fetchesByUrl.get(url)
-          ?? await fetchUrl({ url, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent });
+          ?? await fetchUrl({ url, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent, maxBodyBytes: options.maxBodyBytes });
         fetchesByUrl.set(url, fetchResult);
         const storedFetch = await options.apiClient.recordFetchResult(job.projectId, siteId, stored.id, fetchResult);
         const html = fetchResult.responseBody ?? "";
@@ -238,7 +238,7 @@ async function populateOutgoingLinkStatuses(input: {
 
   for (const link of remainingChecks) {
     if (input.fetchesByUrl.has(link)) continue;
-    const result = await fetchUrl({ url: link, fetchImpl: input.options.fetchImpl, fetchedAt: input.now(), timeoutMs: input.options.fetchTimeoutMs, retry: input.options.retry, maxRedirects: input.options.maxRedirects ?? 5, userAgent: input.userAgent });
+    const result = await fetchUrl({ url: link, fetchImpl: input.options.fetchImpl, fetchedAt: input.now(), timeoutMs: input.options.fetchTimeoutMs, retry: input.options.retry, maxRedirects: input.options.maxRedirects ?? 5, userAgent: input.userAgent, maxBodyBytes: input.options.maxBodyBytes });
     input.fetchesByUrl.set(link, result);
   }
 

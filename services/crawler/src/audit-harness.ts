@@ -261,6 +261,21 @@ const SCENARIOS: Scenario[] = [
     ]
   },
   {
+    name: "binary_resource_not_parsed",
+    description: "An in-scope non-HTML resource is fetched but its body is never parsed for links.",
+    fetch: (url) => {
+      if (url.endsWith("/robots.txt")) return robotsTxt("User-agent: *\nAllow: /\n");
+      if (url.endsWith("/sitemap.xml")) return httpStatus(404, "missing");
+      if (pathOf(url) === "/asset") return new Response('<a href="/should-not-follow">x</a>', { status: 200, headers: { "content-type": "image/png" } });
+      return page("/", ["/asset"]);
+    },
+    checks: ({ cycle, fetchLog }) => [
+      expectEq("status", cycle.status, "succeeded"),
+      check("binary body not parsed for links", !fetchLog.includes("https://example.com/should-not-follow"), `fetchLog=${JSON.stringify(fetchLog)}`),
+      expectEq("fetchedUrls (seed + asset)", cycle.fetchedUrls, 2)
+    ]
+  },
+  {
     name: "broken_link_and_scope",
     description: "In-scope 404 link yields broken_link; external link stays out of scope.",
     fetch: (url) => {
