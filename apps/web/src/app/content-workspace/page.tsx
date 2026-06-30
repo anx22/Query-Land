@@ -350,19 +350,20 @@ export default async function Page({
             <form action={createProposalAction}>
               <input type="hidden" name="briefId" value={selectedBrief.id} />
               <input type="hidden" name="kind" value="dev_ticket" />
-              <button type="submit" className="button compact">
-                → Dev-Ticket
+              <button type="submit" className="button compact" title="Erzeugt eine Aufgabe für Ihr Entwicklungs-Team">
+                → Aufgabe für Entwickler
               </button>
             </form>
             <form action={createProposalAction}>
               <input type="hidden" name="briefId" value={selectedBrief.id} />
               <input type="hidden" name="kind" value="fix_pr" />
-              <button type="submit" className="button compact">
-                → Fix-PR
+              <button type="submit" className="button compact" title="Bereitet eine Code-Änderung (Pull Request) als Vorschlag vor">
+                → Code-Änderung vorbereiten
               </button>
             </form>
             <span className="muted cw-suggestion__reason">
-              Erstellt einen Vorschlag in der Proposal-/MCP-Schiene aus diesem Brief.
+              Macht aus diesem Brief einen konkreten Umsetzungs-Vorschlag, den Entwickler (oder ein KI-Agent)
+              übernehmen können.
             </span>
           </div>
         </section>

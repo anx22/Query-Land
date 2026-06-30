@@ -96,7 +96,10 @@ export function aeoCheckLabel(check: string): string {
     case "question_heading": return "Frage als Überschrift";
     case "list":            return "Listen (Aufzählung)";
     case "concise_answer":  return "Prägnante Antwort";
-    default:                return check;
+    // `check` is a free string (not a closed enum), so a future backend check could arrive
+    // unmapped. Humanize the key (snake_case → "Snake Case") rather than leaking raw English.
+    default:
+      return check.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 }
 

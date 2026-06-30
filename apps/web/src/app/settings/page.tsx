@@ -107,7 +107,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                       <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
                       <input type="hidden" name="provider" value={connector.provider} />
                       <button className="button" type="submit" disabled={!data.connected || !selectedProject || Boolean(existing)}>
-                        {existing ? "Verbindung vorhanden" : "Verbindung anlegen"}
+                        {existing ? connectorStatusLabel(existing.status) : "Verbindung anlegen"}
                       </button>
                     </form>
                   )}
