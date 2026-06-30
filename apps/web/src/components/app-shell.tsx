@@ -49,8 +49,9 @@ export async function AppShell({
                 <span className="badge success" title={currentUser.email}>{currentUser.name}</span>
                 <button className="button secondary compact" type="submit">Abmelden</button>
               </form>
-            ) : (
-              <a className="badge" href="/login">Anmelden</a>
+            ) : activePath === "/login" ? null : (
+              // A real control, not a status pill — and never shown on the login page itself.
+              <a className="button secondary compact" href="/login">Anmelden</a>
             )}
           </div>
         </header>

@@ -94,7 +94,7 @@ export function ScoreGauge({
       style={{ width: "100%", maxWidth: `${size}px`, margin: "0 auto" }}
     >
       <svg
-        viewBox={`0 0 ${size} ${cy + 4}`}
+        viewBox={`0 0 ${size} ${cy + size * 0.22}`}
         width="100%"
         aria-hidden="true"
         style={{ display: "block", overflow: "visible" }}
@@ -141,10 +141,10 @@ export function ScoreGauge({
           {displayValue}
         </text>
 
-        {/* Label below number */}
+        {/* Label below the arc with real clearance (viewBox grew to fit it). */}
         <text
           x={cx}
-          y={cy + strokeWidth * 0.5}
+          y={cy + size * 0.1}
           textAnchor="middle"
           dominantBaseline="hanging"
           style={{

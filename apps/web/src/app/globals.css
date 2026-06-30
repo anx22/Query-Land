@@ -6,6 +6,9 @@
   --muted: #766b62;
   --line: #e8dfd6;
   --primary: #ff5c00;
+  /* Darker burnt-orange used ONLY for solid button fills so white button text reaches
+     WCAG AA (~4.6:1). The bright --primary stays the editorial accent for labels/icons. */
+  --primary-strong: #c2410c;
   --primary-soft: #fff0e6;
   --success: #16794d;
   --warning: #a05a00;
@@ -17,7 +20,7 @@
   --conf-b: #0e7c86; --conf-b-soft: #e2f4f5;   /* B Beobachtet    (Google/eigene API)  */
   --conf-c: #b7791f; --conf-c-soft: #fbf0db;   /* C Gemessen SERP (beobachtete Suche)  */
   --conf-d: #5b6478; --conf-d-soft: #edeff3;   /* D Geschätzt     (Drittanbieter)      */
-  --conf-e: #9aa0a6; --conf-e-soft: #f1f1f2;   /* E KI-Hinweis    (kein Beleg)         */
+  --conf-e: #71777e; --conf-e-soft: #f1f1f2;   /* E KI-Hinweis    (kein Beleg)         */
 
   /* UX-9 — categorical colors for opportunity types (avoids green/red/orange)    */
   --cat-technical: #0e7c86;
@@ -29,7 +32,7 @@
 
   /* Inactive / disabled / locked — single source for every gated surface.        */
   /* Used by .is-locked, [disabled], .button[aria-disabled], .nav-item.is-locked. */
-  --inactive-ink:     #a89e95;   /* muted text on inactive elements              */
+  --inactive-ink:     #837a71;   /* muted-but-legible text on inactive elements  */
   --inactive-surface: #f0ece7;   /* flat fill for inactive chips/icons           */
   --inactive-line:    #e8dfd6;   /* border for inactive controls                 */
   --inactive-opacity: 0.55;      /* applied to fully-disabled action buttons     */
@@ -513,7 +516,7 @@ code, kbd, samp,
   gap: 0.4rem;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--primary);
+  background: var(--primary-strong);
   color: white;
   cursor: pointer;
   min-height: 2.6rem;
@@ -545,6 +548,23 @@ code, kbd, samp,
   border-color: var(--line);
   background: var(--surface);
   color: var(--ink);
+}
+
+/* Keyboard accessibility — one visible focus ring for every interactive control.
+   Previously only .term / .infotip had focus styles; buttons, inputs, selects and
+   link-buttons fell back to the UA default, easy to miss on the warm-paper surface. */
+.button:focus-visible,
+a.button:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--primary-strong);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .button.danger {
@@ -753,7 +773,7 @@ select:disabled {
   display: grid;
   gap: 1rem;
   border: 1px solid var(--line);
-  border-radius: 1.25rem;
+  border-radius: 0.75rem;
   padding: 1rem;
 }
 
@@ -1024,10 +1044,14 @@ select:disabled {
 
 .why-it-matters__icon {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
   color: var(--primary);
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.5;
 }
+/* The empty-state chart glyphs now render a line-icon, not an emoji. */
+.overview-trend-empty__glyph { display: inline-flex; color: var(--muted); }
 
 /* B-3 Mono-Daten-Pass: every Recharts axis tick label is a measured number, so */
 /* it renders in JetBrains Mono / tabular — consistent with .metric-value.       */
@@ -1984,6 +2008,26 @@ select:disabled {
 .overview-empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); margin-top: var(--space-3); }
 .overview-empty-state__text { margin: 0; color: var(--muted); }
 .overview-empty-hint { margin-top: var(--space-2); color: var(--muted); font-size: 0.9rem; }
+
+/* Chart empty-states (Visibility-Verlauf, Positions-Verteilung). Without this the bold title
+   and the hint render inline and glue together ("…vorhandenSobald…"). Centered, calm, stacked. */
+.overview-trend-empty,
+.overview-dist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-align: center;
+  min-height: 180px;
+  padding: var(--space-5) var(--space-4);
+  color: var(--muted);
+}
+.overview-trend-empty__glyph { font-size: 1.75rem; opacity: 0.7; }
+.overview-trend-empty__title,
+.overview-dist-empty__title { color: var(--ink); }
+.overview-trend-empty__hint,
+.overview-dist-empty__hint { font-size: 0.9rem; max-width: 42ch; }
 .overview-site-context { margin-top: var(--space-2); color: var(--muted); font-size: 0.85rem; }
 
 .overview-opportunity-list { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }

@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, "..", ".."); // apps/web/src
-const SCAN_DIRS = [join(SRC, "app"), join(SRC, "features")];
+const SCAN_DIRS = [join(SRC, "app"), join(SRC, "features"), join(SRC, "components")];
 
 const FORBIDDEN: Array<{ phrase: string; why: string }> = [
   { phrase: "API verbunden", why: "technical jargon — use 'Daten verbunden'" },

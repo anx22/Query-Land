@@ -70,7 +70,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               Passwort
               <input name="password" type="password" required minLength={12} placeholder="mindestens 12 Zeichen" />
             </label>
-            <button className="button" type="submit">Konto erstellen</button>
+            <button className="button secondary" type="submit">Konto erstellen</button>
           </form>
         </section>
       )}
