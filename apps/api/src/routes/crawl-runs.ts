@@ -49,7 +49,9 @@ export const routeCrawlRuns: ResourceRoute = async (store, method, pathname, sea
   if (method === "POST" && scheduleMatch) {
     const input = scheduleCrawlSeedRequest(body);
     const crawlRun = await store.createCrawlRun(scheduleMatch[1], scheduleMatch[2], input.trigger);
-    const crawlSeedJob = createCrawlSeedJobInput({ siteId: scheduleMatch[2], baseUrl: input.baseUrl, crawlRunId: crawlRun.id, sitemapUrl: input.sitemapUrl });
+    // Carry the site's crawl scope into the job so the worker's BFS stays in-scope.
+    const site = (await store.listSites(scheduleMatch[1])).find((candidate) => candidate.id === scheduleMatch[2]);
+    const crawlSeedJob = createCrawlSeedJobInput({ siteId: scheduleMatch[2], baseUrl: input.baseUrl, crawlRunId: crawlRun.id, sitemapUrl: input.sitemapUrl, scopeType: site?.scopeType });
     const result = await store.createJob(scheduleMatch[1], crawlSeedJob.type, crawlSeedJob.subject, { ...crawlSeedJob.payload });
     return json(result.idempotent ? 200 : 201, { data: { crawlRun, job: result.job }, idempotent: result.idempotent });
   }

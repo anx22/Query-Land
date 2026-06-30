@@ -11,24 +11,29 @@ import { computeCrawlHealthScore, dismissAuditIssue, loadAuditIssueHistory, reop
 export async function startCrawlAction(formData: FormData) {
   try {
     await scheduleCrawlSeedRun(requiredString(formData, "projectId"), requiredString(formData, "siteId"), requiredString(formData, "baseUrl"));
-    // Process the just-queued crawl immediately. On the Hobby plan the cron only
-    // runs daily, so without this the user would wait up to 24h for results.
-    // Best-effort: if it times out, the job stays claimable (stale-reclaim) and
-    // the scheduled worker picks it up later.
-    await processQueuedCrawlInline();
   } catch (error) {
     redirect(`/technical-audit?error=${encodeURIComponent(messageFor(error))}`);
   }
 
+  // Process the just-queued crawl immediately. On the Hobby plan the cron only
+  // runs daily, so without this the user would wait up to 24h for results. The
+  // crawl is queued regardless; a processing problem is surfaced as a non-blocking
+  // warning (NOT swallowed) so "0 results" is never silently mistaken for "healthy".
+  const warning = await processQueuedCrawlInline();
   revalidateTechnicalAuditViews();
-  redirect("/technical-audit?started=1");
+  redirect(warning ? `/technical-audit?started=1&crawlWarning=${encodeURIComponent(warning)}` : "/technical-audit?started=1");
 }
 
-async function processQueuedCrawlInline(): Promise<void> {
+/** Runs one inline crawl cycle; returns a warning message if it failed, else null. */
+async function processQueuedCrawlInline(): Promise<string | null> {
   try {
-    await drainCrawlJobs({ call: (method, path, body) => callInternalApi(method, path, body), maxJobs: 1 });
-  } catch {
-    // Swallow: the crawl is queued and the scheduled/stale-reclaim path is the backstop.
+    const result = await drainCrawlJobs({ call: (method, path, body) => callInternalApi(method, path, body), maxJobs: 1 });
+    const failed = result.cycles.find((cycle) => cycle.errorMessage || cycle.status === "failed");
+    if (failed) return failed.errorMessage ?? "Crawl-Verarbeitung ist fehlgeschlagen.";
+    return null;
+  } catch (error) {
+    // The crawl stays queued (scheduled/stale-reclaim is the backstop); report the cause.
+    return messageFor(error);
   }
 }
 

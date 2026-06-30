@@ -14,6 +14,12 @@ export const DEFAULT_RETRY_BASE_DELAY_MS = 100;
 /** Cap (ms) for any single exponential-backoff wait. */
 export const DEFAULT_RETRY_MAX_DELAY_MS = 5_000;
 
+/** Default BFS link-following depth (0 = seed only). Seed/sitemap are depth 0. */
+export const DEFAULT_MAX_DEPTH = 5;
+
+/** Default cap on total URLs crawled per run (safety net against traps). */
+export const DEFAULT_MAX_URLS = 150;
+
 /**
  * Capped exponential backoff: base * 2^(attempt-1), clamped to maxDelay.
  * `attempt` is 1-based (1 = first retry). Returns 0 for non-positive base.
