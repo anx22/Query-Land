@@ -10,7 +10,6 @@ import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
 import { GlossarLink } from "../../components/glossar-link";
-import { Icon } from "../../components/icon";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
 import { loadBacklinksScreenData } from "../../lib/backlinks-api";
@@ -66,27 +65,27 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <TermTooltip term="Follow-Ratio">Follow-Ratio</TermTooltip>.
           </p>
           <div className="badge-row">
-            <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
-            <ConfidenceBadge level="B" />
+            {data.snapshots.length > 0 ? (
+              <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
+            ) : null}
+            {/* Only claim a confidence class once there is something measured. With no data, say
+                "Bald verfügbar" — the same honest coming-soon treatment as GA4 in den Einstellungen. */}
+            {hasData ? <ConfidenceBadge level="B" /> : <span className="badge warning">Bald verfügbar</span>}
             <ConnectionBadge connected={data.connected} />
           </div>
           {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
           {!data.connected ? <OfflineNotice /> : null}
+          {/* No dead "Backlinks importieren" button: there is no backlink source yet (Google offers
+              none via API), so a permanently-disabled action would be a dead-end. Instead set the
+              expectation honestly and make clear nothing is blocked on the user. */}
           {data.connected && !hasData ? (
             <p className="notice">
-              Noch keine Backlink-Daten. Eine echte Backlink-Quelle ist noch nicht angebunden —
-              Google Search Console stellt Backlinks nicht über die Schnittstelle bereit.
+              <strong>Backlink-Anbindung folgt.</strong> Google stellt Backlinks nicht über seine
+              Schnittstelle bereit — dafür binden wir eine eigene Backlink-Quelle an. Sobald sie
+              verfügbar ist, erscheinen hier Ihr Linkprofil, die verweisenden Domains und ihre
+              Entwicklung über die Zeit. Von Ihrer Seite ist dafür kein Schritt nötig.
             </p>
           ) : null}
-          <div className="action-row">
-            <div className="locked-action">
-              <button className="button" type="button" disabled>Backlinks importieren</button>
-              <span className="locked-action__reason">
-                <Icon name="lock" />
-                Backlinks-Quelle noch nicht verfügbar — Google liefert keine Backlinks per API.
-              </span>
-            </div>
-          </div>
         </section>
 
         {/* Two-mode: the trend/gauge/flow/distribution/table machinery only renders once there
