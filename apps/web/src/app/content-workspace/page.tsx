@@ -1,6 +1,8 @@
 import "../../features/content-workspace/workspace.css";
 
+import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
+import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { ConfidenceBadge } from "../../components/confidence-badge";
@@ -66,6 +68,21 @@ export default async function Page({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = (await searchParams) ?? {};
+  return (
+    <AppShell activePath="/content-workspace">
+      <Suspense fallback={<PageSkeleton label="Content Workspace wird geladen …" />}>
+        <ContentWorkspaceBody params={params} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+// Data-dependent body — streamed behind Suspense so the shell paints immediately.
+async function ContentWorkspaceBody({
+  params,
+}: {
+  params: Record<string, string | string[] | undefined>;
+}) {
   const data = await loadContentWorkspace({
     url: firstParam(params.url),
     status: firstParam(params.status),
@@ -84,7 +101,7 @@ export default async function Page({
   const opportunityId = firstParam(params.opportunityId) ?? "";
 
   return (
-    <AppShell activePath="/content-workspace">
+    <>
       {banner ? (
         <p className={`notice ${banner.tone}`} role={banner.role}>
           {banner.message}
@@ -414,6 +431,6 @@ export default async function Page({
           <p className="muted">Website + erreichbare API erforderlich.</p>
         )}
       </section>
-    </AppShell>
+    </>
   );
 }

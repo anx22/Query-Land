@@ -8,11 +8,8 @@
  * Data-source mapping (per spec §B / §5.4):
  *   TrendChart       → /projects/{id}/visibility (real VisibilityScore[])
  *   ScoreGauge       → /projects/{id}/sites/{sid}/health-scores (CrawlHealthScore[])
- *   PositionDist     → /projects/{id}/keywords/{kw}/rank-snapshots aggregated over all keywords
- *                      Substitution: since there is no "all rank snapshots" endpoint, we load
- *                      all keywords first then collect the latest rank snapshot per keyword via
- *                      /projects/{id}/keywords/{kw}/rank-snapshots.
- *                      For large sets we cap at 50 keywords — noted in report.
+ *   PositionDist     → /projects/{id}/rank-snapshots/latest — one bulk query returning the latest
+ *                      rank snapshot per keyword (replaces the former per-keyword fetch fan-out).
  *   Top-Chancen      → /projects/{id}/opportunities?limit=5&status=open
  *   Risks            → /projects/{id}/sites/{sid}/audit-issues?status=open&severity=critical
  *   Crawl runs       → /projects/{id}/sites/{sid}/crawl-runs
@@ -146,7 +143,7 @@ export async function loadOverviewData(): Promise<OverviewData> {
     criticalIssues,
     recentCrawlRuns,
     reports,
-    keywords,
+    latestPositions,
   ] = await Promise.all([
     // 1. Visibility trend
     apiGet<VisibilityScore[]>(`/projects/${pid}/visibility`).catch(() => [] as VisibilityScore[]),
@@ -180,10 +177,10 @@ export async function loadOverviewData(): Promise<OverviewData> {
       `/projects/${pid}/reports`
     ).catch(() => []),
 
-    // 7. Keywords list (for rank-bucket aggregation — paginated, cap at 50)
-    apiGetEnvelope<Array<{ id: string }>>(
-      `/projects/${pid}/keywords?limit=50`
-    ).then((env) => env.data).catch(() => [] as Array<{ id: string }>),
+    // 7. Latest rank position per keyword (one bulk query instead of one fetch per keyword)
+    apiGet<Array<{ keywordId: string; position: number | null; capturedAt: string }>>(
+      `/projects/${pid}/rank-snapshots/latest`
+    ).catch(() => [] as Array<{ keywordId: string; position: number | null; capturedAt: string }>),
   ]);
 
   // --- Visibility trend ---
@@ -208,30 +205,15 @@ export async function loadOverviewData(): Promise<OverviewData> {
   const previousHealthScore = sortedHealth.length >= 2 ? sortedHealth[sortedHealth.length - 2] : null;
 
   // --- Position buckets ---
-  // Fetch the latest rank snapshot per keyword (capped at 50 keywords).
-  const keywordIds = (Array.isArray(keywords) ? keywords : []).slice(0, 50).map((k) => k.id);
+  // The API returns the latest rank snapshot per keyword in one query, so we just bucket the
+  // positions directly (no per-keyword fetch loop).
   const buckets = emptyBuckets();
-
-  if (keywordIds.length > 0) {
-    const rankResults = await Promise.allSettled(
-      keywordIds.map((kwId) =>
-        apiGet<Array<{ position: number | null; capturedAt: string }>>(
-          `/projects/${pid}/keywords/${kwId}/rank-snapshots`
-        ).catch(() => [])
-      )
-    );
-    for (const result of rankResults) {
-      if (result.status !== "fulfilled") continue;
-      const snaps = result.value;
-      if (!Array.isArray(snaps) || snaps.length === 0) continue;
-      // Most recent snapshot for this keyword
-      const latest = [...snaps].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt))[0];
-      if (latest.position == null || !Number.isFinite(latest.position)) continue;
-      const bucket = positionToBucket(latest.position);
-      if (bucket) {
-        buckets[bucket]++;
-        buckets.total++;
-      }
+  for (const entry of Array.isArray(latestPositions) ? latestPositions : []) {
+    if (entry.position == null || !Number.isFinite(entry.position)) continue;
+    const bucket = positionToBucket(entry.position);
+    if (bucket) {
+      buckets[bucket]++;
+      buckets.total++;
     }
   }
 

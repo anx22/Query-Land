@@ -16,6 +16,7 @@
  */
 
 import type { ReactNode } from "react";
+import { Icon } from "./icon";
 
 export interface WhyItMattersProps {
   /** Benefit sentence rendered as content */
@@ -47,7 +48,7 @@ export function WhyItMatters({
     <p className="why-it-matters">
       {showIcon && (
         <span className="why-it-matters__icon" aria-hidden="true">
-          💡
+          <Icon name="lightbulb" />
         </span>
       )}
       <span>{content}</span>

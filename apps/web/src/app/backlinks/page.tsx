@@ -88,6 +88,10 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           </div>
         </section>
 
+        {/* Two-mode: the trend/gauge/flow/distribution/table machinery only renders once there
+            is real backlink data; until then the hero above already explains the no-source state. */}
+        {hasData && (
+        <>
         {/* ----------------------------------------------------------------- */}
         {/* Hero: TrendChart (toggle Backlinks/Domains) + Follow-Ratio gauge  */}
         {/* ----------------------------------------------------------------- */}
@@ -203,6 +207,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <WhyItMatters text="Viele unterschiedliche verweisende Domains wiegen schwerer als viele Links von wenigen Domains." />
           <ReferringDomainsTable domains={data.referringDomains} />
         </section>
+        </>
+        )}
       </div>
     </AppShell>
   );

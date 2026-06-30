@@ -1,9 +1,12 @@
 import "../../features/technical-audit/audit.css";
 
+import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
+import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { ScoreGauge } from "../../components/charts/score-gauge";
+import { ModulesPending } from "../../components/modules-pending";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
 import { SectionTreemap } from "../../components/charts/section-treemap";
 import { ConfidenceBadge } from "../../components/confidence-badge";
@@ -285,6 +288,21 @@ export default async function Page({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = (await searchParams) ?? {};
+  return (
+    <AppShell activePath="/technical-audit">
+      <Suspense fallback={<PageSkeleton label="Technical Audit wird geladen …" />}>
+        <TechnicalAuditBody params={params} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+// Data-dependent body — streamed behind Suspense so the shell paints immediately.
+async function TechnicalAuditBody({
+  params,
+}: {
+  params: Record<string, string | string[] | undefined>;
+}) {
   const data = await loadTechnicalAuditOverview({
     issueStatus: firstParam(params.status),
     issueSeverity: firstParam(params.severity),
@@ -339,9 +357,11 @@ export default async function Page({
     ) ?? null;
   const crawlLock = actionLock(data.readiness, ["project", "site"]);
   const feedback = feedbackMessage(params);
+  // Two-mode: hide the funnel/treemap/issues/URL-explorer/diff machinery until a crawl has run.
+  const hasAudit = data.recentCrawlRuns.length > 0;
 
   return (
-    <AppShell activePath="/technical-audit">
+    <>
       {actionBanner ? (
         <p className={`notice ${actionBanner.tone}`} role={actionBanner.role}>
           {actionBanner.message}
@@ -395,6 +415,20 @@ export default async function Page({
         </p>
       </HelpPanel>
 
+      {!hasAudit && (
+        <ModulesPending
+          icon="troubleshoot"
+          title="Noch keine Analyse"
+          text="Indexierbarkeits-Funnel, Health Score, die Bereichs-Treemap, gefundene Issues und der URL-Explorer erscheinen hier nach Ihrer ersten Analyse."
+          ctaHref="/technical-audit#crawl-start"
+          ctaLabel="Analyse starten →"
+          ctaDisabled={crawlLock.locked}
+          disabledReason={crawlLock.reason ?? undefined}
+        />
+      )}
+
+      {hasAudit && (
+      <>
       {/* Health gauge + indexability funnel */}
       <section className="audit-overview-grid">
         <div className="card">
@@ -601,7 +635,9 @@ export default async function Page({
         )}
         <Pagination page={runPage} currentParams={currentParams} param="runOffset" />
       </section>
-    </AppShell>
+      </>
+      )}
+    </>
   );
 }
 

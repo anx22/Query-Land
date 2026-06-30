@@ -1,6 +1,8 @@
 import "../../features/keyword-rank/keywords.css";
 
+import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
+import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { MetricCard } from "../../components/metric-card";
@@ -23,6 +25,21 @@ export default async function Page({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  return (
+    <AppShell activePath="/keywords-rank">
+      <Suspense fallback={<PageSkeleton label="Keywords & Rankings werden geladen …" />}>
+        <KeywordsRankBody params={params} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+// Data-dependent body — streamed behind Suspense so the shell paints immediately.
+async function KeywordsRankBody({
+  params,
+}: {
+  params: Record<string, string | string[] | undefined> | undefined;
+}) {
   const data = await loadKeywordsRankData();
   const feedback = feedbackMessage(params);
 
@@ -36,7 +53,7 @@ export default async function Page({
       : null;
 
   return (
-    <AppShell activePath="/keywords-rank">
+    <>
       <section className="card hero-card">
         <HeroBand src="/brand/hdr-keywords-rank.jpg" />
         <p className="kicker">Suchbegriffe &amp; Platzierungen</p>
@@ -205,7 +222,7 @@ export default async function Page({
           </form>
         </div>
       </section>
-    </AppShell>
+    </>
   );
 }
 
