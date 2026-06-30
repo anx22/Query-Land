@@ -47,9 +47,7 @@
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at top right, rgba(255, 92, 0, 0.12), transparent 32rem),
-    var(--background);
+  background: var(--background);
   color: var(--ink);
   font-family: var(--font-sans);
 }
@@ -248,12 +246,14 @@ select {
   align-items: stretch;
 }
 
+/* Editorial flat cards: crisp 1px hairline, tight radius, no soft shadow —      */
+/* the "technical drawing / broadsheet" surface from the target.                 */
 .card {
   border: 1px solid var(--line);
-  border-radius: 1.5rem;
-  background: rgba(255, 255, 255, 0.83);
-  padding: 1.25rem;
-  box-shadow: 0 24px 80px rgba(77, 47, 23, 0.08);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  padding: 1.35rem 1.4rem;
+  box-shadow: none;
 }
 
 .hero-card {
@@ -1054,38 +1054,38 @@ select:disabled {
 .overview-header {
   position: relative;
   overflow: hidden;
-  margin-bottom: 1.75rem;
-  padding: 2.25rem 0 1.85rem;
+  margin-bottom: 1.5rem;
+  padding: 2.75rem 0 2.25rem;
   border-bottom: 1px solid var(--line);
 }
 
-/* Topographic Ridges band — masked so the left (text) stays clean and the    */
-/* orange contour ring sits upper-right. mix-blend multiply drops the paper.   */
+/* Topographic band — prominent, spanning the header; the orange contour ring  */
+/* sits upper-right, lines flow behind the headline (subtle on the far left).   */
 .overview-header__art {
   position: absolute;
-  inset: -10% 0 -10% 0;
+  inset: -20% -2% -10% 0;
   background-image: url("/brand/overview-header.jpg");
   background-repeat: no-repeat;
   background-position: right top;
   background-size: cover;
   mix-blend-mode: multiply;
-  opacity: 0.85;
+  opacity: 0.92;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 26%, rgba(0, 0, 0, 0.55) 52%, #000 100%);
-  mask-image: linear-gradient(to right, transparent 0%, transparent 26%, rgba(0, 0, 0, 0.55) 52%, #000 100%);
+  -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.25) 24%, rgba(0, 0, 0, 0.7) 48%, #000 100%);
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.25) 24%, rgba(0, 0, 0, 0.7) 48%, #000 100%);
 }
 
 .overview-header__inner {
   position: relative;
-  max-width: 42rem;
+  max-width: 44rem;
 }
 
 .overview-header__title {
-  max-width: 30rem;
-  margin: 0.45rem 0 0;
-  font-size: clamp(2rem, 4.2vw, 3.05rem);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
+  max-width: 32rem;
+  margin: 0.5rem 0 0;
+  font-size: clamp(2.3rem, 5vw, 3.7rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
 }
 
 .overview-header__accent {
