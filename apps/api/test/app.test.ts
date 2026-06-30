@@ -4,14 +4,16 @@ import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
 import { createDatabase } from "../src/db/index.js";
 import { runMigrations } from "../src/db/migrate.js";
+import { seedDemoFoundation } from "./helpers/demo-foundation.js";
 
 async function testApp() {
   const store = await createStore("sqlite::memory:");
+  await seedDemoFoundation(store);
   return { app: createApp(store), store };
 }
 
 test("migrations are versioned and idempotent", async () => {
-  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql"];
+  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql", "015_report_webhook_channel.sql"];
   const db = await createDatabase("sqlite::memory:");
   try {
     const first = await runMigrations(db);
@@ -34,7 +36,8 @@ test("migrations are versioned and idempotent", async () => {
       { version: 11, name: "reporting" },
       { version: 12, name: "ai_aeo" },
       { version: 13, name: "issue_lifecycle" },
-      { version: 14, name: "content_workspace" }
+      { version: 14, name: "content_workspace" },
+      { version: 15, name: "report_webhook_channel" }
     ]);
 
     const second = await runMigrations(db);
@@ -89,6 +92,7 @@ test("POST /jobs is persisted and idempotent by project/type/subject", async () 
 
 test("job queue claims a queued job exactly once and completes it", async () => {
   const store = await createStore("sqlite::memory:");
+  await seedDemoFoundation(store);
   await store.createJob("proj-demo", "health_check", "claim-me");
   const claimed = await store.claimNextJob();
   assert.equal(claimed?.status, "running");
@@ -228,6 +232,38 @@ test("backend auth registers, logs in and resolves bearer session", async () => 
   assert.equal(logout.status, 204);
   const afterLogout = await app("GET", "/auth/session", undefined, { headers: { authorization: `Bearer ${token}` } });
   assert.equal(afterLogout.status, 401);
+  await store.close();
+});
+
+test("DELETE /projects/:id removes the project and cascades to its children", async () => {
+  const { app, store } = await testApp();
+
+  const created = await app("POST", "/projects", { name: "Wegwerf", slug: "wegwerf", status: "active", defaultLocale: "de-DE" });
+  assert.equal(created.status, 201);
+  const projectId = (created.body as { data: { id: string } }).data.id;
+
+  const site = await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://wegwerf.example/", scopeType: "domain", crawlFrequency: "weekly", businessValue: 50 });
+  assert.equal(site.status, 201);
+  const siteId = (site.body as { data: { id: string } }).data.id;
+
+  const del = await app("DELETE", `/projects/${projectId}`);
+  assert.equal(del.status, 200);
+  assert.deepEqual((del.body as { data: unknown }).data, { deleted: true });
+
+  // Project is gone from the listing …
+  const list = await app("GET", "/projects");
+  const ids = (list.body as { data: Array<{ id: string }> }).data.map((p) => p.id);
+  assert.ok(!ids.includes(projectId), "deleted project must not be listed");
+
+  // … and its child site cascaded away (listing sites returns empty, not the old row).
+  const sites = await app("GET", `/projects/${projectId}/sites`);
+  const siteIds = (sites.body as { data: Array<{ id: string }> }).data.map((s) => s.id);
+  assert.ok(!siteIds.includes(siteId), "child site must cascade-delete with the project");
+
+  // Deleting again is a clean 404 (no silent success).
+  const again = await app("DELETE", `/projects/${projectId}`);
+  assert.equal(again.status, 404);
+
   await store.close();
 });
 
@@ -396,6 +432,13 @@ test("limited crawl list endpoints expose pagination, filters, and URL explorer 
   assert.equal(urls.status, 200);
   assert.equal((urls.body as { data: Array<{ id: string }> }).data[0]?.id, "url-page-two");
   assert.equal((urls.body as { meta: { total: number } }).meta.total, 1);
+
+  // URL substring search (C3): case-insensitive LIKE over the URL.
+  const urlSearchHit = await app("GET", "/projects/proj-demo/sites/site-demo/url-explorer?q=EXAMPLE.COM");
+  assert.equal(urlSearchHit.status, 200);
+  assert.equal((urlSearchHit.body as { meta: { total: number } }).meta.total, 2);
+  const urlSearchMiss = await app("GET", "/projects/proj-demo/sites/site-demo/url-explorer?q=zzz-no-such-url");
+  assert.equal((urlSearchMiss.body as { meta: { total: number } }).meta.total, 0);
 
   const issues = await app("GET", "/projects/proj-demo/sites/site-demo/audit-issues?limit=5&status=open&severity=critical&rule=http_error");
   assert.equal(issues.status, 200);

@@ -1,6 +1,7 @@
 import "../../features/backlinks/backlinks.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
@@ -9,7 +10,6 @@ import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
 import { GlossarLink } from "../../components/glossar-link";
 import { Icon } from "../../components/icon";
-import { PREREQUISITE_META } from "../../lib/readiness";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
 import { loadBacklinksScreenData } from "../../lib/backlinks-api";
@@ -24,7 +24,6 @@ import {
 import { BacklinkTrendCard } from "../../features/backlinks/backlink-trend-card";
 import { ReferringDomainsTable } from "../../features/backlinks/referring-domains-table";
 import { AnchorDistribution, FollowDistribution } from "../../features/backlinks/distribution-bars";
-import { importBacklinksAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,11 +38,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const flowBars = diffToFlowBars(data.diff);
   const deltas = snapshotDeltas(data.snapshots);
 
-  const followRatio = data.authority?.followRatio ?? null;
+  // The /authority endpoint always returns a (zeroed) summary even with no links, so guard on real
+  // volume — otherwise an unmeasured profile renders a confident "0 %" follow-ratio as if verified.
+  const totalBacklinks = data.authority?.totalBacklinks ?? 0;
+  const followRatio = totalBacklinks > 0 ? data.authority?.followRatio ?? null : null;
   // ScoreGauge expects a 0–100 value; follow-ratio is a 0–1 fraction.
   const followRatioGauge = followRatio !== null ? Math.round(followRatio * 100) : null;
 
-  const hasData = data.authority !== null || data.snapshots.length > 0;
+  const hasData = totalBacklinks > 0 || data.snapshots.length > 0;
 
   return (
     <AppShell activePath="/backlinks">
@@ -65,25 +67,23 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <div className="badge-row">
             <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
             <ConfidenceBadge level="B" />
-            <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+            <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
           </div>
           {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-          {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+          {!data.connected ? <OfflineNotice /> : null}
           {data.connected && !hasData ? (
-            <p className="notice">Noch keine Backlink-Daten. Mit „Backlinks importieren“ legen Sie den ersten Snapshot an.</p>
+            <p className="notice">
+              Noch keine Backlink-Daten. Eine echte Backlink-Quelle ist noch nicht angebunden —
+              Google Search Console stellt Backlinks nicht über die Schnittstelle bereit.
+            </p>
           ) : null}
           <div className="action-row">
             <div className="locked-action">
-              <form action={importBacklinksAction}>
-                <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-                <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>Backlinks importieren</button>
-              </form>
-              {!data.connected || !data.selectedProject ? (
-                <span className="locked-action__reason">
-                  <Icon name="lock" />
-                  {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
-                </span>
-              ) : null}
+              <button className="button" type="button" disabled>Backlinks importieren</button>
+              <span className="locked-action__reason">
+                <Icon name="lock" />
+                Backlinks-Quelle noch nicht verfügbar — Google liefert keine Backlinks per API.
+              </span>
             </div>
           </div>
         </section>
@@ -108,8 +108,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <span className="backlinks-gauge-note">
                     Backlinks gesamt
                     <InfoTip label="Backlinks gesamt erklären">
-                      Alle eingehenden Links aus dem GSC-Links-Report (Beleg-Klasse B). Siehe{" "}
-                      <GlossarLink term="Backlink">Backlink</GlossarLink>.
+                      Alle eingehenden Links, die Google Search Console meldet (verlässliche Quelle).
+                      Siehe <GlossarLink term="Backlink">Backlink</GlossarLink>.
                     </InfoTip>
                   </span>
                 </div>
@@ -154,11 +154,19 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <BacklinkFlowChart data={flowBars} title="Neue vs. verlorene Links und Domains" />
             </div>
             {data.diff ? (
-              <p className="muted">
-                Netto {data.diff.netBacklinkChange >= 0 ? `+${data.diff.netBacklinkChange}` : data.diff.netBacklinkChange} Links ·{" "}
-                {data.diff.netReferringDomainChange >= 0 ? `+${data.diff.netReferringDomainChange}` : data.diff.netReferringDomainChange} Domains
-                {" "}seit dem letzten Snapshot.
-              </p>
+              <>
+                <div className="facts">
+                  <span className="fact">
+                    <span className="fact__label">Netto Links</span>
+                    <span className="fact__value"><DeltaChip value={data.diff.netBacklinkChange} /></span>
+                  </span>
+                  <span className="fact">
+                    <span className="fact__label">Netto Domains</span>
+                    <span className="fact__value"><DeltaChip value={data.diff.netReferringDomainChange} /></span>
+                  </span>
+                </div>
+                <p className="muted">seit dem letzten Snapshot.</p>
+              </>
             ) : (
               <p className="muted">Vergleich erscheint ab dem zweiten Snapshot.</p>
             )}

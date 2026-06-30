@@ -16,6 +16,7 @@ import {
 } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
+import { sendReportDelivery } from "../reports/delivery.js";
 import type { AsyncDatabase } from "../db/index.js";
 
 const CADENCE_DAYS: Record<ReportCadence, number> = { weekly: 7, monthly: 30 };
@@ -173,23 +174,25 @@ class SQLiteReportStore implements ReportStore {
   }
 
   async deliverReport(reportId: string, channel: DeliveryChannel, target?: string | null): Promise<ReportDelivery> {
-    await this.getReport(reportId);
+    const report = await this.getReport(reportId);
     if (!DELIVERY_CHANNELS.includes(channel)) {
       throw new RequestError(400, "invalid_field", `channel must be one of ${DELIVERY_CHANNELS.join(", ")}`);
     }
-    // Stub-Versand (DEC-002): deterministisch als "sent" protokolliert, kein echter SMTP/Slack-Call.
+    // Real send: webhook POSTs the report; email goes via Resend when configured; otherwise the
+    // result is honestly "skipped"/"failed" — never a faked "sent" (DEC-002 stub retired).
+    const result = await sendReportDelivery(channel, target, report);
     const delivery: ReportDelivery = {
       id: `del-${randomUUID()}`,
       reportId,
       channel,
       target: target && target.trim() !== "" ? target.trim() : null,
-      status: "sent",
+      status: result.status,
       deliveredAt: new Date().toISOString()
     };
     await this.db.prepare(`INSERT INTO report_deliveries (id, report_id, channel, target, status, delivered_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
       delivery.id, delivery.reportId, delivery.channel, delivery.target, delivery.status, delivery.deliveredAt
     );
-    await this.audit("system", "report.deliver", "report", reportId, { channel, status: delivery.status });
+    await this.audit("system", "report.deliver", "report", reportId, { channel, status: delivery.status, detail: result.detail });
     return delivery;
   }
 

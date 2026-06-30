@@ -38,14 +38,16 @@ test("visibility formula is transparent and reproducible (pure function)", () =>
   assert.deepEqual(computeVisibilityScore({ positions: [null, null] }), { score: 0, trackedKeywords: 0, averagePosition: null });
 });
 
-test("recording a rank snapshot persists a deterministic SERP + rank with history", async () => {
+test("recording a rank snapshot persists a SERP + rank with history (empty until a provider is connected)", async () => {
   const { app, store } = await testApp();
   try {
     const { projectId, keywordId } = await projectWithKeyword(app, "snap");
     const recorded = await app("POST", `/projects/${projectId}/keywords/${keywordId}/rank-snapshots`, { device: "desktop" });
     assert.equal(recorded.status, 201);
-    const result = data<{ serpSnapshot: { results: unknown[]; sourceConfidence: string }; rankSnapshot: { market: string } }>(recorded);
-    assert.equal(result.serpSnapshot.results.length, 10);
+    const result = data<{ serpSnapshot: { results: unknown[]; sourceConfidence: string; ownPosition: number | null }; rankSnapshot: { market: string } }>(recorded);
+    // No ranking source connected yet -> empty SERP, no own position; a snapshot is still recorded.
+    assert.equal(result.serpSnapshot.results.length, 0);
+    assert.equal(result.serpSnapshot.ownPosition, null);
     assert.equal(result.serpSnapshot.sourceConfidence, "C", "observed SERP is confidence class C");
     assert.equal(result.rankSnapshot.market, "DE");
 

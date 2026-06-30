@@ -1,8 +1,10 @@
 import "../../features/ai-visibility/ai-visibility.css";
 
-import type { AeoAssessment } from "@seo-tool/domain-model";
+import type { AeoAssessment, ProposalStatus } from "@seo-tool/domain-model";
 import { PROPOSAL_KINDS } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
+import { Icon } from "../../components/icon";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -10,7 +12,7 @@ import { WhyItMatters } from "../../components/why-it-matters";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { CitationMatrix } from "../../features/ai-visibility/citation-matrix";
 import { ProposalsList } from "../../features/ai-visibility/proposals-list";
-import { toMatrixRow, proposalKindLabel } from "../../features/ai-visibility/ai-logic";
+import { toMatrixRow, proposalKindLabel, proposalStatusLabel, aeoCheckLabel } from "../../features/ai-visibility/ai-logic";
 import { loadAiVisibilityOverview } from "../../lib/ai-visibility-api";
 import {
   createPromptAction,
@@ -68,7 +70,7 @@ export default async function Page({
           </p>
           <div className="badge-row">
             <span className={data.connected ? "badge success" : "badge danger"}>
-              {data.connected ? "API verbunden" : "API offline"}
+              {data.connected ? "Daten verbunden" : "Daten offline"}
             </span>
           </div>
 
@@ -86,12 +88,15 @@ export default async function Page({
             </p>
           </div>
 
-          {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-          {!data.connected ? (
-            <p className="notice danger">
-              {data.errorMessage} · Erwartete API: {data.apiBaseUrl}
+          {!data.aiConfigured ? (
+            <p className="notice warning">
+              Noch kein KI-Anbieter verbunden (z. B. ChatGPT oder Gemini). Die Werte unten sind daher
+              Platzhalter mit 0 % — <strong>kein Messergebnis</strong>. Sobald ein KI-Anbieter
+              eingerichtet ist, erscheinen hier echte Citation-Daten.
             </p>
           ) : null}
+          {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+          {!data.connected ? <OfflineNotice /> : null}
         </section>
 
         {/* Score + facts */}
@@ -160,18 +165,31 @@ export default async function Page({
           <CitationMatrix rows={matrixRows} />
 
           {matrixRows.length > 0 ? (
-            <form action={recordSnapshotAction} className="inline-actions">
-              <input type="hidden" name="projectId" value={projectId} />
-              <input type="hidden" name="promptId" value={data.prompts[0]?.id ?? ""} />
-              <button
-                className="button secondary compact"
-                type="submit"
-                disabled={!data.connected}
-                title="Erfasst einen neuen Snapshot für den zuletzt aufgenommenen Prompt"
-              >
-                Snapshot erfassen (neuester Prompt)
-              </button>
-            </form>
+            <div className="locked-action">
+              <form action={recordSnapshotAction} className="inline-actions">
+                <input type="hidden" name="projectId" value={projectId} />
+                <label className="visually-hidden" htmlFor="snapshot-prompt">Prompt für Snapshot</label>
+                <select id="snapshot-prompt" name="promptId" defaultValue={data.prompts[0]?.id ?? ""}>
+                  {data.prompts.map((prompt) => (
+                    <option key={prompt.id} value={prompt.id}>{prompt.prompt}</option>
+                  ))}
+                </select>
+                <button
+                  className="button secondary compact"
+                  type="submit"
+                  disabled={!data.connected || !data.aiConfigured}
+                  title="Erfasst einen neuen Snapshot für den gewählten Prompt"
+                >
+                  Snapshot erfassen
+                </button>
+              </form>
+              {!data.aiConfigured ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  Noch kein KI-Anbieter verbunden — ein Snapshot würde nur Platzhalter (0) erfassen.
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </section>
 
@@ -191,27 +209,41 @@ export default async function Page({
               <input type="hidden" name="siteId" value={data.selectedSite.id} />
               <div className="form-row">
                 <label>
-                  URL
-                  <input type="text" name="url" placeholder="https://example.com/seite" required />
+                  URL der Seite
+                  <input type="url" name="url" placeholder="https://example.com/seite" required />
                 </label>
               </div>
-              <label>
-                HTML-Inhalt
-                <textarea
-                  name="content"
-                  rows={4}
-                  placeholder="Füge hier den HTML-Inhalt der Seite ein…"
-                  required
-                />
-              </label>
-              <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
-                AEO-Scan starten
-              </button>
+              <p className="form-hint muted">
+                Wir rufen den Seiteninhalt automatisch ab und prüfen die KI-Tauglichkeit — kein Kopieren nötig.
+              </p>
+              <details className="advanced-section">
+                <summary>
+                  <span className="advanced-section__title">Erweitert</span>
+                  <span className="advanced-section__hint">
+                    Inhalt manuell einfügen — nur nötig für Seiten mit Login oder reinem JavaScript.
+                  </span>
+                </summary>
+                <label>
+                  Seiteninhalt (optional)
+                  <textarea name="content" rows={4} placeholder="Quelltext der Seite hier einfügen…" />
+                </label>
+              </details>
+              <div className="locked-action">
+                <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
+                  Seite analysieren
+                </button>
+                {!data.connected || !data.selectedProject ? (
+                  <span className="locked-action__reason">
+                    <Icon name="lock" />
+                    {!data.connected ? "Daten momentan nicht erreichbar." : "Zuerst eine Website anlegen."}
+                  </span>
+                ) : null}
+              </div>
             </form>
           ) : (
             <p className="notice warning">
-              Keine Site konfiguriert. Lege zuerst eine Site in den Einstellungen an, um AEO-Scans
-              durchzuführen.
+              Noch keine Website hinterlegt. <a href="/projects">Zuerst eine Website hinzufügen →</a>{" "}
+              danach können Sie hier Seiten auf KI-Lesbarkeit prüfen.
             </p>
           )}
 
@@ -223,9 +255,9 @@ export default async function Page({
             </div>
           ) : (
             <div className="ai-empty">
-              <p className="ai-empty__title">Noch keine AEO-Assessments</p>
+              <p className="ai-empty__title">Noch keine Analyse durchgeführt</p>
               <p className="ai-empty__hint">
-                Starte oben einen Scan, um eine Seite auf Antwort-Engine-Reife zu prüfen.
+                Füllen Sie oben das Formular aus, um eine Seite auf KI-Tauglichkeit zu prüfen.
               </p>
             </div>
           )}
@@ -280,18 +312,27 @@ function AeoRow({ assessment }: { assessment: AeoAssessment }) {
   return (
     <article>
       <strong>{assessment.url}</strong>
-      <span className={`badge ${variant}`}>Score: {assessment.score}%</span>
-      <span>
-        {passedChecks}/{assessment.checks.length} Checks bestanden
-      </span>
+      <div className="facts">
+        <span className="fact">
+          <span className="fact__label">Score</span>
+          <span className="fact__value"><span className={`badge ${variant}`}>{assessment.score}%</span></span>
+        </span>
+        <span className="fact">
+          <span className="fact__label">Checks bestanden</span>
+          <span className="fact__value">{passedChecks}/{assessment.checks.length}</span>
+        </span>
+        <span className="fact">
+          <span className="fact__label">Geprüft am</span>
+          <span className="fact__value">{new Date(assessment.assessedAt).toLocaleDateString("de-DE")}</span>
+        </span>
+      </div>
       <span className="muted">
         {assessment.checks.map((check) => (
           <span key={check.check} className={check.passed ? "check-pass" : "check-fail"}>
-            {check.passed ? "✓" : "✗"} {check.check}{" "}
+            {check.passed ? "✓" : "✗"} {aeoCheckLabel(check.check)}{" "}
           </span>
         ))}
       </span>
-      <span className="muted">{new Date(assessment.assessedAt).toLocaleDateString("de-DE")}</span>
     </article>
   );
 }
@@ -303,10 +344,10 @@ function feedbackMessage(
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.created)) return { kind: "success", message: "Prompt aufgenommen." };
   if (singleParam(params?.snapshot)) return { kind: "success", message: "Snapshot erfasst (Klasse E — Signal, kein Beleg)." };
-  if (singleParam(params?.scanned)) return { kind: "success", message: "AEO-Scan abgeschlossen (Klasse A)." };
+  if (singleParam(params?.scanned)) return { kind: "success", message: "AEO-Analyse abgeschlossen (Klasse A)." };
   if (singleParam(params?.proposed)) return { kind: "success", message: "Proposal erstellt — wartet auf Review." };
   const transition = singleParam(params?.transition);
-  if (transition) return { kind: "success", message: `Proposal-Status gewechselt zu ${transition}.` };
+  if (transition) return { kind: "success", message: `Vorschlag-Status geändert: ${proposalStatusLabel(transition as ProposalStatus)}.` };
   return null;
 }
 

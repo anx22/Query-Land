@@ -28,9 +28,9 @@ export function labelForReportType(type: ReportType): string {
     case "weekly_summary":
       return "Wochenzusammenfassung";
     case "opportunity_digest":
-      return "Opportunity-Digest";
+      return "Chancen-Übersicht";
     case "authority_report":
-      return "Authority-Report";
+      return "Backlink-/Autoritäts-Bericht";
     default:
       return type;
   }
@@ -54,7 +54,7 @@ export function labelForMetric(metric: AlertMetric): string {
     case "health_score":
       return "Health-Score";
     case "open_opportunities":
-      return "Offene Opportunities";
+      return "Offene Chancen";
     case "referring_domains":
       return "Verweisende Domains";
     default:
@@ -81,8 +81,11 @@ export function labelForChannel(channel: string | null | undefined): string {
   switch (channel) {
     case "email":
       return "E-Mail";
+    case "webhook":
+      return "Webhook";
     case "slack":
-      return "Slack";
+      // Slack is no longer an offered channel; legacy rows must not look like a working delivery.
+      return "Slack (nicht mehr unterstützt)";
     case null:
     case undefined:
     case "":

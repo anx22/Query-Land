@@ -1,8 +1,12 @@
 import type { SerpDevice, SerpResult, SourceConfidence } from "@seo-tool/domain-model";
+import type { AsyncDatabase } from "../db/index.js";
+import { countryFilterForMarket, mapAveragePosition } from "../oauth/gsc-client.js";
+import { resolveGscAdapterContext, searchAnalyticsWindow } from "../oauth/gsc-credentials.js";
 
-// SERP-Provider-Vertrag (specs/rank-tracking.md). V1: ein deterministischer Stub statt eines
-// lizenzierten Providers (DEC-002). Echte Adapter (saubere, ratenbegrenzte Quelle) ersetzen
-// nur fetch(); Contract, Persistenz und Confidence-Tagging bleiben gleich.
+// SERP-/Ranking-Provider-Vertrag (specs/rank-tracking.md). Ohne verbundene Ranking-Quelle liefert
+// der Provider KEINE Ergebnisse (ehrlicher Leerzustand). Ist Google Search Console verbunden, gibt
+// resolveSerpProvider() die eigene Durchschnittsposition zurück (Konfidenz B) — ohne Wettbewerber-
+// SERP. Ein lizenzierter SERP-Provider könnte später results/features ergänzen.
 
 export interface SerpFetchInput {
   phrase: string;
@@ -20,50 +24,56 @@ export interface SerpFetchResult {
 export interface SerpProvider {
   readonly name: string;
   readonly sourceConfidence: SourceConfidence;
-  fetch(input: SerpFetchInput): SerpFetchResult;
+  fetch(input: SerpFetchInput): SerpFetchResult | Promise<SerpFetchResult>;
 }
 
-const ALL_FEATURES = ["featured_snippet", "people_also_ask", "image_pack", "video", "local_pack", "sitelinks"] as const;
-const RESULT_COUNT = 10;
-
-function hashString(value: string): number {
-  let hash = 2166136261 >>> 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash ^ value.charCodeAt(index)) >>> 0;
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash >>> 0;
-}
-
-function slugify(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "result";
-}
-
-// Deterministischer Stub: stabile Reihenfolge je phrase|market|device.
-const deterministicProvider: SerpProvider = {
-  name: "deterministic-stub",
+// Keine Ranking-Quelle verbunden → keine Ergebnisse, keine eigene Position. Ein echter Adapter
+// ersetzt nur diese fetch()-Implementierung.
+const emptyProvider: SerpProvider = {
+  name: "unconfigured-serp",
   sourceConfidence: "C",
-  fetch({ phrase, market, device, ownDomain }) {
-    const seed = hashString(`${slugify(phrase)}|${market}|${device}`);
-    const slug = slugify(phrase);
-    const ownPosition = ownDomain && seed % 5 !== 0 ? (seed % RESULT_COUNT) + 1 : null;
-
-    const results: SerpResult[] = [];
-    for (let position = 1; position <= RESULT_COUNT; position += 1) {
-      if (ownPosition === position && ownDomain) {
-        results.push({ position, url: `https://${ownDomain}/${slug}`, domain: ownDomain });
-        continue;
-      }
-      const competitor = ((seed >> (position % 16)) % 8) + 1;
-      const domain = `competitor-${competitor}.example`;
-      results.push({ position, url: `https://${domain}/${slug}`, domain });
-    }
-
-    const serpFeatures = ALL_FEATURES.filter((_, index) => ((seed >> index) & 1) === 1);
-    return { results, serpFeatures, ownPosition };
+  fetch(_input: SerpFetchInput): SerpFetchResult {
+    return { results: [], serpFeatures: [], ownPosition: null };
   }
 };
 
 export function getSerpProvider(): SerpProvider {
-  return deterministicProvider;
+  return emptyProvider;
+}
+
+/**
+ * Resolve the ranking provider for a project: a GSC-backed adapter (own average position per query)
+ * when Google Search Console is connected, otherwise the empty provider. The adapter returns no
+ * competitor results — only ownPosition from GSC search-analytics, which is enough to drive rank
+ * snapshots and the visibility score.
+ */
+export async function resolveSerpProvider(db: AsyncDatabase, projectId: string): Promise<SerpProvider> {
+  const ctx = await resolveGscAdapterContext(db, projectId);
+  if (!ctx) return emptyProvider;
+
+  return {
+    name: "google-search-console",
+    sourceConfidence: "B",
+    async fetch({ phrase, market }: SerpFetchInput): Promise<SerpFetchResult> {
+      const country = countryFilterForMarket(market);
+      const { startDate, endDate } = searchAnalyticsWindow();
+      const filters = [{ dimension: "query", operator: "equals", expression: phrase }];
+      if (country) filters.push({ dimension: "country", operator: "equals", expression: country });
+      try {
+        const rows = await ctx.client.querySearchAnalytics(ctx.creds.accessToken, ctx.creds.property, {
+          startDate,
+          endDate,
+          dimensions: [],
+          dimensionFilterGroups: [{ filters }],
+          rowLimit: 1,
+        });
+        // rank_snapshots.position is an integer rank; GSC reports a fractional average position,
+        // so round it. The exact fractional value stays available in search_performance_rows.
+        const avg = mapAveragePosition(rows);
+        return { results: [], serpFeatures: [], ownPosition: avg === null ? null : Math.round(avg) };
+      } catch {
+        return { results: [], serpFeatures: [], ownPosition: null };
+      }
+    }
+  };
 }

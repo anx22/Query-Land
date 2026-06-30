@@ -11,7 +11,8 @@ export const routeDiscoveredUrls: ResourceRoute = async (store, method, pathname
     if (method === "GET") {
       const page = await store.listDiscoveredUrlsPage(listMatch[1], listMatch[2], paginationOptions(searchParams), {
         status: enumQuery(searchParams, "status", fetchStatusFilter),
-        source: enumQuery(searchParams, "source", sourceFilter)
+        source: enumQuery(searchParams, "source", sourceFilter),
+        q: searchParams.get("q")?.trim() || undefined
       });
       return json(200, { data: page.data, meta: pageMeta(page) });
     }
@@ -27,7 +28,8 @@ export const routeDiscoveredUrls: ResourceRoute = async (store, method, pathname
   if (method === "GET" && explorerMatch) {
     const page = await store.listUrlExplorerRows(explorerMatch[1], explorerMatch[2], paginationOptions(searchParams), {
       status: enumQuery(searchParams, "status", fetchStatusFilter),
-      source: enumQuery(searchParams, "source", sourceFilter)
+      source: enumQuery(searchParams, "source", sourceFilter),
+      q: searchParams.get("q")?.trim() || undefined
     });
     return json(200, { data: page.data, meta: pageMeta(page) });
   }

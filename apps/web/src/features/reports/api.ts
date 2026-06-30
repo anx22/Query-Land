@@ -4,6 +4,7 @@ import type {
   DeliveryChannel,
   Report,
   ReportCadence,
+  ReportDelivery,
   ReportSchedule,
   ReportType,
 } from "@seo-tool/domain-model";
@@ -67,8 +68,8 @@ export function generateReport(projectId: string, type: ReportType): Promise<Rep
   return apiPost<Report>(`/projects/${projectId}/reports`, { type });
 }
 
-export function deliverReport(reportId: string, channel: DeliveryChannel, target?: string): Promise<unknown> {
-  return apiPost<unknown>(`/reports/${reportId}/deliver`, { channel, target });
+export function deliverReport(reportId: string, channel: DeliveryChannel, target?: string): Promise<ReportDelivery> {
+  return apiPost<ReportDelivery>(`/reports/${reportId}/deliver`, { channel, target });
 }
 
 export interface CreateReportScheduleInput {

@@ -63,7 +63,7 @@ test("cannibalization groups multiple own pages per query", () => {
   assert.equal(items[0].totalImpressions, 5800);
 });
 
-test("sync persists a GSC batch (class B) and intelligence derives signals", async () => {
+test("sync without a connected GSC source persists an empty batch (honest empty state)", async () => {
   const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "SP", slug: "sp" })).id;
@@ -73,23 +73,22 @@ test("sync persists a GSC batch (class B) and intelligence derives signals", asy
     assert.equal(synced.status, 202);
     const syncResult = data<{ inserted: number; market: string }>(synced);
     assert.equal(syncResult.market, "DE");
-    assert.equal(syncResult.inserted, 13);
+    // No real GSC source connected yet -> zero rows, no fabricated signals.
+    assert.equal(syncResult.inserted, 0);
 
     const list = await app("GET", `/projects/${projectId}/sites/${siteId}/search-performance`);
     assert.equal(list.status, 200);
-    const rows = data<Array<{ sourceConfidence: string }>>(list);
-    assert.equal((list.body as { meta: { total: number } }).meta.total, 13);
-    assert.equal(rows[0].sourceConfidence, "B", "GSC search analytics is confidence class B");
+    assert.equal((list.body as { meta: { total: number } }).meta.total, 0);
 
     const intelligence = data<{
       summary: { rows: number; strikingDistance: number; ctrGaps: number; cannibalization: number };
       cannibalization: Array<{ pages: unknown[] }>;
     }>(await app("GET", `/projects/${projectId}/sites/${siteId}/search-performance/intelligence`));
-    assert.equal(intelligence.summary.rows, 13);
-    assert.equal(intelligence.summary.strikingDistance, 6, "six positions fall in 11-20");
-    assert.ok(intelligence.summary.ctrGaps >= 6, "underperforming top-10 rows produce ctr gaps");
-    assert.ok(intelligence.summary.cannibalization >= 1);
-    assert.ok(intelligence.cannibalization[0].pages.length >= 2);
+    assert.equal(intelligence.summary.rows, 0);
+    assert.equal(intelligence.summary.strikingDistance, 0);
+    assert.equal(intelligence.summary.ctrGaps, 0);
+    assert.equal(intelligence.summary.cannibalization, 0);
+    assert.equal(intelligence.cannibalization.length, 0);
   } finally {
     await store.close();
   }

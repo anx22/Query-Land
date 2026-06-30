@@ -18,6 +18,7 @@
 
 import type { OverviewData } from "../lib/overview-api";
 import { OverviewHeader } from "./overview-header";
+import { OfflineNotice } from "./offline-notice";
 import { ConfidenceBadge } from "./confidence-badge";
 import { DeltaChip } from "./delta-chip";
 import { WhyItMatters } from "./why-it-matters";
@@ -88,6 +89,13 @@ function crawlStatusLabel(status: string): string {
   return status;
 }
 
+function crawlTriggerLabel(trigger: string): string {
+  if (trigger === "manual") return "manuell";
+  if (trigger === "scheduled") return "geplant";
+  if (trigger === "deploy") return "Deployment";
+  return trigger;
+}
+
 function crawlStatusClass(status: string): string {
   if (status === "succeeded") return "succeeded";
   if (status === "running") return "running";
@@ -123,14 +131,14 @@ export function Dashboard({ data }: { data: OverviewData }) {
   if (connected && !project) {
     return (
       <section className="card overview-cockpit-empty">
-        <p className="kicker">Übersicht · Kein Projekt</p>
-        <h1>Die Übersicht ist das Cockpit Ihres Projekts</h1>
+        <p className="kicker">Übersicht · Keine Website</p>
+        <h1>Die Übersicht ist das Cockpit Ihrer Website</h1>
         <p className="muted">
-          Ein Projekt ist die Klammer über allen Analysen. Legen Sie zuerst ein Projekt an —
-          danach füllt sich diese Übersicht mit Sichtbarkeit, Health Score und Chancen.
+          Legen Sie zuerst eine Website an — danach füllt sich diese Übersicht mit Sichtbarkeit,
+          Health Score und Chancen.
         </p>
         <a className="button" href="/projects">
-          Projekt anlegen
+          Website hinzufügen
         </a>
       </section>
     );
@@ -157,11 +165,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
       {/* ------------------------------------------------------------------ */}
       {/* Offline / API-not-reachable notice                                  */}
       {/* ------------------------------------------------------------------ */}
-      {!connected && (
-        <div className="notice danger" role="alert">
-          API nicht erreichbar. Die Übersicht zeigt leere Zustände — bitte Backend prüfen.
-        </div>
-      )}
+      {!connected && <OfflineNotice />}
 
       {/* ------------------------------------------------------------------ */}
       {/* O-2 KPI Bento — measured headline numbers (mono), real data only    */}
@@ -206,7 +210,8 @@ export function Dashboard({ data }: { data: OverviewData }) {
               {positionBuckets.total > 0 ? positionBuckets.total.toLocaleString("de-DE") : "—"}
             </span>
             <div className="kpi-card__foot">
-              {positionBuckets.total > 0 && <ConfidenceBadge level="B" />}
+              {/* Same SERP-sample source as Visibility/Striking → grade C, not B (consistency + honesty). */}
+              {positionBuckets.total > 0 && <ConfidenceBadge level="C" />}
             </div>
           </article>
 
@@ -254,7 +259,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           {/* Site context */}
           {site && (
             <p className="overview-site-context">
-              Site: <strong>{site.baseUrl}</strong>
+              Website: <strong>{site.baseUrl}</strong>
             </p>
           )}
         </div>
@@ -271,7 +276,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           <WhyItMatters>
             Aggregierter technischer Gesundheitswert — kritische Issues drücken den Score.
           </WhyItMatters>
-          <div style={{ marginTop: "1rem" }}>
+          <div className="overview-chart">
             <ScoreGauge
               value={latestHealthScore?.score ?? null}
               max={100}
@@ -280,21 +285,19 @@ export function Dashboard({ data }: { data: OverviewData }) {
             />
           </div>
           {healthDelta !== null && (
-            <div style={{ textAlign: "center", marginTop: "0.5rem" }}>
+            <div className="overview-center">
               <DeltaChip value={healthDelta} />
-              <span style={{ marginLeft: "0.4rem", color: "var(--muted)", fontSize: "0.8rem" }}>
-                ggü. letzter Berechnung
-              </span>
+              <span className="overview-delta-note">seit letzter Berechnung</span>
             </div>
           )}
           {latestHealthScore !== null && (
-            <div style={{ textAlign: "center", marginTop: "0.5rem" }}>
+            <div className="overview-center">
               <ConfidenceBadge level="A" />
             </div>
           )}
           {latestHealthScore === null && (
             <p className="overview-empty-hint">
-              Noch kein Health Score berechnet. Starten Sie einen Crawl im Technical Audit.
+              Noch kein Health Score berechnet. Starten Sie eine Analyse im Technical Audit.
             </p>
           )}
         </div>
@@ -310,7 +313,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
             -Verteilung
           </h2>
           <WhyItMatters text="Striking-Distance-Keywords (Position 11–20) sind die günstigsten Hebel für schnelle Sichtbarkeitsgewinne." />
-          <div style={{ marginTop: "1rem" }}>
+          <div className="overview-chart">
             <PositionDistribution
               buckets={positionBuckets}
               title="Positions-Verteilung der Keywords"
@@ -332,14 +335,15 @@ export function Dashboard({ data }: { data: OverviewData }) {
           {topOpportunities.length === 0 ? (
             <div className="overview-empty-state">
               <p className="overview-empty-state__text">
-                Noch kein Terrain kartiert — starten Sie die Opportunity-Generierung im Technical Audit oder im Content-Chancen-Board.
+                Noch keine Chancen — starten Sie zuerst eine Analyse Ihrer Website. Daraus entstehen
+                anschließend priorisierte Optimierungschancen.
               </p>
-              <a className="button secondary" style={{ marginTop: "1rem", display: "inline-block" }} href="/content-opportunities">
-                Chancen ansehen
+              <a className="button overview-cta" href="/technical-audit#crawl-start">
+                Analyse starten →
               </a>
             </div>
           ) : (
-            <div className="overview-opportunity-list" style={{ marginTop: "1rem" }}>
+            <div className="overview-opportunity-list">
               {topOpportunities.map((opp) => (
                 <article key={opp.id} className="overview-opportunity-item">
                   <div className="overview-opportunity-item__header">
@@ -376,11 +380,11 @@ export function Dashboard({ data }: { data: OverviewData }) {
             <div className="overview-empty-state">
               <p className="overview-empty-state__text">
                 Keine offenen kritischen Issues.
-                {!site && " Starten Sie einen Crawl, um technische Probleme zu erkennen."}
+                {!site && " Starten Sie eine Analyse, um technische Probleme zu erkennen."}
               </p>
             </div>
           ) : (
-            <div className="table-list" style={{ marginTop: "0.75rem" }}>
+            <div className="table-list overview-issue-list">
               {criticalIssues.slice(0, 8).map((issue) => (
                 <article key={issue.id}>
                   <strong className="overview-issue-rule">
@@ -388,7 +392,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
                     {issue.rule.replace(/_/g, " ")}
                   </strong>
                   <span>{issue.message}</span>
-                  <span style={{ fontSize: "0.78rem" }}>{issue.url}</span>
+                  <span className="overview-issue-url">{issue.url}</span>
                 </article>
               ))}
               {criticalIssues.length > 8 && (
@@ -403,13 +407,13 @@ export function Dashboard({ data }: { data: OverviewData }) {
         {/* Crawl runs + Reports */}
         <div className="card">
           <h2>Letzte Aktivitäten</h2>
-          <WhyItMatters text="Aktuelle Crawl-Ergebnisse und Reports geben Auskunft über den Stand der Daten." />
+          <WhyItMatters text="Aktuelle Analyse-Ergebnisse und Reports geben Auskunft über den Stand der Daten." />
 
           {/* Crawl runs */}
-          <p className="kicker" style={{ marginTop: "1rem" }}>Crawl-Runs</p>
+          <p className="kicker overview-subhead">Analysen</p>
           {recentCrawlRuns.length === 0 ? (
             <p className="overview-empty-hint">
-              Noch kein Crawl gestartet.{" "}
+              Noch keine Analyse gestartet.{" "}
               <a href="/technical-audit">Jetzt starten →</a>
             </p>
           ) : (
@@ -417,9 +421,9 @@ export function Dashboard({ data }: { data: OverviewData }) {
               {recentCrawlRuns.map((run) => (
                 <li key={run.id}>
                   <span>
-                    {run.trigger} · {formatDate(run.startedAt)}
+                    {crawlTriggerLabel(run.trigger)} · {formatDate(run.startedAt)}
                     {run.summary.discoveredUrls > 0 && (
-                      <> · {run.summary.discoveredUrls} URLs</>
+                      <> · {run.summary.discoveredUrls} {run.summary.discoveredUrls === 1 ? "URL" : "URLs"}</>
                     )}
                   </span>
                   <span className={`status ${crawlStatusClass(run.status)}`}>
@@ -431,7 +435,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           )}
 
           {/* Reports */}
-          <p className="kicker" style={{ marginTop: "1.25rem" }}>Reports</p>
+          <p className="kicker overview-subhead">Reports</p>
           {recentReports.length === 0 ? (
             <p className="overview-empty-hint">
               Noch keine Reports generiert.{" "}

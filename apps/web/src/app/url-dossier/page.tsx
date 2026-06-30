@@ -1,6 +1,7 @@
 import "../../features/url-dossier/dossier.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -15,6 +16,32 @@ import {
   formatPosition,
   severityVariant
 } from "../../features/url-dossier/format";
+import { intentLabel } from "../../features/keyword-rank/keyword-logic";
+import { severityLabel } from "../../features/technical-audit/crawl-diff";
+import { ruleLabel } from "../../features/technical-audit/issue-labels";
+import { opportunityTypeLabel, opportunityStatusLabel } from "../../lib/board-logic";
+
+// follow/nofollow is borderline jargon — present it title-cased and human.
+const LINK_TYPE_LABEL: Record<string, string> = { follow: "Follow", nofollow: "Nofollow" };
+
+// Small German maps so internal enum tokens never reach a non-expert user.
+const URL_SOURCE_LABEL: Record<string, string> = {
+  sitemap: "Sitemap", internal_link: "Interner Link", external_link: "Externer Link",
+  gsc: "Search Console", manual: "Manuell", seed: "Startpunkt", redirect: "Weiterleitung",
+};
+const FETCH_STATUS_LABEL: Record<string, string> = {
+  success: "Erfolgreich", redirect: "Weiterleitung", client_error: "Client-Fehler (4xx)",
+  server_error: "Server-Fehler (5xx)", network: "Netzwerkfehler", timeout: "Zeitüberschreitung",
+};
+const INDEX_STATE_LABEL: Record<string, string> = {
+  indexable: "Indexierbar", blocked: "Blockiert", noindex: "Noindex",
+  canonicalized: "Kanonisiert", unknown: "Unbekannt",
+};
+const CONFIDENCE_WORD_LABEL: Record<string, string> = { high: "Hoch", medium: "Mittel", low: "Niedrig" };
+
+function labelFor(map: Record<string, string>, value: string): string {
+  return map[value] ?? value;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -42,14 +69,10 @@ export default async function Page({
         </p>
         <div className="badge-row">
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage} · Erwartete API: {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
         {data.urlOptions.length > 0 ? (
           <form className="filter-row" action="/url-dossier">
             <label>
@@ -68,8 +91,8 @@ export default async function Page({
           </form>
         ) : (
           <p className="notice">
-            Hier ist noch unerschlossenes Gebiet — es liegen keine entdeckten URLs für diese Site vor. Starte zuerst
-            einen Crawl im Technical Audit.
+            Für diese Website wurden noch keine Seiten gefunden. Starten Sie zuerst eine Analyse —{" "}
+            <a href="/technical-audit#crawl-start">zum Technical Audit →</a>
           </p>
         )}
       </section>
@@ -90,28 +113,29 @@ export default async function Page({
               <div className="table-list">
                 <article>
                   <strong className="dossier-mono">{data.selectedUrl}</strong>
-                  <span className="dossier-muted">
-                    {data.discoveredUrl
-                      ? `${data.discoveredUrl.source} · Tiefe ${data.discoveredUrl.depth} · entdeckt ${formatDateTime(
-                          data.discoveredUrl.discoveredAt
-                        )}`
-                      : "keine Discovery-Daten"}
-                  </span>
+                  {data.discoveredUrl ? (
+                    <div className="facts">
+                      <span className="fact"><span className="fact__label">Quelle</span><span className="fact__value">{labelFor(URL_SOURCE_LABEL, data.discoveredUrl.source)}</span></span>
+                      <span className="fact"><span className="fact__label">Tiefe</span><span className="fact__value">{data.discoveredUrl.depth}</span></span>
+                      <span className="fact"><span className="fact__label">Entdeckt</span><span className="fact__value">{formatDateTime(data.discoveredUrl.discoveredAt)}</span></span>
+                    </div>
+                  ) : (
+                    <span className="dossier-muted">keine Discovery-Daten</span>
+                  )}
                 </article>
                 <article>
                   <strong>Quell-Verknüpfung</strong>
                   {data.sourceAnchor ? (
-                    <>
-                      <span>
-                        {data.sourceAnchor.template} · {data.sourceAnchor.component}
-                      </span>
-                      <span className="dossier-muted dossier-mono">
-                        {data.sourceAnchor.repoPath} · Confidence {data.sourceAnchor.confidence}
-                      </span>
-                    </>
+                    <div className="facts">
+                      <span className="fact"><span className="fact__label">Vorlage</span><span className="fact__value">{data.sourceAnchor.template}</span></span>
+                      <span className="fact"><span className="fact__label">Komponente</span><span className="fact__value">{data.sourceAnchor.component}</span></span>
+                      <span className="fact"><span className="fact__label">Datei</span><span className="fact__value dossier-mono">{data.sourceAnchor.repoPath}</span></span>
+                      <span className="fact"><span className="fact__label">Konfidenz</span><span className="fact__value">{labelFor(CONFIDENCE_WORD_LABEL, data.sourceAnchor.confidence)}</span></span>
+                    </div>
                   ) : (
                     <EmptyLine>
-                      Kein Source-Anker zugeordnet. Lege in den Settings eine URL→Repo-Zuordnung an.
+                      Noch keiner Code-Stelle zugeordnet. <a href="/settings">In den Einstellungen
+                      eine URL→Code-Zuordnung anlegen →</a>
                     </EmptyLine>
                   )}
                 </article>
@@ -155,7 +179,7 @@ export default async function Page({
                       className={record.statusClass === "success" || record.statusClass === "redirect" ? "dossier-tl-ok" : "dossier-tl-bad"}
                     >
                       <strong>
-                        Fetch · {record.statusClass} · {record.statusCode ?? "network"}
+                        Abruf · {labelFor(FETCH_STATUS_LABEL, record.statusClass)} · {record.statusCode ?? "Netzwerk"}
                       </strong>
                       <span className="dossier-timeline-when">{formatDateTime(record.fetchedAt)}</span>
                       {record.errorMessage ? <span className="dossier-muted">{record.errorMessage}</span> : null}
@@ -164,7 +188,7 @@ export default async function Page({
                   {data.indexabilityHistory.slice(0, 5).map((record) => (
                     <li key={`i-${record.id}`} className={record.isIndexable ? "dossier-tl-ok" : "dossier-tl-bad"}>
                       <strong>
-                        Indexierbarkeit · {record.state} · {record.isIndexable ? "indexierbar" : "blockiert"}
+                        Indexierbarkeit · {labelFor(INDEX_STATE_LABEL, record.state)} · {record.isIndexable ? "indexierbar" : "blockiert"}
                       </strong>
                       <span className="dossier-timeline-when">{formatDateTime(record.assessedAt)}</span>
                     </li>
@@ -219,8 +243,8 @@ export default async function Page({
                 </>
               ) : (
                 <EmptyLine>
-                  Keine GSC-Leistungsdaten für diese URL. Verbinde Google Search Console und synchronisiere die
-                  Search-Performance.
+                  Noch keine Klick- und Ranking-Daten für diese Seite.{" "}
+                  <a href="/settings">Google Search Console verbinden →</a>
                 </EmptyLine>
               )}
             </SectionCard>
@@ -235,21 +259,23 @@ export default async function Page({
                         <span className="dossier-row-metrics">
                           <span>Pos. {formatPosition(row.latest?.position ?? null)}</span>
                           {row.positionTrend.length > 1 ? (
-                            <span className="dossier-spark" style={{ maxWidth: "6rem" }}>
+                            <span className="dossier-spark dossier-spark--compact">
                               <Sparkline data={row.positionTrend} ariaLabel={`Positions-Trend für ${row.keyword.phrase}`} />
                             </span>
                           ) : null}
                         </span>
                       </div>
-                      <span className="dossier-muted">
-                        {row.keyword.intent} · {row.keyword.market}
-                      </span>
+                      <div className="facts">
+                        <span className="fact"><span className="fact__label">Intent</span><span className="fact__value">{intentLabel(row.keyword.intent)}</span></span>
+                        <span className="fact"><span className="fact__label">Markt</span><span className="fact__value">{row.keyword.market}</span></span>
+                      </div>
                     </article>
                   ))}
                 </div>
               ) : (
                 <EmptyLine>
-                  Keine Keywords auf diese URL gemappt. Ordne in Keywords &amp; Rank Keywords der Ziel-URL zu.
+                  Noch keine Keywords für diese Seite hinterlegt.{" "}
+                  <a href="/keywords-rank">In „Keywords &amp; Rankings“ eine Ziel-URL zuordnen →</a>
                 </EmptyLine>
               )}
             </SectionCard>
@@ -305,7 +331,7 @@ export default async function Page({
                       <div className="dossier-row">
                         <span className="dossier-row-main dossier-mono">{link.sourceDomain}</span>
                         <span className="dossier-row-metrics">
-                          <span className={`badge ${link.linkType === "follow" ? "success" : ""}`}>{link.linkType}</span>
+                          <span className={`badge ${link.linkType === "follow" ? "success" : ""}`}>{LINK_TYPE_LABEL[link.linkType] ?? link.linkType}</span>
                         </span>
                       </div>
                       <span className="dossier-muted">{link.anchorText || "(kein Ankertext)"}</span>
@@ -346,10 +372,10 @@ export default async function Page({
                   {data.issues.map((issue) => (
                     <article key={issue.id}>
                       <div className="dossier-row">
-                        <strong className="dossier-row-main">{issue.rule}</strong>
+                        <strong className="dossier-row-main">{ruleLabel(issue.rule)}</strong>
                         <span className="dossier-row-metrics">
                           <span className={`badge ${severityVariant(issue.severity) === "danger" ? "danger" : ""}`}>
-                            {issue.severity}
+                            {severityLabel(issue.severity)}
                           </span>
                           <span className={`status ${issue.resolvedAt ? "succeeded" : "running"}`}>
                             {issue.resolvedAt ? "behoben" : "offen"}
@@ -374,10 +400,10 @@ export default async function Page({
                   {data.opportunities.map((opportunity) => (
                     <article key={opportunity.id}>
                       <div className="dossier-row">
-                        <strong className="dossier-row-main">{opportunity.type}</strong>
+                        <strong className="dossier-row-main">{opportunityTypeLabel(opportunity.type)}</strong>
                         <span className="dossier-row-metrics">
                           <span>Prio {formatCount(opportunity.priority)}</span>
-                          <span className={`status ${opportunity.status}`}>{opportunity.status}</span>
+                          <span className={`status ${opportunity.status}`}>{opportunityStatusLabel(opportunity.status)}</span>
                           {opportunity.evidence[0] ? (
                             <ConfidenceBadge level={evidenceLevel(opportunity.evidence[0].sourceConfidence)} showLabel={false} />
                           ) : null}

@@ -1,12 +1,14 @@
+import { cookies } from "next/headers";
 import { Navigation } from "./navigation";
 import { ReadinessBanner } from "./readiness-banner";
 import { OnboardingChecklist } from "./onboarding-checklist";
 import { ContextBar } from "./context-bar";
-import { SiteSwitcher } from "./site-switcher";
 import { DataStatusBanner } from "./data-status-banner";
 import { loadFoundationDashboardData } from "../lib/foundation-api";
+import { resolveLocalSession, webSessionCookieName } from "../lib/auth-api";
 import { computeReadiness, firstUnmet } from "../lib/readiness";
 import { moduleRoutes, type ModuleRoute } from "../app/module-routes";
+import { logoutAction } from "../app/login/actions";
 
 export async function AppShell({
   activePath,
@@ -25,6 +27,7 @@ export async function AppShell({
   });
   const unmet = firstUnmet(activePath, readiness);
   const activeRoute: ModuleRoute | null = moduleRoutes.find((route) => route.path === activePath) ?? null;
+  const currentUser = await safeResolveSession();
 
   return (
     <div className="shell">
@@ -41,18 +44,31 @@ export async function AppShell({
             siteBaseUrl={foundation.selectedSite?.baseUrl ?? null}
           />
           <div className="topbar__controls">
-            <SiteSwitcher
-              sites={foundation.sites.map((site) => ({ id: site.id, baseUrl: site.baseUrl }))}
-              activeSiteId={foundation.selectedSite?.id ?? null}
-            />
-            <a className="badge" href="/login">Anmelden</a>
+            {currentUser ? (
+              <form action={logoutAction} className="cluster">
+                <span className="badge success" title={currentUser.email}>{currentUser.name}</span>
+                <button className="button secondary compact" type="submit">Abmelden</button>
+              </form>
+            ) : (
+              <a className="badge" href="/login">Anmelden</a>
+            )}
           </div>
         </header>
         {activePath === "/" && <OnboardingChecklist readiness={readiness} />}
         <ReadinessBanner unmet={unmet} />
-        {activeRoute ? <DataStatusBanner status={activeRoute.dataStatus} note={activeRoute.dataNote} /> : null}
+        {activeRoute ? <DataStatusBanner status={activeRoute.dataStatus} /> : null}
         {children}
       </main>
     </div>
   );
+}
+
+/** Resolve the logged-in user for the top bar; never throw — a session hiccup must not break the shell. */
+async function safeResolveSession() {
+  try {
+    const token = (await cookies()).get(webSessionCookieName)?.value;
+    return await resolveLocalSession(token);
+  } catch {
+    return null;
+  }
 }

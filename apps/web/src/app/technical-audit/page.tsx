@@ -1,6 +1,7 @@
 import "../../features/technical-audit/audit.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
@@ -37,6 +38,7 @@ import {
   formatDelta,
   hasCompleteSelection,
   runOptionLabel,
+  crawlTriggerLabel,
   severityBadgeTone,
   severityLabel,
   type FormattedDelta,
@@ -161,17 +163,16 @@ function CrawlDiffSection({
   return (
     <section className="card">
       <p className="kicker">
-        <TermTooltip term="crawl">Crawl</TermTooltip>-Vergleich
+        <TermTooltip term="crawl">Analyse</TermTooltip>-Vergleich
       </p>
       <p className="muted">
-        Zwei Crawl-Läufe gegenüberstellen: was kam hinzu, was wurde behoben und wie haben sich
+        Zwei Analysen gegenüberstellen: was kam hinzu, was wurde behoben und wie haben sich
         Health-Score, offene Issues und entdeckte URLs verändert.
-        <ConfidenceBadge level="A" />
       </p>
 
       {runs.length < 2 ? (
         <p className="audit-diff-empty">
-          Für einen Vergleich werden mindestens zwei Crawl-Läufe benötigt. Starte weitere Crawls, um
+          Für einen Vergleich werden mindestens zwei Analysen benötigt. Starten Sie weitere Analysen, um
           Veränderungen über die Zeit zu sehen.
         </p>
       ) : (
@@ -290,6 +291,7 @@ export default async function Page({
     issueRule: firstParam(params.issueRule),
     urlStatus: firstParam(params.urlStatus),
     urlSource: firstParam(params.urlSource),
+    urlQ: firstParam(params.urlQ),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
     diffBase: firstParam(params.diffBase),
@@ -309,6 +311,7 @@ export default async function Page({
     issueRule: firstParam(params.issueRule),
     urlStatus: firstParam(params.urlStatus),
     urlSource: firstParam(params.urlSource),
+    urlQ: firstParam(params.urlQ),
     urlOffset: firstParam(params.urlOffset),
     runOffset: firstParam(params.runOffset),
     diffBase: firstParam(params.diffBase),
@@ -344,11 +347,18 @@ export default async function Page({
         </p>
       ) : null}
 
+      {data.loadErrors.length > 0 ? (
+        <p className="notice danger" role="alert">
+          Einige Bereiche konnten nicht geladen werden ({data.loadErrors.join(", ")}). Die Anzeige ist
+          deshalb unvollständig — das ist ein Ladefehler, kein „leerer" Zustand. Bitte neu laden.
+        </p>
+      ) : null}
+
       <section className="card hero-card">
         <HeroBand src="/brand/hdr-technical-audit.jpg" />
         <p className="kicker">Technical Audit</p>
         <h1>
-          <TermTooltip term="crawl">Crawl</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
+          <TermTooltip term="crawl">Analyse</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
         </h1>
         <p>
           Wo verlieren wir URLs auf dem Weg in den Index, wie gesund sind unsere Website-Bereiche und
@@ -357,16 +367,11 @@ export default async function Page({
         </p>
         <div className="badge-row">
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage ?? "Audit-Daten konnten nicht geladen werden."} · Erwartete API:{" "}
-            {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
       </section>
 
       {/* Primary action: start a crawl (the entry point of the whole loop) */}
@@ -401,7 +406,7 @@ export default async function Page({
           </p>
           <p className="muted">
             Wo verliert die Seite URLs auf dem Weg zu Google? Entdeckt → Gecrawlt → Indexierbar
-            (aus dem letzten Crawl-Lauf).
+            (aus der letzten Analyse).
           </p>
           <IndexabilityFunnel stages={data.funnelStages} />
           <WhyItMatters>
@@ -440,13 +445,13 @@ export default async function Page({
         {data.sections.length > 0 ? (
           <div className="audit-treemap-legend" aria-hidden="true">
             <span className="audit-treemap-legend__item">
-              <span className="audit-treemap-legend__swatch" style={{ background: "var(--success)" }} /> gesund (≥70)
+              <span className="audit-treemap-legend__swatch audit-treemap-legend__swatch--success" /> gesund (≥70)
             </span>
             <span className="audit-treemap-legend__item">
-              <span className="audit-treemap-legend__swatch" style={{ background: "var(--warning)" }} /> auffällig (40–69)
+              <span className="audit-treemap-legend__swatch audit-treemap-legend__swatch--warning" /> auffällig (40–69)
             </span>
             <span className="audit-treemap-legend__item">
-              <span className="audit-treemap-legend__swatch" style={{ background: "var(--danger)" }} /> kritisch (&lt;40)
+              <span className="audit-treemap-legend__swatch audit-treemap-legend__swatch--danger" /> kritisch (&lt;40)
             </span>
           </div>
         ) : null}
@@ -512,27 +517,61 @@ export default async function Page({
               );
             })}
           </div>
+          <form method="GET" action="/technical-audit" className="badge-row" role="search" aria-label="URLs nach Adresse durchsuchen">
+            <span className="muted issue-filter-bar__label">Suche</span>
+            {/* Preserve other filters/params; omit urlQ (this field) and urlOffset (reset on search). */}
+            {Object.entries(currentParams)
+              .filter(([key, value]) => value != null && value !== "" && key !== "urlQ" && key !== "urlOffset")
+              .map(([key, value]) => (
+                <input key={key} type="hidden" name={key} value={value} />
+              ))}
+            <input
+              type="search"
+              name="urlQ"
+              defaultValue={data.activeUrlFilter.q}
+              placeholder="URL enthält…"
+              className="input compact"
+              aria-label="URL-Substring"
+            />
+            <button type="submit" className="button compact">Suchen</button>
+          </form>
         </div>
         {data.urlExplorerRows.length === 0 && !isDefaultUrlExplorerFilter(data.activeUrlFilter) ? (
-          <p className="muted">Keine URLs für den aktiven Filter.</p>
+          <p className="muted">Keine URLs für den aktiven Filter{data.activeUrlFilter.q ? ` / die Suche „${data.activeUrlFilter.q}"` : ""}.</p>
         ) : null}
         <UrlExplorerTable rows={data.urlExplorerRows} />
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
       </section>
+
+      {/* Next-step guidance — only once there is at least one analysis to act on. */}
+      {data.recentCrawlRuns.length > 0 ? (
+        <section className="card">
+          <p className="kicker">Nächster Schritt</p>
+          <h2>Aus den Befunden Wirkung machen</h2>
+          <p className="muted">
+            Die Analyse liegt vor — so geht es weiter: Verbesserungschancen priorisieren oder eine
+            einzelne Seite im Detail prüfen.
+          </p>
+          <div className="cluster">
+            <a className="button" href="/content-opportunities">Chancen ansehen →</a>
+            <a className="button secondary" href="/url-dossier">Einzelne Seite prüfen →</a>
+          </div>
+        </section>
+      ) : null}
 
       {/* Crawl-Vergleich (crawl-diff) */}
       <CrawlDiffSection data={data} currentParams={currentParams} />
 
       {/* Recent crawl runs */}
       <section className="card">
-        <p className="kicker">Letzte Crawl-Läufe</p>
+        <p className="kicker">Letzte Analysen</p>
         {data.recentCrawlRuns.length > 0 ? (
           <div className="audit-runs">
             {data.recentCrawlRuns.map((run) => (
               <div className="audit-run" key={run.id}>
                 <div className="audit-run__meta">
                   <span className="audit-run__when">
-                    {new Date(run.startedAt).toLocaleString("de-DE")} · {run.trigger}
+                    {new Date(run.startedAt).toLocaleString("de-DE")} · {crawlTriggerLabel(run.trigger)}
                   </span>
                   <span className="audit-run__detail">
                     {run.summary.discoveredUrls.toLocaleString("de-DE")} URLs entdeckt ·{" "}
@@ -556,7 +595,7 @@ export default async function Page({
           </div>
         ) : (
           <p className="muted">
-            Noch kein Crawl-Lauf. Starten Sie einen Crawl, um Indexierbarkeit und Issues zu erfassen.
+            Noch keine Analyse. Starten Sie eine Analyse, um Indexierbarkeit und Issues zu erfassen.
           </p>
         )}
         <Pagination page={runPage} currentParams={currentParams} param="runOffset" />

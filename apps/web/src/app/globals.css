@@ -34,6 +34,15 @@
   --inactive-line:    #e8dfd6;   /* border for inactive controls                 */
   --inactive-opacity: 0.55;      /* applied to fully-disabled action buttons     */
 
+  /* Spacing scale — one source of truth for vertical/horizontal rhythm so pages   */
+  /* stop hand-rolling margin-top values. Use the .stack/.cluster utilities below.  */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
   /* Editorial Tech typography (B-1) — wired in layout.tsx via next/font.          */
   /* Erzählung serif · Bedienung sans · Messwert mono. brand-identity.md §4.       */
   --font-serif: "Literata", Georgia, "Times New Roman", serif;
@@ -483,6 +492,12 @@ code, kbd, samp,
   color: var(--danger);
 }
 
+/* Neutral "nothing here yet" — an optional step not started is not an error. */
+.status.empty {
+  background: var(--inactive-surface);
+  color: var(--inactive-ink);
+}
+
 .cta-row,
 .action-row {
   display: flex;
@@ -492,13 +507,21 @@ code, kbd, samp,
 }
 
 .button {
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: var(--primary);
   color: white;
   cursor: pointer;
-  padding: 0.85rem 1.1rem;
+  min-height: 2.6rem;
+  padding: 0 1.2rem;
   font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
   transition: box-shadow 120ms ease, transform 120ms ease;
 }
 
@@ -519,10 +542,69 @@ code, kbd, samp,
 }
 
 .button.secondary {
-  border: 1px solid var(--line);
+  border-color: var(--line);
   background: var(--surface);
   color: var(--ink);
 }
+
+.button.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+/* "Danger zone" delete disclosure on a website card — deliberately understated and
+   tucked behind a summary so destructive deletion is never a one-click accident. */
+.danger-zone {
+  margin-top: var(--space-3, 0.75rem);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3, 0.75rem);
+}
+.danger-zone__summary {
+  cursor: pointer;
+  color: var(--danger);
+  font-size: 0.85rem;
+  list-style: none;
+}
+.danger-zone__summary::-webkit-details-marker {
+  display: none;
+}
+.danger-zone__warn {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.6rem 0;
+}
+
+/* Full-width variant for form submits / primary card actions. Replaces the old
+   implicit "stretches in a form-card but not in a grid" inconsistency. */
+.button--block {
+  display: flex;
+  width: 100%;
+}
+
+.button.compact {
+  min-height: 2.1rem;
+  padding: 0 0.85rem;
+  font-size: 0.82rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Layout utilities — consistent rhythm without per-element inline styles */
+/* ------------------------------------------------------------------ */
+
+/* Vertical stack: even spacing between direct children. */
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.stack--sm { gap: var(--space-2); }
+.stack--lg { gap: var(--space-5); }
+
+/* Horizontal cluster (wraps): for button rows and chip rows. */
+.cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+/* Structured key/value facts — replaces important data shown as muted running text. */
+.facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+.fact { display: inline-flex; flex-direction: column; gap: 0.1rem; }
+.fact__label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.fact__value { font-size: 0.9rem; font-weight: 700; color: var(--ink); }
 
 /* Consolidated inactive/disabled state for ALL action buttons.                   */
 /* Applies to real <button disabled>, links with aria-disabled="true", and the    */
@@ -742,11 +824,6 @@ select:disabled {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.45rem;
-}
-
-.button.compact {
-  padding: 0.55rem 0.8rem;
-  font-size: 0.82rem;
 }
 
 /* ============================================================
@@ -1829,3 +1906,115 @@ select:disabled {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* Collapsed "add another website" toggle on the websites index — keeps the add-form
+   a calm secondary action once a website already exists. */
+.add-website > summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 800;
+  color: var(--ink);
+  padding: 0.2rem 0;
+}
+.add-website > summary::-webkit-details-marker {
+  display: none;
+}
+.add-website > summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+.add-website[open] > summary::before {
+  content: "▾ ";
+}
+.add-website[open] > summary {
+  margin-bottom: 1rem;
+}
+
+/* Inline helper text under a form field/label (plain-language guidance). */
+.form-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* Optional "boost" block in the setup wizard — visually separated from required steps. */
+.onboarding__optional {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--line);
+}
+.onboarding__optional-label {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.onboarding-step.is-optional {
+  opacity: 0.95;
+}
+
+/* Highlight the active project in the "Alle Projekte" list. */
+.entity-row--active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+/* Website index cards (1 website = 1 project). */
+.website-card { display: flex; flex-direction: column; gap: var(--space-4); }
+.website-card--active { border-color: var(--primary); }
+.website-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.website-card__name { margin: 0; }
+.website-card__url { display: inline-block; margin-top: 0.2rem; color: var(--primary); font-weight: 700; word-break: break-all; }
+.website-card__url--missing { color: var(--warning); }
+
+/* ------------------------------------------------------------------ */
+/* Overview / dashboard — design-system styling for the cockpit.       */
+/* Replaces ad-hoc inline-style spacing with token-based utilities and */
+/* gives the previously-unstyled semantic classes a consistent look.   */
+/* ------------------------------------------------------------------ */
+.overview-chart { margin-top: var(--space-4); }
+.overview-center { text-align: center; margin-top: var(--space-2); }
+.overview-delta-note { margin-left: var(--space-1); color: var(--muted); font-size: 0.8rem; }
+.overview-subhead { margin-top: var(--space-5); }
+.overview-cta { margin-top: var(--space-4); }
+
+.overview-empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); margin-top: var(--space-3); }
+.overview-empty-state__text { margin: 0; color: var(--muted); }
+.overview-empty-hint { margin-top: var(--space-2); color: var(--muted); font-size: 0.9rem; }
+.overview-site-context { margin-top: var(--space-2); color: var(--muted); font-size: 0.85rem; }
+
+.overview-opportunity-list { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.overview-opportunity-item { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: 0.5rem; }
+.overview-opportunity-item__header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.overview-opportunity-item__action { margin: 0; font-weight: 600; }
+.overview-opportunity-item__meta { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); color: var(--muted); font-size: 0.85rem; }
+.overview-link-more { display: inline-block; margin-top: var(--space-1); color: var(--primary); font-weight: 600; }
+
+.overview-issue-list { margin-top: var(--space-3); }
+.overview-issue-rule { display: flex; align-items: center; gap: var(--space-2); }
+.overview-issue-url { color: var(--muted); font-size: 0.78rem; word-break: break-all; }
+
+/* ------------------------------------------------------------------ */
+/* Generic route loading skeleton (shared by per-route loading.tsx via */
+/* <PageSkeleton/>) + root error page (app/error.tsx).                 */
+/* ------------------------------------------------------------------ */
+.page-skeleton { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-5); }
+.page-skeleton__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.skeleton-line, .skeleton-block { background: var(--line); border-radius: 0.5rem; opacity: 0.6; }
+.skeleton-line { height: 0.9rem; margin: 0.4rem 0; width: 100%; }
+.skeleton-line--kicker { width: 30%; height: 0.75rem; }
+.skeleton-line--title { width: 60%; height: 1.6rem; }
+.skeleton-line--half { width: 50%; }
+.skeleton-block { height: 8rem; margin-top: 0.5rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-line, .skeleton-block { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+}
+@keyframes skeleton-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.75; } }
+
+.error-page { max-width: 32rem; margin: 0 auto; padding: var(--space-6) var(--space-5); }
+
+/* Notice that carries a follow-up CTA button (e.g. "Erste Analyse starten →" after website creation). */
+.notice--cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }

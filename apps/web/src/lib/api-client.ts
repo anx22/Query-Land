@@ -61,6 +61,24 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   throw new Error(`POST ${path} returned an invalid response`);
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  if (!configuredApiBaseUrl) {
+    const { callInternalApi } = await import("./server-api");
+    const response = await callInternalApi("DELETE", path);
+    if (response.status < 200 || response.status >= 300) {
+      const payload = response.body as { error?: { message?: string } } | null;
+      throw new Error(payload?.error?.message ?? `DELETE ${path} failed with ${response.status}`);
+    }
+    return;
+  }
+
+  const response = await fetch(new URL(path, configuredApiBaseUrl), { method: "DELETE", cache: "no-store" });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new Error(payload?.error?.message ?? `DELETE ${path} failed with ${response.status}`);
+  }
+}
+
 export function emptyListMeta(total = 0): ListMeta {
   return { limit: total, offset: 0, total, nextCursor: null };
 }

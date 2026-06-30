@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import { apiPost } from "../../lib/api-client";
 
@@ -45,27 +46,18 @@ export async function addKeywordsAction(formData: FormData) {
   redirect("/keywords-rank?added=1");
 }
 
-export async function recordRankAction(formData: FormData) {
-  try {
-    const projectId = requiredString(formData, "projectId");
-    const keywordId = requiredString(formData, "keywordId");
-    await apiPost(`/projects/${projectId}/keywords/${keywordId}/rank-snapshots`, {});
-  } catch (error) {
-    redirect(`/keywords-rank?error=${encodeURIComponent(messageFor(error))}`);
-  }
-  revalidateKeywordViews();
-  redirect("/keywords-rank?ranked=1");
-}
-
 export async function computeVisibilityAction(formData: FormData) {
+  let trackedKeywords = 0;
   try {
     const projectId = requiredString(formData, "projectId");
-    await apiPost(`/projects/${projectId}/visibility/compute`, {});
+    const result = await apiPost<{ trackedKeywords?: number }>(`/projects/${projectId}/visibility/compute`, {});
+    trackedKeywords = result?.trackedKeywords ?? 0;
   } catch (error) {
     redirect(`/keywords-rank?error=${encodeURIComponent(messageFor(error))}`);
   }
   revalidateKeywordViews();
-  redirect("/keywords-rank?visibility=1");
+  // Honest feedback: a Visibility-Index over zero ranked keywords is a meaningless 0, not a result.
+  redirect(trackedKeywords > 0 ? "/keywords-rank?visibility=1" : "/keywords-rank?visibility=empty");
 }
 
 function revalidateKeywordViews(): void {
@@ -87,5 +79,5 @@ function optionalString(formData: FormData, key: string): string | undefined {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Keyword-Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Keyword-Aktion konnte nicht gespeichert werden.");
 }

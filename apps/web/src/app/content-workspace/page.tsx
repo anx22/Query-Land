@@ -1,6 +1,7 @@
 import "../../features/content-workspace/workspace.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -100,20 +101,15 @@ export default async function Page({
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.project?.name ?? "kein Projekt"}</span>
-          <span className="badge">{data.site?.baseUrl ?? "keine Site"}</span>
+          <span className="badge">{data.site?.baseUrl ?? "keine Website"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage ?? "Content-Daten konnten nicht geladen werden."} · Erwartete API:{" "}
-            {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
         {data.connected && (!data.project || !data.site) ? (
           <p className="notice">
-            Lege zuerst ein Projekt und eine Site an, um Refresh-Kandidaten und Briefs zu sehen.
+            Fügen Sie zuerst eine Website hinzu, um Refresh-Kandidaten und Briefs zu sehen.
           </p>
         ) : null}
       </section>
@@ -122,9 +118,9 @@ export default async function Page({
         <p>
           Wähle links einen Refresh-Kandidaten — das treibt den Content-Score-Gauge und die internen
           Link-Vorschläge rechts. Erstelle daraus einen Brief, pflege Gliederung und Term-Checkliste
-          manuell und schiebe ihn über den Status-Verlauf bis „erledigt“. Performance-Signale
-          (Klicks-Trend, Score) sind aktuell Demo-Daten (Konfidenz E), bis ein GSC-Connector verbunden
-          ist.
+          manuell und schiebe ihn über den Status-Verlauf bis „erledigt“. Klick-Werte (Klick-Trend,
+          Score) erscheinen, sobald die Google Search Console verbunden ist — bis dahin bleibt diese
+          Liste leer.
         </p>
       </HelpPanel>
 
@@ -133,8 +129,8 @@ export default async function Page({
         <section className="card">
           <p className="kicker">Refresh-Kandidaten</p>
           <p className="muted">
-            Seiten mit fallendem Klicks-Trend, gewichtet nach Traffic-at-stake und offenen Issues.
-            Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="E" />
+            Seiten mit fallendem Klick-Trend, gewichtet nach geschätztem Traffic und offenen Problemen.
+            Die Auswahl treibt Score &amp; Link-Vorschläge. <ConfidenceBadge level="E" />
           </p>
           {data.refreshCandidates.length > 0 ? (
             <div className="cw-candidates">
@@ -148,19 +144,26 @@ export default async function Page({
                     aria-current={active ? "true" : undefined}
                   >
                     <span className="cw-candidate__url">{candidate.url}</span>
-                    <span className="cw-candidate__meta">
-                      <span
-                        className={
-                          candidate.clicksTrend < 0
-                            ? "cw-candidate__trend--down"
-                            : "cw-candidate__trend--up"
-                        }
-                      >
-                        Trend {candidate.clicksTrend > 0 ? "+" : ""}
-                        {candidate.clicksTrend}
+                    <span className="facts">
+                      <span className="fact">
+                        <span className="fact__label">Klick-Trend</span>
+                        <span
+                          className={`fact__value ${
+                            candidate.clicksTrend < 0 ? "cw-candidate__trend--down" : "cw-candidate__trend--up"
+                          }`}
+                        >
+                          {candidate.clicksTrend > 0 ? "+" : ""}
+                          {candidate.clicksTrend}
+                        </span>
                       </span>
-                      <span>{candidate.openIssues} Issues</span>
-                      <span className="cw-candidate__score">Score {candidate.refreshScore}</span>
+                      <span className="fact">
+                        <span className="fact__label">Probleme</span>
+                        <span className="fact__value">{candidate.openIssues}</span>
+                      </span>
+                      <span className="fact">
+                        <span className="fact__label">Score</span>
+                        <span className="fact__value">{candidate.refreshScore}</span>
+                      </span>
                     </span>
                   </a>
                 );
@@ -168,8 +171,8 @@ export default async function Page({
             </div>
           ) : (
             <p className="muted">
-              Keine Refresh-Kandidaten. Sobald Klick-Metriken (Demo oder echt) vorliegen und Seiten
-              abfallen, erscheinen sie hier.
+              Noch keine Refresh-Kandidaten. Sobald die Google Search Console verbunden ist und Seiten
+              an Klicks verlieren, erscheinen sie hier.
             </p>
           )}
         </section>
@@ -264,9 +267,12 @@ export default async function Page({
       <section className="card">
         <p className="kicker">Briefs</p>
         <p className="muted">
-          Manuell gepflegte Content-Briefs für diese Site, nach Status filterbar. Briefs sind echte,
+          Manuell gepflegte Content-Briefs für diese Website, nach Status filterbar. Briefs sind echte,
           persistierte Artefakte. <ConfidenceBadge level="A" />
         </p>
+        <div className="cluster">
+          <a className="button secondary compact" href="#brief-erstellen">+ Neuen Brief erstellen</a>
+        </div>
         <div className="cw-filter" role="group" aria-label="Briefs nach Status filtern">
           {BRIEF_STATUS_FILTERS.map((status) => {
             const selected = status === data.activeStatus;
@@ -344,19 +350,20 @@ export default async function Page({
             <form action={createProposalAction}>
               <input type="hidden" name="briefId" value={selectedBrief.id} />
               <input type="hidden" name="kind" value="dev_ticket" />
-              <button type="submit" className="button compact">
-                → Dev-Ticket
+              <button type="submit" className="button compact" title="Erzeugt eine Aufgabe für Ihr Entwicklungs-Team">
+                → Aufgabe für Entwickler
               </button>
             </form>
             <form action={createProposalAction}>
               <input type="hidden" name="briefId" value={selectedBrief.id} />
               <input type="hidden" name="kind" value="fix_pr" />
-              <button type="submit" className="button compact">
-                → Fix-PR
+              <button type="submit" className="button compact" title="Bereitet eine Code-Änderung (Pull Request) als Vorschlag vor">
+                → Code-Änderung vorbereiten
               </button>
             </form>
             <span className="muted cw-suggestion__reason">
-              Erstellt einen Vorschlag in der Proposal-/MCP-Schiene aus diesem Brief.
+              Macht aus diesem Brief einen konkreten Umsetzungs-Vorschlag, den Entwickler (oder ein KI-Agent)
+              übernehmen können.
             </span>
           </div>
         </section>
@@ -404,7 +411,7 @@ export default async function Page({
             </div>
           </form>
         ) : (
-          <p className="muted">Projekt + Site + erreichbare API erforderlich.</p>
+          <p className="muted">Website + erreichbare API erforderlich.</p>
         )}
       </section>
     </AppShell>

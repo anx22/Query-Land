@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { callInternalApi } from "../../../../lib/server-api";
 import { drainCrawlJobs } from "../../../../lib/crawl-cron";
 import { drainConnectorSyncJobs, enqueueDueConnectorSyncs } from "../../../../lib/connector-sync-cron";
+import { runDueReportSchedules } from "../../../../lib/reports-cron";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,6 +42,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Refresh connector data: enqueue one sync per integration per day, then drain.
   const enqueued = await enqueueDueConnectorSyncs(call);
   const connectors = await drainConnectorSyncJobs({ call });
+  // Generate + deliver any report schedules that have fallen due.
+  const reports = await runDueReportSchedules(call);
 
-  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued } });
+  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued }, reports });
 }

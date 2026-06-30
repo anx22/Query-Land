@@ -22,7 +22,7 @@ describe("resolveActionBanner", () => {
     const banner = resolveActionBanner({ started: "1" });
     expect(banner?.tone).toBe("success");
     expect(banner?.role).toBe("status");
-    expect(banner?.message).toContain("Crawl gestartet");
+    expect(banner?.message).toContain("Analyse gestartet");
   });
 
   it("prefers an error over a started flag", () => {

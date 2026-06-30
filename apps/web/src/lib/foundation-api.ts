@@ -1,4 +1,4 @@
-import { apiBaseUrl, apiGet, apiPost } from "./api-client";
+import { apiBaseUrl, apiDelete, apiGet, apiPost } from "./api-client";
 
 export interface FoundationProject {
   id: string;
@@ -169,6 +169,11 @@ export async function createFoundationProject(input: CreateFoundationProjectInpu
 
 export async function createFoundationSite(projectId: string, input: CreateFoundationSiteInput): Promise<FoundationSite> {
   return apiPost<FoundationSite>(`/projects/${projectId}/sites`, input);
+}
+
+/** Delete a website (= project) and all its data. Backed by ON DELETE CASCADE in the schema. */
+export async function deleteFoundationProject(projectId: string): Promise<void> {
+  return apiDelete(`/projects/${projectId}`);
 }
 
 export async function createFoundationIntegration(input: CreateFoundationIntegrationInput): Promise<FoundationIntegration> {

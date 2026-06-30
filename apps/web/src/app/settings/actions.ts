@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import { apiPost } from "../../lib/api-client";
 import { createFoundationIntegration, createFoundationJob } from "../../lib/foundation-api";
@@ -103,5 +104,5 @@ function providerString(formData: FormData): ConnectorProvider {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Connector-Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Connector-Aktion konnte nicht gespeichert werden.");
 }

@@ -16,6 +16,7 @@
 import type { Opportunity } from "@seo-tool/domain-model";
 import { apiGetEnvelope, emptyListMeta, type ListMeta } from "./api-client";
 import { loadFoundationDashboardData, type FoundationProject, type FoundationSite } from "./foundation-api";
+import { computeReadiness } from "./readiness";
 
 export * from "./board-logic";
 
@@ -29,6 +30,10 @@ export interface OpportunityBoardData {
   errorMessage?: string;
   selectedProject: FoundationProject | null;
   selectedSite: FoundationSite | null;
+  /** Whether the active project has run a crawl — opportunities are generated from crawl data. */
+  hasCrawl: boolean;
+  /** Whether a real data source (GSC) is connected — Search-Performance sync needs this. */
+  hasIntegration: boolean;
   opportunities: Opportunity[];
   meta: ListMeta;
 }
@@ -40,11 +45,20 @@ export interface OpportunityBoardData {
 export async function loadOpportunityBoard(): Promise<OpportunityBoardData> {
   const dashboard = await loadFoundationDashboardData();
   const selectedSite = dashboard.selectedSite ?? dashboard.sites[0] ?? null;
+  const readiness = computeReadiness({
+    projects: dashboard.projects,
+    selectedProject: dashboard.selectedProject,
+    sites: dashboard.sites,
+    integrations: dashboard.integrations,
+    jobs: dashboard.jobs,
+  });
 
   const base = {
     apiBaseUrl: dashboard.apiBaseUrl,
     selectedProject: dashboard.selectedProject,
     selectedSite,
+    hasCrawl: readiness.hasCrawl,
+    hasIntegration: readiness.hasIntegration,
   };
 
   if (!dashboard.connected || !dashboard.selectedProject) {

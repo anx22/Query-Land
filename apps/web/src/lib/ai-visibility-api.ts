@@ -22,6 +22,7 @@ import type {
   AiVisibilityScore,
   Proposal,
 } from "@seo-tool/domain-model";
+import { isAiProviderConfigured } from "@seo-tool/api";
 import { apiBaseUrl, apiGet } from "./api-client";
 import {
   loadFoundationDashboardData,
@@ -46,6 +47,8 @@ export interface AiVisibilityOverview extends FoundationDashboardData {
   visibility: AiVisibilityScore | null;
   aeo: AeoAssessment[];
   proposals: Proposal[];
+  /** Whether a real LLM answer-provider is wired. While false, citation numbers are placeholders, not measurements. */
+  aiConfigured: boolean;
 }
 
 function emptyOverview(
@@ -61,6 +64,7 @@ function emptyOverview(
     visibility: null,
     aeo: [],
     proposals: [],
+    aiConfigured: isAiProviderConfigured(),
     ...overrides,
   };
 }

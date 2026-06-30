@@ -3,11 +3,11 @@ import "../../features/reports/reports.css";
 import {
   ALERT_COMPARATORS,
   ALERT_METRICS,
-  DELIVERY_CHANNELS,
   REPORT_CADENCES,
   REPORT_TYPES,
 } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
@@ -75,20 +75,20 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <HeroBand src="/brand/hdr-reports.jpg" />
         <p className="kicker">Berichte &amp; Warnungen</p>
         <h1>
-          <TermTooltip term="report">Reports</TermTooltip> &amp; <TermTooltip term="alert">Alarme</TermTooltip>
+          <TermTooltip term="Report / Alert">Reports</TermTooltip> &amp; <TermTooltip term="Report / Alert">Alarme</TermTooltip>
         </h1>
         <p>
           Berichte als Momentaufnahme Ihrer wichtigsten Kennzahlen (Health, Sichtbarkeit, Chancen,
-          Backlinks) — mit automatischer Lieferung per E-Mail und Warnungen, sobald ein Wert eine
-          festgelegte Schwelle über- oder unterschreitet.
+          Backlinks) — sofort als CSV, HTML oder PDF exportierbar, mit Warnungen, sobald ein Wert
+          eine festgelegte Schwelle über- oder unterschreitet.
         </p>
         <div className="badge-row">
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <p className="notice danger">{data.errorMessage} · Erwartete API: {data.apiBaseUrl}</p> : null}
+        {!data.connected ? <OfflineNotice /> : null}
         {data.connected && !data.selectedProject ? (
-          <p className="notice">Kein Projekt ausgewählt. Legen Sie zuerst ein Projekt an, um Reports zu erzeugen.</p>
+          <p className="notice">Keine Website ausgewählt. Legen Sie zuerst eine Website an, um Berichte zu erzeugen.</p>
         ) : null}
         <div className="action-row">
           <form action={generateReportAction}>
@@ -110,7 +110,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           {disabled ? (
             <span className="locked-action__reason">
               <Icon name="lock" />
-              {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+              {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
             </span>
           ) : null}
         </div>
@@ -225,17 +225,29 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <label>
                 Kanal
                 <select name="channel" defaultValue="email">
-                  {DELIVERY_CHANNELS.map((c) => (
-                    <option key={c} value={c}>{labelForChannel(c)}</option>
-                  ))}
+                  <option value="email">E-Mail</option>
+                  <option value="webhook">Webhook</option>
                 </select>
               </label>
               <label>
-                Ziel (E-Mail / Webhook)
-                <input type="text" name="target" placeholder="z. B. team@example.com" />
+                Empfänger
+                <input type="text" name="target" required placeholder="E-Mail-Adresse oder Webhook-URL" />
               </label>
-              <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
+              <div className="locked-action">
+                <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
+                {!data.connected ? (
+                  <span className="locked-action__reason">
+                    <Icon name="lock" />
+                    Daten momentan nicht erreichbar — bitte später erneut versuchen.
+                  </span>
+                ) : null}
+              </div>
             </form>
+            <p className="form-hint muted">
+              Ein Webhook wird sofort zugestellt. Der E-Mail-Versand funktioniert, sobald er vom Betreiber
+              eingerichtet wurde — bis dahin wird eine E-Mail-Lieferung ehrlich als „übersprungen“ vermerkt.
+              Für Slack, Discord oder Zapier tragen Sie einfach deren Webhook-URL als Kanal „Webhook“ ein.
+            </p>
           </div>
         ) : null}
       </section>
@@ -246,6 +258,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <p className="kicker">Automatische Lieferung</p>
           <h2>Geplante Lieferungen</h2>
           <WhyItMatters>Automatische Lieferungen halten alle Beteiligten ohne manuelles Nachfassen auf dem Laufenden.</WhyItMatters>
+          <p className="notice">
+            Fällige Zeitpläne werden täglich automatisch erzeugt und zugestellt: <strong>Webhook</strong>{" "}
+            sofort, <strong>E-Mail</strong> sobald der Versand vom Betreiber eingerichtet ist.
+            Bis dahin bleibt die E-Mail-Zustellung ehrlich „übersprungen“ — Berichte stehen
+            jederzeit als Export (CSV/HTML/PDF) bereit.
+          </p>
 
           {data.schedules.length > 0 ? (
             <div className="table-list">
@@ -294,15 +312,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <label>
               Lieferkanal (optional)
               <select name="channel">
-                <option value="">— keiner —</option>
-                {DELIVERY_CHANNELS.map((c) => (
-                  <option key={c} value={c}>{labelForChannel(c)}</option>
-                ))}
+                <option value="">— kein Versand —</option>
+                <option value="email">E-Mail</option>
+                <option value="webhook">Webhook</option>
               </select>
             </label>
             <label>
-              Ziel (optional)
-              <input type="text" name="target" placeholder="z. B. team@example.com" />
+              Empfänger (bei gewähltem Kanal)
+              <input type="text" name="target" placeholder="E-Mail-Adresse oder Webhook-URL" />
             </label>
             <button className="button" type="submit" disabled={disabled}>Lieferung planen</button>
           </form>
@@ -312,7 +329,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <div className="card">
           <p className="kicker">Warnungen</p>
           <h2>
-            <TermTooltip term="alert">Warn</TermTooltip>-Regeln &amp; Auslösungen
+            <TermTooltip term="Report / Alert">Warn</TermTooltip>-Regeln &amp; Auslösungen
           </h2>
           <WhyItMatters>Schwellen-Warnungen melden Einbrüche, bevor sie unbemerkt Traffic kosten.</WhyItMatters>
 
@@ -337,7 +354,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <p className="muted">
                       {model.observedValue !== null
                         ? `Zuletzt beobachtet: ${formatMetricValue(model.observedValue)}`
-                        : "Noch nicht ausgewertet — Schwelle definiert, aber keine Messung."}
+                        : "Noch nicht ausgewertet — Schwelle definiert, aber keine Messung. Klicken Sie „Warnungen prüfen“, um auszuwerten."}
                     </p>
                   )}
 
@@ -400,8 +417,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <article key={event.id} className="reports-row">
                     <strong className="reports-row__title">{labelForMetric(event.metric)}</strong>
                     <span className={`badge ${severityBadge(severity)}`}>{severityLabel(severity)}</span>
-                    <span className="reports-row__meta">
-                      Beobachtet {formatMetricValue(event.observedValue)} · Schwelle {labelForComparator(event.comparator)} {formatMetricValue(event.threshold)}
+                    <span className="facts">
+                      <span className="fact">
+                        <span className="fact__label">Beobachtet</span>
+                        <span className="fact__value">{formatMetricValue(event.observedValue)}</span>
+                      </span>
+                      <span className="fact">
+                        <span className="fact__label">Schwelle</span>
+                        <span className="fact__value">{labelForComparator(event.comparator)} {formatMetricValue(event.threshold)}</span>
+                      </span>
                     </span>
                     <span className="reports-row__spacer" />
                     <span className="reports-row__meta">{formatTimestamp(event.evaluatedAt)}</span>
@@ -418,11 +442,29 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   );
 }
 
-function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
+function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger" | "warning"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.generated)) return { kind: "success", message: "Bericht erfolgreich erstellt." };
-  if (singleParam(params?.delivered)) return { kind: "success", message: "Bericht erfolgreich versendet." };
+  const delivered = singleParam(params?.delivered);
+  if (delivered) {
+    if (delivered === "sent") return { kind: "success", message: "Bericht erfolgreich versendet." };
+    if (delivered === "skipped") {
+      return {
+        kind: "warning",
+        message:
+          "Versand übersprungen — der E-Mail-Versand ist noch nicht eingerichtet. Nutzen Sie solange den Export oder einen Webhook.",
+      };
+    }
+    if (delivered === "failed") {
+      return {
+        kind: "danger",
+        message: "Der Versand ist fehlgeschlagen. Bitte prüfen Sie die Zieladresse und versuchen Sie es erneut.",
+      };
+    }
+    // Unknown/legacy status — stay honest rather than claim success.
+    return { kind: "warning", message: "Versand abgeschlossen — bitte Status der Lieferung prüfen." };
+  }
   if (singleParam(params?.schedule)) return { kind: "success", message: "Lieferung geplant." };
   const due = singleParam(params?.due);
   if (due !== undefined) return { kind: "success", message: `Fällige Lieferungen ausgeführt — ${due} Bericht(e) erstellt.` };

@@ -32,9 +32,9 @@ export function ProjectSwitcher({ projects, activeProjectId }: ProjectSwitcherPr
   if (projects.length === 0) {
     return (
       <div className="project-switcher project-switcher--empty">
-        <span className="project-switcher__label">Aktives Projekt</span>
+        <span className="project-switcher__label">Aktive Website</span>
         <a className="project-switcher__cta" href="/projects">
-          + Projekt anlegen
+          + Website hinzufügen
         </a>
       </div>
     );
@@ -49,7 +49,7 @@ export function ProjectSwitcher({ projects, activeProjectId }: ProjectSwitcherPr
   return (
     <div className="project-switcher" data-pending={isPending ? "" : undefined}>
       <label className="project-switcher__label" htmlFor="project-switcher-select">
-        Aktives Projekt
+        Aktive Website
       </label>
       <select
         id="project-switcher-select"

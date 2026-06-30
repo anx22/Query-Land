@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
+import { seedDemoFoundation } from "./helpers/demo-foundation.js";
 
 // D1: Crawl-Diff Backend (UX-6b). Endpoint coverage for
 // GET /projects/:p/sites/:s/crawl-runs/diff?base=&compare=
@@ -13,6 +14,7 @@ type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
   const store = await createStore("sqlite::memory:");
+  await seedDemoFoundation(store);
   return { app: createApp(store), store };
 }
 

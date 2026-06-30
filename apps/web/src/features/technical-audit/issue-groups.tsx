@@ -19,6 +19,8 @@ import { dismissIssueAction, loadIssueHistoryAction, reopenIssueAction, resolveI
 import { availableIssueActions, formatHistoryEntry, ISSUE_ACTION_LABEL, issueStatusLabel, type IssueAction } from "./issue-actions";
 import { ruleLabel } from "./issue-labels";
 
+export { ruleLabel };
+
 const SEVERITY_BADGE: Record<AuditIssueSeverity, string> = {
   critical: "danger",
   high: "warning",

@@ -152,6 +152,6 @@ describe("runOptionLabel", () => {
   it("combines a formatted timestamp with the trigger", () => {
     const label = runOptionLabel({ startedAt: "2026-06-01T10:00:00.000Z", trigger: "manual" });
     expect(label).toContain("·");
-    expect(label).toContain("manual");
+    expect(label).toContain("manuell");
   });
 });

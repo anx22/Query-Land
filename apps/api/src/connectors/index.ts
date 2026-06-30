@@ -1,4 +1,11 @@
 import type { IntegrationProvider, SourceConfidence } from "@seo-tool/domain-model";
+import {
+  resolveGscCredentials,
+  resolvePsiCredentials,
+  hasRealCredentials,
+  type EnvSource
+} from "./credential-resolution.js";
+import { fetchGscLive, fetchPsiLive, type FetchImpl } from "./adapters.js";
 
 // Connector-Vertrag gemäß specs/integrations.md (§4.2): source_type, auth_config (am
 // integration_account), fetch, validate, normalize sowie quota_status/freshness (pro Lauf
@@ -14,6 +21,12 @@ import type { IntegrationProvider, SourceConfidence } from "@seo-tool/domain-mod
 // Netzwerk-Call. Der Rest des Vertrags (Auth-Gate, Quota, Freshness, Capabilities) bleibt
 // unverändert. Solange keine echten Credentials hinterlegt sind, liefern die Stubs
 // deterministische Werte bzw. melden "missing_credentials".
+//
+// B3 "Real adapters": fetch() ist jetzt async. Wenn echte Credentials/Env vorhanden sind
+// (GSC access token, PAGESPEED_API_KEY), macht der jeweilige Adapter einen echten HTTPS-Call
+// und mappt auf dieselben normalisierten Rows; Netzwerk-/Quota-/Auth-Fehler werden als
+// typisierte degraded/quota_exceeded/expired-Outcomes zurückgegeben (nie geworfen). Ohne echte
+// Credentials bleibt das Verhalten byte-für-byte gleich (Stub bzw. missing_credentials).
 
 export interface NormalizedMetricInput {
   metric: string;
@@ -83,6 +96,17 @@ export interface ConnectorContext {
   entityId: string;
   /** Ob am integration_account verwendbare Credentials (auth_config) hinterlegt sind. */
   hasCredentials: boolean;
+  /**
+   * Entschlüsselte auth_config der Integration (kann access token / property / apiKey tragen).
+   * Wird nur vom realen Adapter gelesen; undefined => kein realer Call, Stub-Fallback.
+   */
+  authConfig?: unknown;
+  /** Ziel-URL für PSI/Lighthouse (z. B. base_url der Site). */
+  siteUrl?: string | null;
+  /** Injizierbare fetch-Implementierung (Default: globalThis.fetch) für Tests/Proxy. */
+  fetchImpl?: FetchImpl;
+  /** Injizierbare Env-Quelle (Default: process.env) für deterministische Tests. */
+  env?: EnvSource;
 }
 
 /** Read-only Statuskontext, den describe() braucht (ohne Entity-Bezug). */
@@ -90,6 +114,10 @@ export interface ConnectorStatusContext {
   hasCredentials: boolean;
   lastSyncedAt: string | null;
   lastEvidenceAt: string | null;
+  /** Entschlüsselte auth_config — damit describe() echte vs. Stub-Credentials unterscheiden kann. */
+  authConfig?: unknown;
+  /** Injizierbare Env-Quelle (Default: process.env). */
+  env?: EnvSource;
 }
 
 export interface Connector {
@@ -99,7 +127,7 @@ export interface Connector {
   readonly capabilities: string[];
   /** Typisierter Vertrag/Status für UI/Agent (auth/quota/freshness/capabilities). */
   describe(ctx: ConnectorStatusContext): ConnectorContract;
-  fetch(ctx: ConnectorContext): ConnectorFetchResult;
+  fetch(ctx: ConnectorContext): Promise<ConnectorFetchResult>;
   validate(payload: unknown): void;
   normalize(payload: unknown, ctx: ConnectorContext): NormalizedMetricInput[];
 }
@@ -116,6 +144,13 @@ function rowsPayload(payload: unknown): MetricRow[] {
   return (payload as { rows: MetricRow[] }).rows;
 }
 
+/** Real-adapter hook: returns a typed result for the live network path, or null to use the stub. */
+type LiveFetch = (ctx: ConnectorContext) => Promise<ConnectorFetchResult> | null;
+
+function defaultEnv(ctx: { env?: EnvSource }): EnvSource {
+  return ctx.env ?? (process.env as EnvSource);
+}
+
 function metricConnector(options: {
   provider: IntegrationProvider;
   sourceType: string;
@@ -125,6 +160,11 @@ function metricConnector(options: {
   capabilities: string[];
   /** Deterministische Stub-Quota (used/limit). */
   quota: ConnectorQuota;
+  /**
+   * Optionaler realer Adapter. Wird nur aufgerufen, wenn hasCredentials true ist. Liefert null,
+   * wenn keine echten Provider-Credentials konfiguriert sind => Stub-Fallback (unverändert).
+   */
+  liveFetch?: LiveFetch;
 }): Connector {
   return {
     provider: options.provider,
@@ -132,19 +172,24 @@ function metricConnector(options: {
     sourceConfidence: options.sourceConfidence,
     capabilities: options.capabilities,
     describe(ctx) {
-      const authStatus: ConnectorAuthStatus = ctx.hasCredentials ? "connected" : "missing_credentials";
+      // "connected" sobald irgendeine auth_config hinterlegt ist (Stub oder echt). Reale
+      // Credentials (env/auth_config) heben den Status ebenfalls auf connected, selbst wenn die
+      // gespeicherte auth_config leer ist — so spiegelt der Status die Realität wider.
+      const realCreds = hasRealCredentials(options.provider, ctx.authConfig, defaultEnv(ctx));
+      const authStatus: ConnectorAuthStatus =
+        ctx.hasCredentials || realCreds ? "connected" : "missing_credentials";
       return {
         provider: options.provider,
         sourceType: options.sourceType,
         sourceConfidence: options.sourceConfidence,
         authStatus,
         // Quota ist erst nach Verbindung aussagekräftig; ohne Credentials kein Verbrauch.
-        quota: ctx.hasCredentials ? { ...options.quota } : { used: 0, limit: options.quota.limit },
+        quota: authStatus === "connected" ? { ...options.quota } : { used: 0, limit: options.quota.limit },
         freshness: { lastSyncedAt: ctx.lastSyncedAt, lastEvidenceAt: ctx.lastEvidenceAt },
         capabilities: options.capabilities
       };
     },
-    fetch(ctx) {
+    async fetch(ctx) {
       // Credential-Gate: ohne hinterlegte auth_config gibt es keinen (realen) Call. Der
       // Stub macht das explizit sichtbar statt zu crashen. Echte Adapter ersetzen den
       // ok-Zweig durch den Netzwerk-Call; der missing_credentials-Zweig bleibt gleich.
@@ -157,6 +202,14 @@ function metricConnector(options: {
           freshness: ctx.now,
           reason: `${options.provider} has no credentials configured (auth_config is empty)`
         };
+      }
+      // Realer Adapter: nur wenn echte Provider-Credentials/Env aufgelöst werden konnten
+      // (liveFetch !== null). Sonst (Stub-Credentials wie in Produktion) Stub-Fallback.
+      if (options.liveFetch) {
+        const live = options.liveFetch(ctx);
+        if (live) {
+          return live;
+        }
       }
       return {
         outcome: "ok",
@@ -199,7 +252,16 @@ const gscConnector = metricConnector({
     { metric: "impressions", value: 45210 },
     { metric: "ctr", value: 0.0283 },
     { metric: "position", value: 12.4 }
-  ]
+  ],
+  liveFetch(ctx) {
+    const creds = resolveGscCredentials(ctx.authConfig, ctx.env ?? (process.env as EnvSource));
+    if (!creds) return null;
+    return fetchGscLive(creds, {
+      property: ctx.siteUrl ?? null,
+      now: ctx.now,
+      fetchImpl: ctx.fetchImpl ?? fetch
+    });
+  }
 });
 
 const ga4Connector = metricConnector({
@@ -228,7 +290,17 @@ const pagespeedConnector = metricConnector({
     { metric: "cls", value: 0.04 },
     { metric: "inp_ms", value: 180 },
     { metric: "ttfb_ms", value: 320 }
-  ]
+  ],
+  liveFetch(ctx) {
+    const creds = resolvePsiCredentials(ctx.authConfig, ctx.env ?? (process.env as EnvSource));
+    if (!creds) return null;
+    return fetchPsiLive(creds, {
+      siteUrl: ctx.siteUrl ?? null,
+      now: ctx.now,
+      fetchImpl: ctx.fetchImpl ?? fetch,
+      variant: "psi"
+    });
+  }
 });
 
 // T5: Lighthouse-Stub registrieren, damit getConnector("lighthouse") einen funktionierenden,
@@ -245,7 +317,19 @@ const lighthouseConnector = metricConnector({
     { metric: "accessibility", value: 0.97 },
     { metric: "best_practices", value: 0.95 },
     { metric: "seo", value: 1.0 }
-  ]
+  ],
+  liveFetch(ctx) {
+    // Lighthouse-Daten kommen aus der PSI-Antwort (PSI liefert lighthouseResult), teilen also
+    // den PSI-API-Key. Ohne Key => Stub.
+    const creds = resolvePsiCredentials(ctx.authConfig, ctx.env ?? (process.env as EnvSource));
+    if (!creds) return null;
+    return fetchPsiLive(creds, {
+      siteUrl: ctx.siteUrl ?? null,
+      now: ctx.now,
+      fetchImpl: ctx.fetchImpl ?? fetch,
+      variant: "lighthouse"
+    });
+  }
 });
 
 const registry: Partial<Record<IntegrationProvider, Connector>> = {

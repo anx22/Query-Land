@@ -54,7 +54,7 @@ test("authority summary computes follow ratio, anchors and top targets (pure)", 
   assert.ok(domains.every((domain) => domain.backlinks === 1));
 });
 
-test("import persists a GSC-links snapshot (class B); list/referring/authority read the latest", async () => {
+test("import without a connected links provider persists an empty snapshot (honest empty state)", async () => {
   const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Authority", slug: "authority" })).id;
@@ -63,24 +63,25 @@ test("import persists a GSC-links snapshot (class B); list/referring/authority r
     const imported = await app("POST", `/projects/${projectId}/backlinks/import`, {});
     assert.equal(imported.status, 202);
     const result = data<{ totalBacklinks: number; referringDomains: number; snapshotId: string }>(imported);
-    assert.ok(result.totalBacklinks > 0);
-    assert.ok(result.referringDomains > 0);
+    // No real authority/links provider is connected yet -> no backlinks, but a snapshot is recorded.
+    assert.equal(result.totalBacklinks, 0);
+    assert.equal(result.referringDomains, 0);
+    assert.ok(result.snapshotId);
 
-    const rows = data<Array<{ sourceConfidence: string; sourceDomain: string }>>(await app("GET", `/projects/${projectId}/backlinks?limit=100`));
-    assert.equal(rows[0].sourceConfidence, "B", "GSC links are confidence class B");
+    const rows = data<unknown[]>(await app("GET", `/projects/${projectId}/backlinks?limit=100`));
+    assert.equal(rows.length, 0);
 
-    const refDomains = data<Array<{ domain: string; backlinks: number }>>(await app("GET", `/projects/${projectId}/referring-domains`));
-    assert.equal(refDomains.length, result.referringDomains);
+    const refDomains = data<unknown[]>(await app("GET", `/projects/${projectId}/referring-domains`));
+    assert.equal(refDomains.length, 0);
 
-    const authority = data<{ totalBacklinks: number; followRatio: number; topReferringDomains: unknown[] }>(await app("GET", `/projects/${projectId}/authority`));
-    assert.equal(authority.totalBacklinks, result.totalBacklinks);
-    assert.ok(authority.followRatio > 0 && authority.followRatio <= 1);
+    const authority = data<{ totalBacklinks: number }>(await app("GET", `/projects/${projectId}/authority`));
+    assert.equal(authority.totalBacklinks, 0);
   } finally {
     await store.close();
   }
 });
 
-test("a second import yields a meaningful new/lost diff", async () => {
+test("a second import diffs two snapshots (empty diff when no provider is connected)", async () => {
   const { app, store } = await testApp();
   try {
     const projectId = data<{ id: string }>(await app("POST", "/projects", { name: "Diff", slug: "diff" })).id;
@@ -94,14 +95,14 @@ test("a second import yields a meaningful new/lost diff", async () => {
 
     await app("POST", `/projects/${projectId}/backlinks/import`, {});
 
-    const diff = data<{ newReferringDomains: string[]; lostReferringDomains: string[]; newBacklinks: unknown[]; lostBacklinks: unknown[]; netReferringDomainChange: number }>(await app("GET", `/projects/${projectId}/backlinks/diff`));
-    assert.ok(diff.newReferringDomains.includes("new-1.example"), "round 2 adds new-1.example");
-    assert.ok(diff.lostReferringDomains.includes("ref-0.example"), "round 2 drops ref-0.example");
-    assert.ok(diff.newBacklinks.length >= 1);
-    assert.ok(diff.lostBacklinks.length >= 1);
+    const diff = data<{ newReferringDomains: string[]; lostReferringDomains: string[]; newBacklinks: unknown[]; lostBacklinks: unknown[] }>(await app("GET", `/projects/${projectId}/backlinks/diff`));
+    assert.equal(diff.newReferringDomains.length, 0);
+    assert.equal(diff.lostReferringDomains.length, 0);
+    assert.equal(diff.newBacklinks.length, 0);
+    assert.equal(diff.lostBacklinks.length, 0);
 
     const snapshots = data<unknown[]>(await app("GET", `/projects/${projectId}/backlink-snapshots`));
-    assert.equal(snapshots.length, 2, "snapshot history accumulates");
+    assert.equal(snapshots.length, 2, "snapshot history accumulates even when empty");
   } finally {
     await store.close();
   }

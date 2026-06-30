@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
+import { seedDemoFoundation } from "./helpers/demo-foundation.js";
 
 // WP-0.7 (Teil: Testabdeckung Kernlogik). Die Inventur fand nur ~20% der Routen getestet.
 // Diese Suite deckt die bisher ungetesteten Kernpfade ab: Project/Site-CRUD inkl. Duplicate,
@@ -14,6 +15,7 @@ type ApiResponse = { status: number; body: unknown };
 
 async function testApp() {
   const store = await createStore("sqlite::memory:");
+  await seedDemoFoundation(store);
   return { app: createApp(store), store };
 }
 

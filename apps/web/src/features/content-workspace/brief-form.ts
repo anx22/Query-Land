@@ -169,7 +169,7 @@ export function addInternalLink(
 // ---------------------------------------------------------------------------
 
 const INTENT_LABELS: Record<ContentIntent, string> = {
-  informational: "Informational",
+  informational: "Informativ",
   commercial: "Kommerziell",
   transactional: "Transaktional",
   navigational: "Navigational",

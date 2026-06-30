@@ -9,7 +9,7 @@ import {
   type SearchPerformanceRow,
   type StrikingDistanceItem
 } from "@seo-tool/domain-model";
-import { getSearchAnalyticsProvider } from "../search-performance/index.js";
+import { resolveSearchAnalyticsProvider } from "../search-performance/index.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";
@@ -83,8 +83,8 @@ class SQLiteSearchPerformanceStore implements SearchPerformanceStore {
   async syncSearchPerformance(projectId: string, siteId: string, options: SearchPerformanceSyncOptions = {}): Promise<SearchPerformanceSyncResult> {
     const site = await this.requireSite(projectId, siteId);
     const market = (options.market ?? DEFAULT_MARKET).trim() || DEFAULT_MARKET;
-    const provider = getSearchAnalyticsProvider();
-    const rows = provider.fetch({ baseUrl: site.base_url, market });
+    const provider = await resolveSearchAnalyticsProvider(this.db, projectId, market);
+    const rows = await provider.fetch({ baseUrl: site.base_url, market });
     const capturedAt = new Date().toISOString();
 
     await this.db.transaction(async (tx) => {

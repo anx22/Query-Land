@@ -1,6 +1,7 @@
 import "../../features/keyword-rank/keywords.css";
 
 import { AppShell } from "../../components/app-shell";
+import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -26,7 +27,9 @@ export default async function Page({
   const feedback = feedbackMessage(params);
 
   const brandCount = data.rows.filter((r) => r.brand).length;
-  const visScore = data.latestVisibility?.score;
+  // A Visibility-Index computed over zero ranked keywords is a meaningless 0 — treat it as "no data".
+  const hasVisibility = data.latestVisibility != null && data.latestVisibility.trackedKeywords > 0;
+  const visScore = hasVisibility ? data.latestVisibility!.score : undefined;
   const visDelta =
     data.latestVisibility && data.previousVisibility
       ? data.latestVisibility.score - data.previousVisibility.score
@@ -49,15 +52,11 @@ export default async function Page({
         <div className="badge-row">
           <span className="badge">{data.groups.length} Cluster</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? (
-          <p className="notice danger">
-            {data.errorMessage ?? "API nicht erreichbar."} · Erwartete API: {data.apiBaseUrl}
-          </p>
-        ) : null}
+        {!data.connected ? <OfflineNotice /> : null}
         <div className="action-row">
           <div className="locked-action">
             <form action={computeVisibilityAction}>
@@ -69,7 +68,7 @@ export default async function Page({
             {!data.connected || !data.project ? (
               <span className="locked-action__reason">
                 <Icon name="lock" />
-                {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+                {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
               </span>
             ) : null}
           </div>
@@ -87,11 +86,11 @@ export default async function Page({
             </>
           }
           note={
-            data.latestVisibility
-              ? `${data.latestVisibility.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility.averagePosition ?? "—"}${
+            hasVisibility
+              ? `${data.latestVisibility!.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility!.averagePosition ?? "—"}${
                   visDelta != null ? ` · ${visDelta > 0 ? "+" : ""}${visDelta} Pkt` : ""
-                }`
-              : "noch nicht berechnet"
+                } · Konfidenz C (SERP-Stichprobe)`
+              : "erscheint nach der ersten Ranking-Messung"
           }
         />
         <MetricCard
@@ -142,7 +141,9 @@ export default async function Page({
         <div className="card">
           <p className="kicker">Keywords hinzufügen</p>
           <WhyItMatters showIcon={false}>
-            Neue Begriffe werden automatisch nach Intent, Brand und Funnel-Stage klassifiziert.
+            Neue Begriffe werden automatisch nach{" "}
+            <TermTooltip term="Keyword / Intent">Intent</TermTooltip>, Brand und{" "}
+            <TermTooltip term="Funnel-Stage">Funnel-Stage</TermTooltip> klassifiziert.
           </WhyItMatters>
           <form className="form-card" action={addKeywordsAction}>
             <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
@@ -168,9 +169,17 @@ export default async function Page({
               Brand-Begriffe (kommagetrennt, optional)
               <input name="brandTerms" placeholder="query-land, acme" />
             </label>
-            <button className="button" type="submit" disabled={!data.connected || !data.project}>
-              Klassifizieren &amp; speichern
-            </button>
+            <div className="locked-action">
+              <button className="button" type="submit" disabled={!data.connected || !data.project}>
+                Klassifizieren &amp; speichern
+              </button>
+              {!data.connected || !data.project ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
+                </span>
+              ) : null}
+            </div>
           </form>
         </div>
         <div className="card">
@@ -182,9 +191,17 @@ export default async function Page({
             <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
             <label>Name<input name="name" placeholder="Pricing" required /></label>
             <label>Thema (optional)<input name="topic" placeholder="Money pages" /></label>
-            <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
-              Cluster anlegen
-            </button>
+            <div className="locked-action">
+              <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+                Cluster anlegen
+              </button>
+              {!data.connected || !data.project ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
+                </span>
+              ) : null}
+            </div>
           </form>
         </div>
       </section>
@@ -194,13 +211,16 @@ export default async function Page({
 
 function feedbackMessage(
   params: Record<string, string | string[] | undefined> | undefined
-): { kind: "success" | "danger"; message: string } | null {
+): { kind: "success" | "danger" | "warning"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.added)) return { kind: "success", message: "Keywords klassifiziert und gespeichert." };
   if (singleParam(params?.group)) return { kind: "success", message: "Keyword-Cluster angelegt." };
-  if (singleParam(params?.ranked)) return { kind: "success", message: "Ranking-Messung erfasst (Demo-Daten)." };
-  if (singleParam(params?.visibility)) return { kind: "success", message: "Visibility-Index neu berechnet." };
+  const visibility = singleParam(params?.visibility);
+  if (visibility === "empty") {
+    return { kind: "warning", message: "Noch keine Ranking-Daten — der Visibility-Index erscheint nach der ersten Positions-Messung." };
+  }
+  if (visibility) return { kind: "success", message: "Visibility-Index neu berechnet." };
   return null;
 }
 

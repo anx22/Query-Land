@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sourceConfidenceForProvider, validateBusinessValue, type IntegrationAccount, type IntegrationProvider, type Project, type Site } from "@seo-tool/domain-model";
 import { getConnector, type ConnectorContract } from "../connectors/index.js";
+import { encryptJson, decryptJson } from "../oauth/token-crypto.js";
 import { mapIntegration, mapProject, mapSite } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
@@ -35,6 +36,15 @@ export interface ConnectorSyncOptions {
   siteId?: string;
 }
 
+export interface UpsertIntegrationCredentialsInput {
+  projectId: string;
+  provider: IntegrationProvider;
+  property: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
 export interface WebVitalMetric {
   metric: string;
   value: number;
@@ -45,11 +55,13 @@ export interface WebVitalMetric {
 export interface ProjectStore {
   listProjects(): Promise<Project[]>;
   createProject(input: Partial<Project>): Promise<Project>;
+  deleteProject(projectId: string): Promise<void>;
   listSites(projectId: string): Promise<Site[]>;
   createSite(projectId: string, input: Partial<Site>): Promise<Site>;
   listIntegrations(): Promise<IntegrationStatusView[]>;
   getIntegration(integrationId: string): Promise<IntegrationStatusView>;
   createIntegration(projectId: string, provider: IntegrationProvider): Promise<IntegrationAccount>;
+  upsertIntegrationCredentials(input: UpsertIntegrationCredentialsInput): Promise<IntegrationAccount>;
   runConnectorSync(integrationId: string, options?: ConnectorSyncOptions): Promise<ConnectorSyncResult>;
   listSiteWebVitals(projectId: string, siteId: string): Promise<WebVitalMetric[]>;
 }
@@ -89,6 +101,17 @@ class SQLiteProjectStore implements ProjectStore {
     return project;
   }
 
+  async deleteProject(projectId: string): Promise<void> {
+    const existing = await this.db.prepare(`SELECT id FROM projects WHERE id = ?`).get(projectId);
+    if (!existing) {
+      throw new RequestError(404, "unknown_project", "Project not found");
+    }
+    // All child tables reference projects with ON DELETE CASCADE, so a single delete removes
+    // the website and every dependent row (sites, crawls, keywords, opportunities, reports …).
+    await this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(projectId);
+    await this.audit("system", "project.delete", "project", projectId, {});
+  }
+
   async listSites(projectId: string): Promise<Site[]> {
     return (await this.db.prepare(`SELECT * FROM sites WHERE project_id = ? ORDER BY created_at ASC`).all(projectId)).map(mapSite);
   }
@@ -98,7 +121,9 @@ class SQLiteProjectStore implements ProjectStore {
       throw new RequestError(400, "missing_field", "baseUrl and scopeType are required");
     }
     const site: Site = {
-      id: `site-${randomUUID()}`,
+      // The public POST /sites route never sends an id (createSiteRequest whitelists fields);
+      // an explicit id is only honored for direct store callers such as test setup helpers.
+      id: input.id ?? `site-${randomUUID()}`,
       projectId,
       baseUrl: input.baseUrl,
       scopeType: input.scopeType,
@@ -147,6 +172,35 @@ class SQLiteProjectStore implements ProjectStore {
     return Boolean(parsed) && typeof parsed === "object" && Object.keys(parsed as Record<string, unknown>).length > 0;
   }
 
+  /**
+   * Best-effort decode of auth_config into a plain object the connector adapter can read.
+   * Handles encrypted blobs (real OAuth credentials) and plain JSON (stub). Never throws and
+   * never logs token values; returns null when nothing usable is present.
+   */
+  private decodeAuthConfig(raw: unknown): unknown {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw !== "string") return raw;
+    // Encrypted blobs are produced by encryptJson() ("v1:gcm:..."); try that first.
+    if (raw.startsWith("v1:gcm:")) {
+      try {
+        return decryptJson<unknown>(raw);
+      } catch {
+        return null;
+      }
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Primary site base_url for a project (used as the GSC property / PSI target when set). */
+  private async primarySiteUrl(projectId: string): Promise<string | null> {
+    const row = await this.db.prepare(`SELECT base_url FROM sites WHERE project_id = ? ORDER BY created_at ASC LIMIT 1`).get(projectId);
+    return row ? String((row as Record<string, unknown>).base_url) : null;
+  }
+
   private async lastEvidenceAt(integrationId: string): Promise<string | null> {
     const row = await this.db.prepare(`SELECT fetched_at FROM raw_events WHERE integration_account_id = ? ORDER BY fetched_at DESC LIMIT 1`).get(integrationId);
     return row ? String(row.fetched_at) : null;
@@ -159,7 +213,12 @@ class SQLiteProjectStore implements ProjectStore {
     const lastSyncedAt = integration.freshness;
     const lastEvidenceAt = await this.lastEvidenceAt(integration.id);
     const contract = connector
-      ? connector.describe({ hasCredentials: this.hasCredentials(row), lastSyncedAt, lastEvidenceAt })
+      ? connector.describe({
+          hasCredentials: this.hasCredentials(row),
+          lastSyncedAt,
+          lastEvidenceAt,
+          authConfig: this.decodeAuthConfig(row.auth_config)
+        })
       : null;
     return { ...integration, contract, lastSyncedAt, lastEvidenceAt };
   }
@@ -188,6 +247,34 @@ class SQLiteProjectStore implements ProjectStore {
     return integration;
   }
 
+  /**
+   * Create-or-update an integration with real OAuth credentials (encrypted) and mark it connected.
+   * Called by the OAuth callback once tokens have been exchanged. Never logs token values.
+   */
+  async upsertIntegrationCredentials(input: UpsertIntegrationCredentialsInput): Promise<IntegrationAccount> {
+    const now = new Date().toISOString();
+    const sourceConfidence = sourceConfidenceForProvider(input.provider);
+    const authConfig = encryptJson({
+      accessToken: input.accessToken,
+      refreshToken: input.refreshToken,
+      expiresAt: input.expiresAt,
+      property: input.property
+    });
+    const id = `int-${input.provider}-${randomUUID()}`;
+    try {
+      await this.db.prepare(
+        `INSERT INTO integration_accounts (id, project_id, provider, status, source_confidence, auth_config, quota_remaining, freshness, created_at, updated_at)
+         VALUES (?, ?, ?, 'connected', ?, ?, NULL, ?, ?, ?)
+         ON CONFLICT (project_id, provider) DO UPDATE SET status = 'connected', source_confidence = ?, auth_config = ?, freshness = ?, updated_at = ?`
+      ).run(id, input.projectId, input.provider, sourceConfidence, authConfig, now, now, now, sourceConfidence, authConfig, now, now);
+    } catch (error) {
+      throw sqliteConstraintError(error, "integration_write_failed", "Integration could not be stored or project is unknown");
+    }
+    const row = await this.db.prepare(`SELECT * FROM integration_accounts WHERE project_id = ? AND provider = ?`).get(input.projectId, input.provider);
+    await this.audit("system", "integration.credentials_set", "integration_account", id, { projectId: input.projectId, provider: input.provider, property: input.property });
+    return mapIntegration(row as Record<string, unknown>);
+  }
+
   async runConnectorSync(integrationId: string, options: ConnectorSyncOptions = {}): Promise<ConnectorSyncResult> {
     const row = await this.db.prepare(`SELECT * FROM integration_accounts WHERE id = ?`).get(integrationId);
     if (!row) {
@@ -213,9 +300,15 @@ class SQLiteProjectStore implements ProjectStore {
 
     const now = new Date().toISOString();
     const hasCredentials = this.hasCredentials(row as Record<string, unknown>);
-    const ctx = { projectId: integration.projectId, integrationId, now, entityType, entityId, hasCredentials };
+    // Real-adapter inputs: decrypted auth_config (may carry tokens/keys) + the site URL to query.
+    // The site-scoped entity wins; otherwise the project's primary site base_url.
+    const authConfig = this.decodeAuthConfig((row as Record<string, unknown>).auth_config);
+    const siteUrl = options.siteId
+      ? String((await this.db.prepare(`SELECT base_url FROM sites WHERE id = ?`).get(options.siteId) as Record<string, unknown> | undefined)?.base_url ?? "") || null
+      : await this.primarySiteUrl(integration.projectId);
+    const ctx = { projectId: integration.projectId, integrationId, now, entityType, entityId, hasCredentials, authConfig, siteUrl };
     try {
-      const fetched = connector.fetch(ctx);
+      const fetched = await connector.fetch(ctx);
 
       // Fehlermodi (missing_credentials/quota_exceeded/expired/degraded) sind KEIN Crash:
       // sie werden als sichtbarer, abfragbarer degraded-Status persistiert und als typisiertes

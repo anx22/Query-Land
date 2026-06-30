@@ -35,6 +35,8 @@ export interface AuditIssueListFilters {
 export interface DiscoveredUrlListFilters {
   status?: FetchStatusClass;
   source?: DiscoveredUrl["source"];
+  /** Case-insensitive substring match on the URL. */
+  q?: string;
 }
 
 export interface UrlExplorerRow {
@@ -108,6 +110,13 @@ function discoveredUrlWhere(projectId: string, siteId: string, filters: Discover
   if (filters.status) {
     where.push(`(SELECT fetch.status_class FROM url_fetch_results fetch WHERE fetch.discovered_url_id = discovered_urls.id ORDER BY fetch.fetched_at DESC, fetch.created_at DESC, fetch.id ASC LIMIT 1) = ?`);
     params.push(filters.status);
+  }
+  const q = filters.q?.trim();
+  if (q) {
+    // Case-insensitive substring search; escape LIKE wildcards so user input is literal.
+    const escaped = q.toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    where.push(`LOWER(url) LIKE ? ESCAPE '\\'`);
+    params.push(`%${escaped}%`);
   }
   return { whereSql: where.join(" AND "), params };
 }

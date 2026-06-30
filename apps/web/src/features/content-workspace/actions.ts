@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import type { ContentRecommendationStatus } from "@seo-tool/domain-model";
 import { CONTENT_RECOMMENDATION_STATUSES } from "@seo-tool/domain-model";
@@ -184,5 +185,5 @@ function requiredStringOrRedirect(formData: FormData, key: string): string {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Content-Workspace-Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Content-Workspace-Aktion konnte nicht gespeichert werden.");
 }

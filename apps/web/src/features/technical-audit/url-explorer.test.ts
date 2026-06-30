@@ -23,11 +23,12 @@ import {
 // --- URL-Explorer filter (fetch status class + source) ---
 
 describe("resolveUrlExplorerFilter", () => {
-  it("defaults to all/all", () => {
-    expect(resolveUrlExplorerFilter()).toEqual({ status: "all", source: "all" });
+  it("defaults to all/all + empty query", () => {
+    expect(resolveUrlExplorerFilter()).toEqual({ status: "all", source: "all", q: "" });
     expect(resolveUrlExplorerFilter({ urlStatus: "bogus", urlSource: "nope" })).toEqual({
       status: "all",
       source: "all",
+      q: "",
     });
   });
 
@@ -35,21 +36,27 @@ describe("resolveUrlExplorerFilter", () => {
     expect(resolveUrlExplorerFilter({ urlStatus: "server_error", urlSource: "sitemap" })).toEqual({
       status: "server_error",
       source: "sitemap",
+      q: "",
     });
+  });
+
+  it("trims the URL search query", () => {
+    expect(resolveUrlExplorerFilter({ urlQ: "  /blog/  " }).q).toBe("/blog/");
   });
 });
 
 describe("isDefaultUrlExplorerFilter", () => {
-  it("is true only for all/all", () => {
-    expect(isDefaultUrlExplorerFilter({ status: "all", source: "all" })).toBe(true);
-    expect(isDefaultUrlExplorerFilter({ status: "redirect", source: "all" })).toBe(false);
-    expect(isDefaultUrlExplorerFilter({ status: "all", source: "link" })).toBe(false);
+  it("is true only for all/all with no query", () => {
+    expect(isDefaultUrlExplorerFilter({ status: "all", source: "all", q: "" })).toBe(true);
+    expect(isDefaultUrlExplorerFilter({ status: "redirect", source: "all", q: "" })).toBe(false);
+    expect(isDefaultUrlExplorerFilter({ status: "all", source: "link", q: "" })).toBe(false);
+    expect(isDefaultUrlExplorerFilter({ status: "all", source: "all", q: "blog" })).toBe(false);
   });
 });
 
 describe("urlFilterHref", () => {
   it("omits default values and resets urlOffset", () => {
-    expect(urlFilterHref({ urlOffset: "50" }, { status: "all", source: "all" })).toBe(
+    expect(urlFilterHref({ urlOffset: "50" }, { status: "all", source: "all", q: "" })).toBe(
       "/technical-audit"
     );
   });
@@ -57,17 +64,18 @@ describe("urlFilterHref", () => {
   it("sets non-default filter params and drops the old urlOffset", () => {
     const href = urlFilterHref(
       { urlOffset: "50", urlStatus: "success" },
-      { status: "redirect", source: "sitemap" }
+      { status: "redirect", source: "sitemap", q: "" }
     );
     expect(href).toContain("urlStatus=redirect");
     expect(href).toContain("urlSource=sitemap");
     expect(href).not.toContain("urlOffset");
   });
 
-  it("preserves unrelated params (e.g. issue filters)", () => {
-    const href = urlFilterHref({ status: "resolved" }, { status: "client_error", source: "all" });
+  it("carries the URL search query and preserves unrelated params", () => {
+    const href = urlFilterHref({ status: "resolved" }, { status: "client_error", source: "all", q: "/blog" });
     expect(href).toContain("status=resolved");
     expect(href).toContain("urlStatus=client_error");
+    expect(href).toContain("urlQ=%2Fblog");
   });
 });
 

@@ -11,10 +11,11 @@
  * an onClose callback. Closes on Escape and on backdrop click.
  */
 
-import { useEffect } from "react";
+import { useRef } from "react";
 import type { Evidence, Opportunity, SourceConfidence } from "@seo-tool/domain-model";
 import { ConfidenceBadge, confidenceMeta, type ConfidenceLevel } from "../../components/confidence-badge";
-import { confidenceToLevel, opportunityTypeLabel } from "../../lib/board-logic";
+import { confidenceToLevel, opportunityTypeLabel, opportunityStatusLabel } from "../../lib/board-logic";
+import { useFocusTrap } from "../../lib/use-focus-trap";
 
 export interface EvidenceChainDrawerProps {
   opportunity: Opportunity | null;
@@ -44,14 +45,8 @@ function workspaceDrillHref(opportunity: Opportunity): string {
 }
 
 export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawerProps) {
-  useEffect(() => {
-    if (!opportunity) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [opportunity, onClose]);
+  const drawerRef = useRef<HTMLElement>(null);
+  useFocusTrap(drawerRef, opportunity !== null, onClose);
 
   if (!opportunity) return null;
 
@@ -60,6 +55,7 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
   return (
     <div className="board-drawer-backdrop" onClick={onClose} role="presentation">
       <aside
+        ref={drawerRef}
         className="board-drawer"
         role="dialog"
         aria-modal="true"
@@ -77,10 +73,10 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
         </header>
 
         <div className="board-drawer__badges">
-          <span className={`status ${opportunity.status}`}>{opportunity.status}</span>
+          <span className={`status ${opportunity.status}`}>{opportunityStatusLabel(opportunity.status)}</span>
           <ConfidenceBadge level={overallLevel} />
-          <span className="badge">Wirkung {opportunity.expectedImpact}</span>
-          <span className="badge">Aufwand {opportunity.effort}</span>
+          <span className="badge" title="Erwartete Wirkung auf einer Skala von 1 (gering) bis 5 (hoch)">Wirkung {opportunity.expectedImpact}/5</span>
+          <span className="badge" title="Geschätzter Aufwand auf einer Skala von 1 (gering) bis 5 (hoch)">Aufwand {opportunity.effort}/5</span>
         </div>
 
         <ol className="board-chain">
@@ -150,7 +146,7 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
               <p className="board-chain__label">Validierung</p>
               <p className="board-chain__text">{opportunity.validationMetric || "Keine Validierungsmetrik definiert."}</p>
               <p className="board-chain__text muted">
-                Status: <span className={`status ${opportunity.status}`}>{opportunity.status}</span>
+                Status: <span className={`status ${opportunity.status}`}>{opportunityStatusLabel(opportunity.status)}</span>
               </p>
               {opportunity.affectedUrls.length > 0 ? (
                 <p className="board-chain__text muted">Betroffene URLs: {opportunity.affectedUrls.join(", ")}</p>

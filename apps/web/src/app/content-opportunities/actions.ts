@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import type { OpportunityStatus } from "@seo-tool/domain-model";
 import { generateAllOpportunities, revalidateOpportunity, syncSearchPerformance, transitionOpportunity } from "../../features/content-opportunities";
@@ -87,5 +88,5 @@ function requiredString(formData: FormData, key: string): string {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Opportunity-Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Opportunity-Aktion konnte nicht gespeichert werden.");
 }

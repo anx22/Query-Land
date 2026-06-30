@@ -65,6 +65,7 @@
   max-width: 18rem;
   margin-top: 0.25rem;
 }
+.dossier-spark--compact { max-width: 6rem; }
 
 .dossier-spark-row {
   display: flex;

@@ -155,10 +155,20 @@ export function diffSelectionHref(
   return qs ? `/technical-audit?${qs}` : "/technical-audit";
 }
 
+/** Human German label for what triggered a crawl/analysis (never show the raw enum). */
+export function crawlTriggerLabel(trigger: string): string {
+  switch (trigger) {
+    case "manual":    return "manuell";
+    case "scheduled": return "geplant";
+    case "deploy":    return "Deployment";
+    default:          return trigger;
+  }
+}
+
 /** Short, human label for a crawl run in a selector (date + trigger). */
 export function runOptionLabel(run: Pick<CrawlRun, "startedAt" | "trigger">): string {
   const when = formatTimestamp(run.startedAt);
-  return `${when} · ${run.trigger}`;
+  return `${when} · ${crawlTriggerLabel(run.trigger)}`;
 }
 
 function formatTimestamp(iso: string | null | undefined): string {

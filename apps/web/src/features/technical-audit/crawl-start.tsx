@@ -33,28 +33,28 @@ export function CrawlStartPanel({ project, site, lock, connected, runningRun }: 
   const disabled = lock.locked || !connected || running;
 
   const reason = !connected
-    ? "API nicht erreichbar."
+    ? "Daten momentan nicht erreichbar."
     : running
-      ? "Crawl läuft bereits."
+      ? "Analyse läuft bereits."
       : lock.reason;
 
   return (
     <section className="card crawl-start" id="crawl-start">
       <div className="crawl-start__head">
         <div>
-          <p className="kicker">Crawl starten</p>
+          <p className="kicker">Analyse starten</p>
           <p className="muted crawl-start__scope">
             {site ? (
               <>
-                Crawlt: <strong>{site.baseUrl}</strong> · Frequenz{" "}
+                Analysiert: <strong>{site.baseUrl}</strong> · Rhythmus{" "}
                 {FREQUENCY_LABEL[site.crawlFrequency] ?? site.crawlFrequency}
               </>
             ) : (
-              "Noch keine Site gewählt — füge zuerst eine Site zum Projekt hinzu."
+              "Noch keine Website gewählt — füge zuerst eine Website zum Projekt hinzu."
             )}
           </p>
         </div>
-        {running ? <span className="badge primary">Crawl läuft …</span> : null}
+        {running ? <span className="badge primary">Analyse läuft …</span> : null}
       </div>
 
       <div className="action-row">
@@ -64,7 +64,7 @@ export function CrawlStartPanel({ project, site, lock, connected, runningRun }: 
             <input type="hidden" name="siteId" value={site?.id ?? ""} />
             <input type="hidden" name="baseUrl" value={site?.baseUrl ?? ""} />
             <button className="button" type="submit" disabled={disabled}>
-              Crawl starten
+              Analyse starten
             </button>
           </form>
           {disabled && reason ? (

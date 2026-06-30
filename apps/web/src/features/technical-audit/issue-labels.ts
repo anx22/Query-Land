@@ -1,14 +1,15 @@
 /**
- * issue-labels — server-safe (no "use client") rule label map for Technical Audit.
+ * Shared, framework-agnostic labels for audit-issue rules.
  *
- * `ruleLabel` is consumed by BOTH a server component (IssueFilterBar) and a
- * client component (IssueGroups). It must therefore live in a plain module with
- * no "use client" directive — calling a function exported from a client module
- * during server render throws an RSC boundary error.
+ * Kept in a plain (non-"use client") module so both the client `IssueGroups`
+ * component and the server-rendered `IssueFilterBar` can import `ruleLabel`
+ * without crossing the server/client boundary. Importing a function from a
+ * "use client" module into a server component and calling it throws
+ * ("Attempted to call ruleLabel() from the server …").
  */
 import type { IssueGroup } from "../../lib/audit-api";
 
-const RULE_LABEL: Record<IssueGroup["rule"], string> = {
+export const RULE_LABEL: Record<IssueGroup["rule"], string> = {
   http_error: "HTTP-Fehler",
   redirect_chain: "Redirect-Kette",
   missing_title: "Fehlender Title",

@@ -58,6 +58,21 @@ export const glossaryEntries: GlossaryEntry[] = [
       "Keywords knapp außerhalb der Top-10 (Position 11–20) — die günstigsten Hebel.",
   },
   {
+    term: "Funnel-Stage",
+    definition:
+      "Phase der Kaufentscheidung, die ein Suchbegriff bedient (z. B. Information, Vergleich, Kauf).",
+  },
+  {
+    term: "Quick Win",
+    definition:
+      "Chance mit hoher Wirkung und geringem Aufwand — lohnt sich zuerst.",
+  },
+  {
+    term: "Big Bet",
+    definition:
+      "Chance mit hoher Wirkung, aber größerem Aufwand — bewusst einplanen statt nebenbei erledigen.",
+  },
+  {
     term: "CTR-Gap",
     definition:
       "Abstand zwischen positionsüblicher und tatsächlicher Klickrate — Hinweis auf schwache Snippets.",
