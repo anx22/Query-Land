@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parsePage, parseRobotsTxt } from "../src/index.js";
+import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, loadRobotsPolicy, parsePage, parseRobotsTxt, robotsCrawlDelaySeconds } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
   const urls = discoverUrlsFromSitemap({
@@ -219,6 +219,35 @@ test("robots selects the most specific matching agent group and falls back to *"
   // The default crawler UA matches the SeoToolBot group via prefix.
   assert.equal(DEFAULT_CRAWLER_USER_AGENT.toLowerCase().startsWith("seotoolbot"), true);
   assert.equal(isRobotsAllowed("https://example.com/page", policy), true);
+});
+
+test("robots wildcard (*) and end-anchor ($) path matching", () => {
+  const policy = {
+    fetchedUrl: "https://example.com/robots.txt",
+    rules: parseRobotsTxt("User-agent: *\nDisallow: /*.pdf$\nDisallow: /private/*/secret\n")
+  };
+  assert.equal(isRobotsAllowed("https://example.com/file.pdf", policy), false); // *.pdf$ matches
+  assert.equal(isRobotsAllowed("https://example.com/file.pdf?x=1", policy), true); // $ anchors end → query means no match
+  assert.equal(isRobotsAllowed("https://example.com/a/b/file.pdf", policy), false); // * spans path segments
+  assert.equal(isRobotsAllowed("https://example.com/private/a/secret", policy), false); // /private/*/secret matches
+  assert.equal(isRobotsAllowed("https://example.com/private/secret", policy), true); // no middle segment → no match
+});
+
+test("robots Crawl-delay is parsed per group with wildcard fallback", async () => {
+  const policy = await loadRobotsPolicy({
+    baseUrl: "https://example.com",
+    fetchImpl: async () => new Response("User-agent: *\nCrawl-delay: 2\nUser-agent: SeoToolBot\nCrawl-delay: 5\n", { status: 200, headers: { "content-type": "text/plain" } })
+  });
+  assert.equal(robotsCrawlDelaySeconds(policy, "SeoToolBot/1.0"), 5); // specific group
+  assert.equal(robotsCrawlDelaySeconds(policy, "OtherBot/9"), 2); // wildcard fallback
+});
+
+test("robots Sitemap: directives are collected and absolutized", async () => {
+  const policy = await loadRobotsPolicy({
+    baseUrl: "https://example.com",
+    fetchImpl: async () => new Response("Sitemap: https://example.com/sm1.xml\nSitemap: /sm2.xml\nUser-agent: *\nDisallow:\n", { status: 200, headers: { "content-type": "text/plain" } })
+  });
+  assert.deepEqual(policy.sitemaps, ["https://example.com/sm1.xml", "https://example.com/sm2.xml"]);
 });
 
 test("backoffDelayMs produces a capped exponential sequence", () => {
