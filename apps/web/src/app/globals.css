@@ -379,7 +379,24 @@ p {
   font-feature-settings: "tnum" 1;
 }
 
-.data-mono {
+/* Mono-Microcopy (flächendeckend): every technical string — URLs, domains,    */
+/* paths, raw metrics, code — renders in JetBrains Mono / tabular, app-wide.    */
+.data-mono,
+code, kbd, samp,
+.audit-diff-issue__url,
+.audit-diff-url,
+.audit-issue-group__url,
+.issue-drawer__url,
+.url-explorer__url-button,
+.backlinks-domain,
+.ai-matrix__domains,
+.cw-candidate__url,
+.cw-suggestion__url,
+.backlinks-num,
+.dossier-section-num,
+.board-evidence-card__metric,
+.reports-alert-card__metric,
+.reports-alert-card__numbers {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -482,6 +499,23 @@ p {
   cursor: pointer;
   padding: 0.85rem 1.1rem;
   font-weight: 800;
+  transition: box-shadow 120ms ease, transform 120ms ease;
+}
+
+/* Haptic press: a sharp (blur-less) 2px shadow on hover, settles on click —    */
+/* the flat/graphic surface feels physical without soft elevation. (§7)         */
+.button:hover {
+  box-shadow: 0 2px 0 0 color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+.button:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 0 color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+  .button:active { transform: none; }
 }
 
 .button.secondary {
