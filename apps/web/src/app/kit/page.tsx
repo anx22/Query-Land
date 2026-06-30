@@ -347,7 +347,7 @@ export default function KitPage() {
           <div className="card notice" style={{ maxWidth: "28rem" }}>
             <strong>Keine Daten verfügbar</strong>
             <p style={{ marginBottom: 0, marginTop: "0.25rem", fontSize: "0.88rem" }}>
-              Starten Sie einen Crawl im Technical Audit, um Daten zu erfassen.
+              Starten Sie einen Crawl in der Technischen Prüfung, um Daten zu erfassen.
             </p>
           </div>
 

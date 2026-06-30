@@ -112,7 +112,7 @@ export default async function Page({
           </WhyItMatters>
           <div className="ai-scores">
             <div className="ai-gauge">
-              <ScoreGauge value={score} max={100} label="Citation-Anteil" size={180} />
+              <ScoreGauge value={score} max={100} label="Nennungs-Anteil" size={180} />
               <span className="badge warning">Klasse E · Signal</span>
             </div>
             <div className="ai-scores__facts">
@@ -130,7 +130,7 @@ export default async function Page({
               </div>
               <div className="ai-fact">
                 <span className="ai-fact__value">{score !== null ? `${score} %` : "—"}</span>
-                <span className="ai-fact__label">Citation-Anteil</span>
+                <span className="ai-fact__label">Nennungs-Anteil</span>
               </div>
             </div>
           </div>

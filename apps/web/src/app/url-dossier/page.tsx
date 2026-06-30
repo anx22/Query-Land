@@ -92,7 +92,7 @@ export default async function Page({
         ) : (
           <p className="notice">
             Für diese Website wurden noch keine Seiten gefunden. Starten Sie zuerst eine Analyse —{" "}
-            <a href="/technical-audit#crawl-start">zum Technical Audit →</a>
+            <a href="/technical-audit#crawl-start">zur Technischen Prüfung →</a>
           </p>
         )}
       </section>
