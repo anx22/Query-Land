@@ -2005,6 +2005,29 @@ select:disabled {
 .overview-subhead { margin-top: var(--space-5); }
 .overview-cta { margin-top: var(--space-4); }
 
+/* First-run "modules pending" panel — shown instead of a screen's empty machinery. */
+.modules-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-5);
+}
+.modules-pending__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 1.35rem;
+}
+.modules-pending__title { margin: 0; }
+.modules-pending__text { margin: 0; color: var(--muted); max-width: 48ch; }
+
 .overview-empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); margin-top: var(--space-3); }
 .overview-empty-state__text { margin: 0; color: var(--muted); }
 .overview-empty-hint { margin-top: var(--space-2); color: var(--muted); font-size: 0.9rem; }

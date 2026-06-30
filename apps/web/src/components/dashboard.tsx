@@ -19,6 +19,7 @@
 import type { OverviewData } from "../lib/overview-api";
 import { OverviewHeader } from "./overview-header";
 import { OfflineNotice } from "./offline-notice";
+import { ModulesPending } from "./modules-pending";
 import { ConfidenceBadge } from "./confidence-badge";
 import { DeltaChip } from "./delta-chip";
 import { WhyItMatters } from "./why-it-matters";
@@ -155,6 +156,19 @@ export function Dashboard({ data }: { data: OverviewData }) {
       ? latestHealthScore.score - previousHealthScore.score
       : null;
 
+  // Two-mode cockpit: until the first analysis has produced something real, the KPI bento,
+  // charts, gauges and activity panels render as a wall of empty "—" boxes that reads as
+  // broken. Show a single calm "first analysis" panel instead and reveal the machinery only
+  // once there is data to show.
+  const hasData =
+    latestVisibility !== null ||
+    latestHealthScore !== null ||
+    positionBuckets.total > 0 ||
+    topOpportunities.length > 0 ||
+    criticalIssues.length > 0 ||
+    recentCrawlRuns.length > 0 ||
+    recentReports.length > 0;
+
   return (
     <>
       {/* ------------------------------------------------------------------ */}
@@ -167,10 +181,21 @@ export function Dashboard({ data }: { data: OverviewData }) {
       {/* ------------------------------------------------------------------ */}
       {!connected && <OfflineNotice />}
 
+      {/* First-run: no analysis yet → one calm panel instead of empty machinery. */}
+      {connected && project && !hasData && (
+        <ModulesPending
+          icon="dashboard"
+          title="Bereit für Ihre erste Analyse"
+          text="Ihre Kennzahlen, der Sichtbarkeits-Verlauf und priorisierte Chancen erscheinen hier, sobald Sie die erste Analyse gestartet haben."
+          ctaHref="/technical-audit#crawl-start"
+          ctaLabel="Analyse starten →"
+        />
+      )}
+
       {/* ------------------------------------------------------------------ */}
       {/* O-2 KPI Bento — measured headline numbers (mono), real data only    */}
       {/* ------------------------------------------------------------------ */}
-      {connected && project && (
+      {connected && project && hasData && (
         <section className="kpi-bento" aria-label="Kennzahlen im Überblick">
           <article className="kpi-card">
             <p className="kpi-card__label">
@@ -232,6 +257,9 @@ export function Dashboard({ data }: { data: OverviewData }) {
         </section>
       )}
 
+      {/* Data mode — the full cockpit renders only once there is something real to show. */}
+      {hasData && (
+      <>
       {/* ------------------------------------------------------------------ */}
       {/* Hero: Visibility TrendChart + Health ScoreGauge                     */}
       {/* ------------------------------------------------------------------ */}
@@ -453,6 +481,8 @@ export function Dashboard({ data }: { data: OverviewData }) {
           )}
         </div>
       </section>
+      </>
+      )}
     </>
   );
 }
