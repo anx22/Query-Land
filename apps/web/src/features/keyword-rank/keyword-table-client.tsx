@@ -232,8 +232,8 @@ function KeywordTableEmpty({ hasRows }: { hasRows: boolean }) {
       <strong>{hasRows ? "Keine Keywords im aktuellen Filter" : "Noch keine Keywords"}</strong>
       <span className="muted">
         {hasRows
-          ? "Passe die Filter an, um andere Keywords zu sehen."
-          : "Füge unten Keywords hinzu und starte das Rank-Tracking, um Positionen und Trends zu sehen."}
+          ? "Passen Sie die Filter an, um andere Keywords zu sehen."
+          : "Fügen Sie unten Keywords hinzu. Positionen und Trends erscheinen, sobald eine Ranking-Quelle (z. B. Google Search Console) verbunden ist."}
       </span>
     </div>
   );
