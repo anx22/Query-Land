@@ -6,6 +6,7 @@ import type {
   IndexabilityAssessment,
   UrlDiscoverySource
 } from "@seo-tool/domain-model";
+import type { CrawlScopeType } from "./url-normalization.js";
 
 export interface CrawlSeedInput {
   projectId: string;
@@ -85,6 +86,10 @@ export interface CrawlWorkerCycleOptions {
   fetchImpl?: typeof fetch;
   now?: () => string;
   maxUrls?: number;
+  /** BFS link-following depth limit (0 = seed/sitemap only). Default DEFAULT_MAX_DEPTH. */
+  maxDepth?: number;
+  /** Crawl scope strategy (from site.scope_type). Default "domain". */
+  scopeType?: CrawlScopeType;
   fetchTimeoutMs?: number;
   retry?: FetchRetryPolicy;
   maxRedirects?: number;
@@ -103,6 +108,10 @@ export interface CrawlWorkerCycleResult {
   discoveredUrls?: number;
   fetchedUrls?: number;
   issues?: number;
+  /** Pages whose fetch/assess raised an error but did not abort the run (per-URL boundary). */
+  pageErrors?: number;
+  /** True when maxUrls/maxDepth capped the crawl before the frontier was exhausted. */
+  truncated?: boolean;
   errorMessage?: string;
 }
 

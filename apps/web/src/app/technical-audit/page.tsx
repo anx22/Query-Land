@@ -319,6 +319,7 @@ async function TechnicalAuditBody({
   const actionBanner = resolveActionBanner({
     error: firstParam(params.error),
     started: firstParam(params.started),
+    crawlWarning: firstParam(params.crawlWarning),
   });
 
   // Flatten the current searchParams to a single-value map for href building,

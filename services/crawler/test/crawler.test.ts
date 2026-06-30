@@ -223,10 +223,22 @@ test("fetchUrl on garbage/invalid sitemap content still classifies without throw
 });
 
 
-test("crawl scope keeps only same-protocol same-host URLs", () => {
+test("crawl scope is scheme- and www-tolerant with domain/subdomain/folder modes", () => {
+  // domain (default): apex + www + any subdomain; scheme-tolerant.
   assert.equal(isInCrawlScope("https://example.com/a", "https://example.com"), true);
-  assert.equal(isInCrawlScope("http://example.com/a", "https://example.com"), false);
+  assert.equal(isInCrawlScope("http://example.com/a", "https://example.com"), true); // http↔https same site
+  assert.equal(isInCrawlScope("https://www.example.com/a", "https://example.com"), true); // www == apex
+  assert.equal(isInCrawlScope("https://blog.example.com/a", "https://example.com", "domain"), true); // subdomain in domain scope
   assert.equal(isInCrawlScope("https://other.example/a", "https://example.com"), false);
+  assert.equal(isInCrawlScope("ftp://example.com/a", "https://example.com"), false); // non-http(s)
+
+  // subdomain: exactly the base host (modulo www), no other subdomains.
+  assert.equal(isInCrawlScope("https://www.example.com/a", "https://example.com", "subdomain"), true);
+  assert.equal(isInCrawlScope("https://blog.example.com/a", "https://example.com", "subdomain"), false);
+
+  // folder: same host + path prefix.
+  assert.equal(isInCrawlScope("https://example.com/shop/x", "https://example.com/shop", "folder"), true);
+  assert.equal(isInCrawlScope("https://example.com/blog/x", "https://example.com/shop", "folder"), false);
 });
 
 
@@ -287,6 +299,76 @@ function apiClientForStore(store: Store): CrawlWorkerApiClient {
     completeJob: (jobId, status, lastError) => post(`/jobs/${jobId}/complete`, { status, lastError })
   };
 }
+
+/** Build a deterministic fetchImpl for an in-memory link graph (no sitemap; robots allow-all). */
+function linkGraphFetchImpl(graph: Record<string, string[]>): typeof fetch {
+  return (async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    const links = graph[path] ?? [];
+    const body = `<html><head><title>${path}</title></head><body>${links.map((l) => `<a href="${l}">x</a>`).join("")}</body></html>`;
+    return new Response(body, { status: 200, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+}
+
+const LINK_GRAPH: Record<string, string[]> = { "/": ["/a", "/b"], "/a": ["/a1"], "/b": ["/", "/a"], "/a1": [] };
+
+async function seedGraphJob(store: Store) {
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: "https://example.com", payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+  return { app, projectId, siteId };
+}
+
+test("crawl worker follows in-scope links (BFS) across the whole link graph", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z" });
+  assert.equal(result.status, "succeeded");
+  // seed + /a + /b + /a1 (reached via /a) — BFS, deduped (/b links back to / and /a).
+  assert.equal(result.fetchedUrls, 4);
+  assert.equal(result.truncated, false);
+  await store.close();
+});
+
+test("crawl worker honors maxDepth (does not follow links beyond the limit)", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z", maxDepth: 1 });
+  assert.equal(result.status, "succeeded");
+  // depth 0 seed → depth 1 /a,/b; /a1 (depth 2) is NOT followed.
+  assert.equal(result.fetchedUrls, 3);
+  await store.close();
+});
+
+test("crawl worker truncates at maxUrls and flags it", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z", maxUrls: 2 });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.fetchedUrls, 2);
+  assert.equal(result.truncated, true);
+  await store.close();
+});
+
+test("crawl worker per-URL error boundary: one failing page does not abort the run", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const base = apiClientForStore(store);
+  // Make persisting the fetch of /b fail; the run must still crawl seed + /a + /a1.
+  const apiClient: CrawlWorkerApiClient = {
+    ...base,
+    recordFetchResult: (projectId, siteId, discoveredUrlId, result) =>
+      result.url.replace(/\/$/, "").endsWith("/b") ? Promise.reject(new Error("boom")) : base.recordFetchResult(projectId, siteId, discoveredUrlId, result)
+  };
+  const result = await runCrawlWorkerCycle({ apiClient, fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z" });
+  assert.equal(result.status, "succeeded");
+  assert.ok((result.pageErrors ?? 0) >= 1, "the failing page is counted as a per-URL error");
+  assert.ok((result.fetchedUrls ?? 0) >= 3, "seed + /a + /a1 still crawled despite /b failing");
+  await store.close();
+});
 
 test("crawl worker creates a crawl run when legacy crawl_seed payload has no crawlRunId", async () => {
   const store = await createStore("sqlite::memory:");
@@ -388,10 +470,11 @@ test("crawl worker checks limited in-scope outgoing links and records broken_lin
 
   const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", maxOutgoingLinkChecks: 5 });
   assert.equal(result.status, "succeeded");
-  assert.equal(result.discoveredUrls, 1);
-  assert.equal(result.fetchedUrls, 1);
+  // BFS now follows the in-scope link: seed + /missing are both discovered and fetched.
+  assert.equal(result.discoveredUrls, 2);
+  assert.equal(result.fetchedUrls, 2);
   assert.equal(fetched.includes("https://example.com/missing"), true);
-  assert.equal(fetched.includes("https://outside.example/missing"), false);
+  assert.equal(fetched.includes("https://outside.example/missing"), false); // external stays out of scope
 
   const issues = envelopeData<Array<{ rule: string; url: string; message: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
   assert.equal(issues.some((issue) => issue.rule === "broken_link" && issue.url === "https://example.com/" && issue.message.includes("https://example.com/missing")), true);

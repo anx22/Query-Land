@@ -193,6 +193,7 @@ test("POST /crawl-runs/schedule creates a crawl run and typed crawl_seed job tog
     baseUrl: "https://example.com/",
     crawlRunId: body.data.crawlRun.id,
     sitemapUrl: "https://example.com/sitemap.xml",
+    scopeType: "domain",
     subject: `https://example.com/:run:${body.data.crawlRun.id}`
   });
   await store.close();
