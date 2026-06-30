@@ -1,6 +1,8 @@
 import "../../features/technical-audit/audit.css";
 
+import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
+import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
 import { HeroBand } from "../../components/hero-band";
 import { ScoreGauge } from "../../components/charts/score-gauge";
@@ -286,6 +288,21 @@ export default async function Page({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = (await searchParams) ?? {};
+  return (
+    <AppShell activePath="/technical-audit">
+      <Suspense fallback={<PageSkeleton label="Technical Audit wird geladen …" />}>
+        <TechnicalAuditBody params={params} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+// Data-dependent body — streamed behind Suspense so the shell paints immediately.
+async function TechnicalAuditBody({
+  params,
+}: {
+  params: Record<string, string | string[] | undefined>;
+}) {
   const data = await loadTechnicalAuditOverview({
     issueStatus: firstParam(params.status),
     issueSeverity: firstParam(params.severity),
@@ -343,7 +360,7 @@ export default async function Page({
   const hasAudit = data.recentCrawlRuns.length > 0;
 
   return (
-    <AppShell activePath="/technical-audit">
+    <>
       {actionBanner ? (
         <p className={`notice ${actionBanner.tone}`} role={actionBanner.role}>
           {actionBanner.message}
@@ -619,7 +636,7 @@ export default async function Page({
       </section>
       </>
       )}
-    </AppShell>
+    </>
   );
 }
 
