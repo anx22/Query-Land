@@ -48,6 +48,8 @@ export interface FetchWorkerInput {
   maxRedirects?: number;
   /** User-Agent header to send and to use for robots.txt group selection. */
   userAgent?: string;
+  /** Cap (bytes) on the response body read into memory. Default DEFAULT_MAX_BODY_BYTES. */
+  maxBodyBytes?: number;
 }
 
 export interface AuditPageInput {
@@ -102,6 +104,8 @@ export interface CrawlWorkerCycleOptions {
   maxSitemapFetches?: number;
   /** User-Agent header to send and to use for robots.txt group selection. */
   userAgent?: string;
+  /** Cap (bytes) on each response body read into memory. Default DEFAULT_MAX_BODY_BYTES. */
+  maxBodyBytes?: number;
 }
 
 export interface CrawlWorkerCycleResult {

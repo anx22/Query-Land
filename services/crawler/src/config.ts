@@ -21,6 +21,17 @@ export const DEFAULT_MAX_DEPTH = 5;
 export const DEFAULT_MAX_URLS = 150;
 
 /**
+ * Default cap (bytes) on a single response body we will read into memory and
+ * parse. Protects the serverless worker from huge/malicious payloads; bodies
+ * larger than this are read up to the cap and flagged truncated.
+ */
+export const DEFAULT_MAX_BODY_BYTES = 5_000_000;
+
+/** Accept header sent on crawl fetches — we want HTML/XML, tolerate anything. */
+export const DEFAULT_ACCEPT_HEADER =
+  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+
+/**
  * Capped exponential backoff: base * 2^(attempt-1), clamped to maxDelay.
  * `attempt` is 1-based (1 = first retry). Returns 0 for non-positive base.
  */

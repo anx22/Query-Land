@@ -278,6 +278,47 @@ test("fetchUrl sends the configured User-Agent header (and a default otherwise)"
   assert.equal(sentCustom, "CustomBot/2.0");
 });
 
+test("fetchUrl does not read binary (non-textual) response bodies", async () => {
+  const result = await fetchUrl({
+    url: "https://example.com/logo.png",
+    fetchImpl: async () => new Response("\x89PNG\r\n\x1a\n binary bytes", { status: 200, headers: { "content-type": "image/png" } })
+  });
+  assert.equal(result.statusClass, "success");
+  assert.equal(result.headers["content-type"], "image/png");
+  assert.equal(result.responseBody, ""); // body discarded, never fed to the HTML parser
+});
+
+test("fetchUrl decodes non-UTF-8 bodies using the declared charset", async () => {
+  // 0xE4 is 'ä' in ISO-8859-1; naive UTF-8 decoding would mangle it.
+  const body = Buffer.from([0x3c, 0x70, 0x3e, 0xe4, 0x3c, 0x2f, 0x70, 0x3e]); // <p>ä</p>
+  const result = await fetchUrl({
+    url: "https://example.com/latin1",
+    fetchImpl: async () => new Response(body, { status: 200, headers: { "content-type": "text/html; charset=iso-8859-1" } })
+  });
+  assert.equal(result.responseBody, "<p>ä</p>");
+});
+
+test("fetchUrl caps the response body at maxBodyBytes", async () => {
+  const result = await fetchUrl({
+    url: "https://example.com/huge",
+    maxBodyBytes: 4,
+    fetchImpl: async () => new Response("0123456789", { status: 200, headers: { "content-type": "text/plain" } })
+  });
+  assert.equal(result.responseBody, "0123");
+});
+
+test("fetchUrl sends an Accept header preferring HTML/XML", async () => {
+  let accept: string | null = null;
+  await fetchUrl({
+    url: "https://example.com/",
+    fetchImpl: async (_url, init) => {
+      accept = new Headers(init?.headers).get("accept");
+      return new Response("ok", { status: 200 });
+    }
+  });
+  assert.match(accept ?? "", /^text\/html/);
+});
+
 test("fetchUrl on garbage/invalid sitemap content still classifies without throwing", async () => {
   const result = await fetchUrl({
     url: "https://example.com/sitemap.xml",
