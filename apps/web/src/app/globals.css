@@ -215,20 +215,26 @@ select {
   opacity: 0.75;
 }
 
+/* Oneline icons — thin, no tile; follow the nav-item ink (muted → ink active). */
 .nav-icon {
   display: grid;
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 1.4rem;
+  height: 1.4rem;
   place-items: center;
-  border-radius: 0.65rem;
-  background: var(--surface-muted);
-  color: var(--primary);
-  font-size: 1.05rem;
+  background: transparent;
+  color: inherit;
+  opacity: 0.8;
+  font-size: 1.2rem;
+}
+
+.nav-item.active .nav-icon,
+.nav-item:hover .nav-icon {
+  opacity: 1;
 }
 
 /* Inactive / locked navigation — consolidated inactive tokens (see :root). */
 .nav-item.is-locked .nav-icon {
-  background: var(--inactive-surface);
+  background: transparent;
   color: var(--inactive-ink);
 }
 
@@ -237,7 +243,17 @@ select {
 }
 
 .main {
-  padding: 2rem;
+  padding: 1.75rem 2rem 2.5rem;
+}
+
+/* Editorial table headers — label-caps on a quiet ground, hairline rows.        */
+/* Low-specificity baseline; feature tables with their own th styles still win.  */
+th {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .topbar {
@@ -372,7 +388,24 @@ p {
   font-feature-settings: "tnum" 1;
 }
 
-.data-mono {
+/* Mono-Microcopy (flächendeckend): every technical string — URLs, domains,    */
+/* paths, raw metrics, code — renders in JetBrains Mono / tabular, app-wide.    */
+.data-mono,
+code, kbd, samp,
+.audit-diff-issue__url,
+.audit-diff-url,
+.audit-issue-group__url,
+.issue-drawer__url,
+.url-explorer__url-button,
+.backlinks-domain,
+.ai-matrix__domains,
+.cw-candidate__url,
+.cw-suggestion__url,
+.backlinks-num,
+.dossier-section-num,
+.board-evidence-card__metric,
+.reports-alert-card__metric,
+.reports-alert-card__numbers {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -489,6 +522,23 @@ p {
   line-height: 1.2;
   text-align: center;
   white-space: nowrap;
+  transition: box-shadow 120ms ease, transform 120ms ease;
+}
+
+/* Haptic press: a sharp (blur-less) 2px shadow on hover, settles on click —    */
+/* the flat/graphic surface feels physical without soft elevation. (§7)         */
+.button:hover {
+  box-shadow: 0 2px 0 0 color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+.button:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 0 color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button { transition: none; }
+  .button:active { transform: none; }
 }
 
 .button.secondary {
@@ -1151,6 +1201,48 @@ select:disabled {
   pointer-events: none;
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.85) 42%, rgba(0, 0, 0, 0.35) 72%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.85) 42%, rgba(0, 0, 0, 0.35) 72%, transparent 100%);
+}
+
+.overview-header__controls {
+  position: absolute;
+  top: 0.1rem;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.overview-header__period,
+.overview-header__export {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.overview-header__period {
+  color: var(--muted);
+}
+
+.overview-header__export {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.overview-header__export:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 980px) {
+  .overview-header__controls { display: none; }
 }
 
 .overview-header__inner {
