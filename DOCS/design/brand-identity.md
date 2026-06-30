@@ -1,14 +1,15 @@
 # Query-Land — Brand Identity & Design Directions
 
-> **Zweck:** Den „Editorial Tech"-Nordstern aus `DESIGN.md` zu einer **unverkennbaren** Marken- und
+> **Zweck:** Den „Editorial Tech"-Nordstern zu einer **unverkennbaren** Marken- und
 > Design-Signatur schärfen — und die konkreten _Feinheiten_ festlegen, die Query-Land vom generischen
 > SEO-SaaS (Ahrefs, Sistrix, Semrush) abheben.
 >
 > **Status:** Direction / Entwurf (2026-06-26). Visuelle Exploration via Magnific läuft begleitend
 > (siehe §10). Umsetzung folgt iterativ, nachdem die Richtung an den Mockups validiert ist.
 >
-> **Wahrheitsebenen:** `DESIGN.md` (Token-Quelle „Editorial Tech") · `ux-ui-sprint.md` Teil 1–3
-> (Voice, UI-Kit, Placement) · `globals.css` (Implementierungsstand).
+> **Dieses Dokument ist die einzige Brand-&-Design-Quelle** (DESIGN/color/typography hier konsolidiert).
+> **Wahrheitsebenen:** `apps/web/src/app/globals.css` (kanonische Tokens) · `ux-ui-sprint.md` Teil 1–3
+> (Voice, UI-Kit, Placement) · `/brand/` (Assets).
 
 ---
 
@@ -112,9 +113,8 @@ Bestehende Tokens (`globals.css`) bleiben die Quelle; dieses Dokument schärft i
 | Orange weich | `--primary-soft` | `#fff0e6` | aktive Nav, Chips, Hover |
 
 > **Warmer Unterton statt Reinweiß:** Query-Land nutzt bewusst ein _papierwarmes_ Off-White
-> (`#fcfcfb`, Tinte `#211b17`) statt des kalten `#F9F9F9/#121212` aus dem DESIGN.md-Frontmatter.
-> Das ist die gewünschte Abweichung — wärmer = „Print/Manuskript", kälter = „Screen". **`globals.css`
-> gewinnt.** Beim Re-Sync von DESIGN.md die warmen Werte übernehmen.
+> (`#fcfcfb`, Tinte `#211b17`) statt des kühleren `#F9F9F9/#121212` (historischer Referenzwert).
+> Wärmer = „Print/Manuskript", kälter = „Screen". **`globals.css` gewinnt.**
 
 ### 3.2 Das Orange-Prinzip (verbindlich)
 **Brand-Orange `--primary` bedeutet immer „du/uns".** Erlaubt für: primäre CTA, aktive Nav, Kicker/Eyebrow,
@@ -149,7 +149,7 @@ dritte Akzentfarbe. So liest sich Orange im ganzen Produkt eindeutig als „unse
 Kennzahl** ist (Visibility 73, Position 4, 1.240 URLs), steht sie in Mono. Das ist die sofort
 wiedererkennbare Geste — „die Zahlen sehen aus wie im Terminal, die Überschriften wie in der Zeitung".
 
-### 4.2 Skala (aus DESIGN.md, verbindlich)
+### 4.2 Skala (verbindlich)
 - `display-lg` Literata 700 / 48px / 1.1 / -0.02em
 - `headline-lg` Literata 700 / 32px / 1.2 / -0.01em  (mobil 28px)
 - `headline-md` Literata 600 / 24px / 1.3
@@ -231,6 +231,29 @@ Diese Detail-Entscheidungen sind der eigentliche Markenkern — die Summe macht 
 
 ---
 
+## 7.1 Komponenten, Form & Tokens (konsolidiert)
+
+> Hierher gefoldet aus der früheren `DESIGN.md`/`color.md`/`typography.md`. **Kanonische Tokens:**
+> `apps/web/src/app/globals.css` (warme Paper-&-Ink-Werte) — die Datei gewinnt; dieses Dokument
+> beschreibt die Rollen. Typo-Skala: §4.2. Farben: §3.
+
+**Form & Elevation**
+- **Ecken:** Inputs/Buttons weich; große Karten Radius ~`0.75rem`; Pills `999px`. Diszipliniert, nie verspielt.
+- **Oneline-Icons:** Inline-SVG, ~1.5px-Stroke, nie gefüllt, `currentColor` — „Annotationen am Manuskript".
+- **Keine weichen Schatten** zur Trennung — flache Karten mit 1px-Haarlinie („technische Zeichnung").
+- **Haptik:** einzige Elevation = scharfer 2px-Hover-Schatten auf Buttons (simulierter Druck).
+- **Glassmorphism:** nur Sidebar-/Overlay-Backdrops (hoher Blur + Grain).
+
+**Komponenten**
+- **Buttons:** primär solid `--primary`/weiß; sekundär Ghost (1px-Rand). Hover-Haptik.
+- **Karten (Bento):** weiß, 1px `--line`, Radius ~`0.75rem`; „Metric Header" = `label-caps` oben links.
+- **Tabellen:** editorial — keine Vertikalen, 1px-Zeilen-Haarlinien, Header `label-caps` (`th`).
+- **Inputs:** minimal, 1px-Rand; Fokus = `--primary`-Rand.
+- **Navigation:** viel Negativraum; aktiv = Inter Medium + **oranger Punkt**.
+- **SEO-Badges/Chips:** klein, `data-mono`-Text, niedrig gesättigte Tints.
+
+---
+
 ## 8. Voice (Verweis)
 Tonalität, Serious-Zonen, Begriffe und das kontrollierte Metaphern-Vokabular sind in
 `ux-ui-sprint.md` Teil 1 verbindlich geregelt. Branding-relevant hier nur: **belegbar** ist das
@@ -255,7 +278,7 @@ Reihenfolge nach Sichtbarkeit/Aufwand. Jeder Schritt nutzt CSS-Tokens, kein Hard
 | **B-4** | **Editorial-Tabellen**: Header `label-caps`/`--surface-muted`, Zeilen-Haarlinien, keine Vertikalen | S | Mittel |
 | **B-5** | **Grain-Overlay** + Aktiv-Punkt-Nav + Oneline-Icon-Audit | S | Mittel |
 | **B-6** | **Logomark + Header-Illustration** finalisieren (aus §5.0/§10) → saubere **SVGs** (Layered-Ridges-Header, Höhenlinien-Mark), Favicon, Lockup; `/kit` „Brand"-Sektion | M | Mittel |
-| **B-7** | **DESIGN.md-Resync**: warme Paper-&-Ink-Werte + Mono-Rolle in Frontmatter spiegeln | S (Doku) | Konsistenz |
+| **B-7** | **Doc-Konsolidierung** (5→2): DESIGN/color/typography in dieses Dokument gefoldet; `globals.css` = Token-Quelle | S (Doku) | Konsistenz |
 
 **Gate je Schnitt:** Tokens via `var(--…)`; Orange nur „wir/CTA"; `/kit` zeigt den Zustand;
 `npm run check` + `build:web` grün; A11y (Kontrast, Fokus, `reduced-motion`).

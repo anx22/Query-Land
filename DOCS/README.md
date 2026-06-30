@@ -12,8 +12,7 @@ specs/   14 Child-Specs           ← verfeinern Module/Querschichten; Master ge
 architecture/ ai-layer-aeo · authority-backlinks · reporting-alerts ← tiefe, implementierte Modul-Docs
 prompts/ codex-prompts.md         ← Basis-Prompt-Muster + Wellen-Übersicht
 openapi/ internal-api.yaml        ← API-Vertrag (~66 Pfade); UI + Agent/MCP teilen den Kern
-design/  DESIGN.md                ← Brand-System Token-Quelle „Editorial Tech" (Farben, Typo, Layout)
-         brand-identity.md        ← ★ Brand Identity & Design Directions (Signatur, „New Horizon", Roadmap)
+design/  brand-identity.md        ← ★ einzige Brand-&-Design-Quelle (Marke, Farbe, Typo, „New Horizon", Komponenten, Roadmap). Token-Quelle: apps/web/src/app/globals.css
          ux-ui-sprint.md          ← UX-Sprint-Spec (UX-0–UX-9, DoD, Komponenten)
 tasks/   roadmap.md               ← ★ aktive, konsolidierte Planungsquelle (Status + GAPs)
          parallel-execution-plan.md ← ★ paralleler Umsetzungsplan der offenen Punkte
