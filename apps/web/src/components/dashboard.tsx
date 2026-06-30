@@ -89,6 +89,13 @@ function crawlStatusLabel(status: string): string {
   return status;
 }
 
+function crawlTriggerLabel(trigger: string): string {
+  if (trigger === "manual") return "manuell";
+  if (trigger === "scheduled") return "geplant";
+  if (trigger === "deploy") return "Deployment";
+  return trigger;
+}
+
 function crawlStatusClass(status: string): string {
   if (status === "succeeded") return "succeeded";
   if (status === "running") return "running";
@@ -124,14 +131,14 @@ export function Dashboard({ data }: { data: OverviewData }) {
   if (connected && !project) {
     return (
       <section className="card overview-cockpit-empty">
-        <p className="kicker">Übersicht · Kein Projekt</p>
-        <h1>Die Übersicht ist das Cockpit Ihres Projekts</h1>
+        <p className="kicker">Übersicht · Keine Website</p>
+        <h1>Die Übersicht ist das Cockpit Ihrer Website</h1>
         <p className="muted">
-          Ein Projekt ist die Klammer über allen Analysen. Legen Sie zuerst ein Projekt an —
-          danach füllt sich diese Übersicht mit Sichtbarkeit, Health Score und Chancen.
+          Legen Sie zuerst eine Website an — danach füllt sich diese Übersicht mit Sichtbarkeit,
+          Health Score und Chancen.
         </p>
         <a className="button" href="/projects">
-          Projekt anlegen
+          Website hinzufügen
         </a>
       </section>
     );
@@ -414,7 +421,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
               {recentCrawlRuns.map((run) => (
                 <li key={run.id}>
                   <span>
-                    {run.trigger} · {formatDate(run.startedAt)}
+                    {crawlTriggerLabel(run.trigger)} · {formatDate(run.startedAt)}
                     {run.summary.discoveredUrls > 0 && (
                       <> · {run.summary.discoveredUrls} {run.summary.discoveredUrls === 1 ? "URL" : "URLs"}</>
                     )}

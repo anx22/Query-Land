@@ -5,7 +5,7 @@ import { friendlyActionError } from "../../lib/action-errors";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACTIVE_PROJECT_COOKIE, ACTIVE_SITE_COOKIE } from "../../lib/active-project-cookie";
-import { createFoundationProject, createFoundationSite } from "../../lib/foundation-api";
+import { createFoundationProject, createFoundationSite, deleteFoundationProject } from "../../lib/foundation-api";
 
 const COOKIE_OPTIONS = { path: "/", maxAge: 31536000, sameSite: "lax" as const };
 
@@ -19,6 +19,24 @@ export async function setActiveProjectAction(formData: FormData) {
   revalidateProjectViews();
   // "Open" a website → land on its overview cockpit.
   redirect("/");
+}
+
+/** Permanently delete a website (= project) and all its analysis data. */
+export async function deleteWebsiteAction(formData: FormData) {
+  try {
+    const projectId = requiredString(formData, "projectId");
+    await deleteFoundationProject(projectId);
+    const cookieStore = await cookies();
+    // If the deleted website was the active one, clear the context so the app rebinds cleanly.
+    if (cookieStore.get(ACTIVE_PROJECT_COOKIE)?.value === projectId) {
+      cookieStore.delete(ACTIVE_PROJECT_COOKIE);
+      cookieStore.delete(ACTIVE_SITE_COOKIE);
+    }
+  } catch (error) {
+    redirect(`/projects?error=${encodeURIComponent(messageFor(error))}`);
+  }
+  revalidateProjectViews();
+  redirect("/projects?deleted=1");
 }
 
 

@@ -85,5 +85,11 @@ async function routeTopLevel(store: AppStore, method: string, pathname: string, 
     return json(201, { data: await store.createProject(createProjectRequest(body)) });
   }
 
+  const projectDeleteMatch = /^\/projects\/([^/]+)$/.exec(pathname);
+  if (method === "DELETE" && projectDeleteMatch) {
+    await store.deleteProject(decodeURIComponent(projectDeleteMatch[1]));
+    return json(200, { data: { deleted: true } });
+  }
+
   return routeProjectChildren(store, method, pathname, searchParams, body, requestId, context);
 }

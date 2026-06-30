@@ -55,6 +55,7 @@ export interface WebVitalMetric {
 export interface ProjectStore {
   listProjects(): Promise<Project[]>;
   createProject(input: Partial<Project>): Promise<Project>;
+  deleteProject(projectId: string): Promise<void>;
   listSites(projectId: string): Promise<Site[]>;
   createSite(projectId: string, input: Partial<Site>): Promise<Site>;
   listIntegrations(): Promise<IntegrationStatusView[]>;
@@ -98,6 +99,17 @@ class SQLiteProjectStore implements ProjectStore {
     }
     await this.audit("system", "project.create", "project", project.id, { slug: project.slug });
     return project;
+  }
+
+  async deleteProject(projectId: string): Promise<void> {
+    const existing = await this.db.prepare(`SELECT id FROM projects WHERE id = ?`).get(projectId);
+    if (!existing) {
+      throw new RequestError(404, "unknown_project", "Project not found");
+    }
+    // All child tables reference projects with ON DELETE CASCADE, so a single delete removes
+    // the website and every dependent row (sites, crawls, keywords, opportunities, reports …).
+    await this.db.prepare(`DELETE FROM projects WHERE id = ?`).run(projectId);
+    await this.audit("system", "project.delete", "project", projectId, {});
   }
 
   async listSites(projectId: string): Promise<Site[]> {

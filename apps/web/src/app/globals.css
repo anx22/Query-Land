@@ -497,6 +497,34 @@ p {
   color: var(--ink);
 }
 
+.button.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+/* "Danger zone" delete disclosure on a website card — deliberately understated and
+   tucked behind a summary so destructive deletion is never a one-click accident. */
+.danger-zone {
+  margin-top: var(--space-3, 0.75rem);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3, 0.75rem);
+}
+.danger-zone__summary {
+  cursor: pointer;
+  color: var(--danger);
+  font-size: 0.85rem;
+  list-style: none;
+}
+.danger-zone__summary::-webkit-details-marker {
+  display: none;
+}
+.danger-zone__warn {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.6rem 0;
+}
+
 /* Full-width variant for form submits / primary card actions. Replaces the old
    implicit "stretches in a form-card but not in a grid" inconsistency. */
 .button--block {

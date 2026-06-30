@@ -235,6 +235,38 @@ test("backend auth registers, logs in and resolves bearer session", async () => 
   await store.close();
 });
 
+test("DELETE /projects/:id removes the project and cascades to its children", async () => {
+  const { app, store } = await testApp();
+
+  const created = await app("POST", "/projects", { name: "Wegwerf", slug: "wegwerf", status: "active", defaultLocale: "de-DE" });
+  assert.equal(created.status, 201);
+  const projectId = (created.body as { data: { id: string } }).data.id;
+
+  const site = await app("POST", `/projects/${projectId}/sites`, { baseUrl: "https://wegwerf.example/", scopeType: "domain", crawlFrequency: "weekly", businessValue: 50 });
+  assert.equal(site.status, 201);
+  const siteId = (site.body as { data: { id: string } }).data.id;
+
+  const del = await app("DELETE", `/projects/${projectId}`);
+  assert.equal(del.status, 200);
+  assert.deepEqual((del.body as { data: unknown }).data, { deleted: true });
+
+  // Project is gone from the listing …
+  const list = await app("GET", "/projects");
+  const ids = (list.body as { data: Array<{ id: string }> }).data.map((p) => p.id);
+  assert.ok(!ids.includes(projectId), "deleted project must not be listed");
+
+  // … and its child site cascaded away (listing sites returns empty, not the old row).
+  const sites = await app("GET", `/projects/${projectId}/sites`);
+  const siteIds = (sites.body as { data: Array<{ id: string }> }).data.map((s) => s.id);
+  assert.ok(!siteIds.includes(siteId), "child site must cascade-delete with the project");
+
+  // Deleting again is a clean 404 (no silent success).
+  const again = await app("DELETE", `/projects/${projectId}`);
+  assert.equal(again.status, 404);
+
+  await store.close();
+});
+
 test("API errors use stable code/message/requestId format", async () => {
   const { app, store } = await testApp();
   const validation = await app("POST", "/projects", { name: "Invalid Slug", slug: "Invalid Slug" }, { headers: { "x-request-id": "req-test" } });

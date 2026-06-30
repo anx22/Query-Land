@@ -38,6 +38,7 @@ import {
   formatDelta,
   hasCompleteSelection,
   runOptionLabel,
+  crawlTriggerLabel,
   severityBadgeTone,
   severityLabel,
   type FormattedDelta,
@@ -570,7 +571,7 @@ export default async function Page({
               <div className="audit-run" key={run.id}>
                 <div className="audit-run__meta">
                   <span className="audit-run__when">
-                    {new Date(run.startedAt).toLocaleString("de-DE")} · {run.trigger}
+                    {new Date(run.startedAt).toLocaleString("de-DE")} · {crawlTriggerLabel(run.trigger)}
                   </span>
                   <span className="audit-run__detail">
                     {run.summary.discoveredUrls.toLocaleString("de-DE")} URLs entdeckt ·{" "}

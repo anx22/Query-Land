@@ -1,6 +1,6 @@
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
-import { createSiteAction, createWebsiteAction, setActiveProjectAction } from "./actions";
+import { createSiteAction, createWebsiteAction, deleteWebsiteAction, setActiveProjectAction } from "./actions";
 import { loadProjectControlData } from "../../lib/foundation-api";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const data = await loadProjectControlData();
   const hasProjects = data.projects.length > 0;
   const activeProjectId = (data.selectedProject ?? data.projects[0])?.id ?? null;
-  const feedback = feedbackMessage(params?.created, params?.error);
+  const feedback = feedbackMessage(params?.created, params?.error, params?.deleted);
 
   return (
     <AppShell activePath="/projects">
@@ -88,6 +88,21 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <button className="button" type="submit" disabled={!data.connected}>Adresse speichern</button>
                   </form>
                 )}
+
+                {/* Deliberately tucked behind a disclosure so deletion is never a one-click accident. */}
+                <details className="danger-zone">
+                  <summary className="danger-zone__summary">Website entfernen</summary>
+                  <p className="danger-zone__warn">
+                    Entfernt <strong>{project.name}</strong> und alle zugehörigen Daten (Analysen, Keywords,
+                    Chancen, Berichte) unwiderruflich.
+                  </p>
+                  <form action={deleteWebsiteAction}>
+                    <input type="hidden" name="projectId" value={project.id} />
+                    <button className="button danger" type="submit" disabled={!data.connected}>
+                      Endgültig löschen
+                    </button>
+                  </form>
+                </details>
               </article>
             );
           })}
@@ -158,9 +173,11 @@ function addWebsiteForm({ connected, autoFocus }: { connected: boolean; autoFocu
 function feedbackMessage(
   created: string | string[] | undefined,
   error: string | string[] | undefined,
+  deleted: string | string[] | undefined,
 ): { kind: "success" | "danger"; message: string; cta?: { href: string; label: string } } | null {
   const errorValue = Array.isArray(error) ? error[0] : error;
   if (errorValue) return { kind: "danger", message: errorValue };
+  if (Array.isArray(deleted) ? deleted[0] : deleted) return { kind: "success", message: "Website entfernt." };
   const createdValue = Array.isArray(created) ? created[0] : created;
   const startAnalysis = { href: "/technical-audit#crawl-start", label: "Erste Analyse starten →" };
   if (createdValue === "website") return { kind: "success", message: "Website hinzugefügt und aktiviert.", cta: startAnalysis };

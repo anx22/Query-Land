@@ -25,7 +25,7 @@ import {
 } from "../board-logic";
 import { intentLabel } from "../../features/keyword-rank/keyword-logic";
 import { RULE_LABEL, ruleLabel } from "../../features/technical-audit/issue-labels";
-import { severityLabel } from "../../features/technical-audit/crawl-diff";
+import { severityLabel, crawlTriggerLabel } from "../../features/technical-audit/crawl-diff";
 import {
   aeoCheckLabel,
   citationStatusLabel,
@@ -44,6 +44,7 @@ import {
 const AUDIT_SEVERITIES = ["critical", "high", "medium", "low"] as const;
 const CITATION_STATUSES = ["cited", "mentioned", "absent", "none"] as const;
 const AEO_CHECKS = ["h1", "structured_data", "question_heading", "list", "concise_answer"] as const;
+const CRAWL_TRIGGERS = ["manual", "scheduled", "deploy"] as const;
 
 const CASES: Array<{ name: string; values: readonly string[]; label: (v: string) => string }> = [
   { name: "OpportunityStatus", values: BOARD_STATUSES, label: (v) => opportunityStatusLabel(v as never) },
@@ -59,6 +60,7 @@ const CASES: Array<{ name: string; values: readonly string[]; label: (v: string)
   { name: "ProposalKind", values: PROPOSAL_KINDS, label: (v) => proposalKindLabel(v as never) },
   { name: "ProposalStatus", values: PROPOSAL_STATUSES, label: (v) => proposalStatusLabel(v as never) },
   { name: "AeoCheck", values: AEO_CHECKS, label: (v) => aeoCheckLabel(v) },
+  { name: "CrawlTrigger", values: CRAWL_TRIGGERS, label: (v) => crawlTriggerLabel(v) },
 ];
 
 describe("guard: every domain enum value has a non-raw German label", () => {

@@ -88,7 +88,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}
         {data.connected && !data.selectedProject ? (
-          <p className="notice">Kein Projekt ausgewählt. Legen Sie zuerst ein Projekt an, um Reports zu erzeugen.</p>
+          <p className="notice">Keine Website ausgewählt. Legen Sie zuerst eine Website an, um Berichte zu erzeugen.</p>
         ) : null}
         <div className="action-row">
           <form action={generateReportAction}>
