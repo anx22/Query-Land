@@ -44,6 +44,9 @@ async function KeywordsRankBody({
   const feedback = feedbackMessage(params);
 
   const brandCount = data.rows.filter((r) => r.brand).length;
+  // Two-mode: until the project actually has keywords, the KPI grid / charts / table are all empty
+  // shells. Hide them and lead with the "Keywords hinzufügen" form — the single real next step.
+  const hasKeywords = data.totalKeywords > 0;
   // A Visibility-Index computed over zero ranked keywords is a meaningless 0 — treat it as "no data".
   const hasVisibility = data.latestVisibility != null && data.latestVisibility.trackedKeywords > 0;
   const visScore = hasVisibility ? data.latestVisibility!.score : undefined;
@@ -74,24 +77,28 @@ async function KeywordsRankBody({
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}
-        <div className="action-row">
-          <div className="locked-action">
-            <form action={computeVisibilityAction}>
-              <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
-              <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
-                Visibility neu berechnen
-              </button>
-            </form>
-            {!data.connected || !data.project ? (
-              <span className="locked-action__reason">
-                <Icon name="lock" />
-                {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
-              </span>
-            ) : null}
+        {hasKeywords && (
+          <div className="action-row">
+            <div className="locked-action">
+              <form action={computeVisibilityAction}>
+                <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
+                <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+                  Visibility neu berechnen
+                </button>
+              </form>
+              {!data.connected || !data.project ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
+      {hasKeywords && (
+      <>
       <section className="metric-grid">
         <MetricCard
           label="Visibility-Index"
@@ -152,8 +159,11 @@ async function KeywordsRankBody({
 
       {/* Interactive keyword table + FilterBar + Inspector */}
       <KeywordTableClient rows={data.rows} inspectors={data.inspectors} />
+      </>
+      )}
 
-      {/* Curation forms (reframed in voice) */}
+      {/* Curation forms (reframed in voice) — always visible; in the empty state these ARE the
+          primary next step, so they lead directly below the hero. */}
       <section className="content-grid">
         <div className="card">
           <p className="kicker">Keywords hinzufügen</p>

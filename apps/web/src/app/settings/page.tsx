@@ -30,23 +30,26 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const data = await loadFoundationDashboardData();
   const selectedProject = data.selectedProject;
   const feedback = feedbackMessage(params);
+  // The status pill renders its `status` string verbatim, so it must already be German — the raw
+  // enum ("connected"/"queued"/"empty") must never reach the UI. The label carries the name only;
+  // the pill carries the (German) state.
   const connectorItems = data.integrations.length > 0
     ? data.integrations.map((integration) => ({
       id: integration.id,
-      label: `${providerLabel(integration.provider)} · ${connectorStatusLabel(integration.status)}`,
-      status: integration.status,
+      label: providerLabel(integration.provider),
+      status: connectorStatusLabel(integration.status),
       statusClassName: `status ${integration.status}`
     }))
-    : [{ id: "connector-empty", label: "Noch keine Datenquelle verbunden", status: "empty", statusClassName: "status empty" }];
+    : [{ id: "connector-empty", label: "Noch keine Datenquelle verbunden", status: "leer", statusClassName: "status empty" }];
   const connectorJobs = data.jobs.filter((job) => job.type === "connector_sync");
   const jobItems = connectorJobs.length > 0
     ? connectorJobs.map((job) => ({
       id: job.id,
       label: `${providerLabel(job.subject)} — Datenabgleich`,
-      status: job.status,
+      status: jobStatusLabel(job.status),
       statusClassName: `status ${job.status}`
     }))
-    : [{ id: "job-empty", label: "Noch kein Datenabgleich geplant", status: "empty", statusClassName: "status empty" }];
+    : [{ id: "job-empty", label: "Noch kein Datenabgleich geplant", status: "leer", statusClassName: "status empty" }];
 
   return (
     <AppShell activePath="/settings">
@@ -253,6 +256,15 @@ function connectorStatusLabel(status: string): string {
   if (status === "connected") return "verbunden";
   if (status === "degraded") return "eingeschränkt";
   if (status === "error") return "Fehler — bitte neu verbinden";
+  return status;
+}
+
+function jobStatusLabel(status: string): string {
+  if (status === "queued") return "geplant";
+  if (status === "running") return "läuft";
+  if (status === "succeeded") return "erledigt";
+  if (status === "failed") return "fehlgeschlagen";
+  if (status === "canceled" || status === "cancelled") return "abgebrochen";
   return status;
 }
 

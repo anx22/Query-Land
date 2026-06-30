@@ -39,10 +39,16 @@ export async function AppShell({
       />
       <main className="main">
         <header className="topbar">
-          <ContextBar
-            projectName={foundation.selectedProject?.name ?? null}
-            siteBaseUrl={foundation.selectedSite?.baseUrl ?? null}
-          />
+          {/* The "you are here" crumb is meaningless on the login screen — and showing
+              "Keine Website — zuerst hinzufügen" there contradicts the actual next step (sign in). */}
+          {activePath === "/login" ? (
+            <span />
+          ) : (
+            <ContextBar
+              projectName={foundation.selectedProject?.name ?? null}
+              siteBaseUrl={foundation.selectedSite?.baseUrl ?? null}
+            />
+          )}
           <div className="topbar__controls">
             {currentUser ? (
               <form action={logoutAction} className="cluster">
