@@ -38,7 +38,8 @@ export const moduleRoutes = [
   { label: "Backlinks", path: "/backlinks", icon: "link", description: "Verweisende Domains, Link-Aufbau und Authority-Entwicklung im Zeitverlauf.", status: "active", plannedWave: 5, section: "Wachstum", tier: "advanced", dataStatus: "live" },
   { label: "Reports", path: "/reports", icon: "description", description: "Regelmäßige Berichte, automatische Lieferungen und Schwellwert-Alarme.", status: "active", plannedWave: 6, section: "Wachstum", tier: "advanced", dataStatus: "live" },
   { label: "KI-Sichtbarkeit", path: "/ai-visibility", icon: "auto_awesome", description: "Ob die eigene Domain in KI-Antworten zitiert wird — Prompts, Citations und AEO-Bewertung.", status: "active", plannedWave: 7, section: "Erweitert", tier: "advanced", dataStatus: "live" },
-  { label: "Einstellungen", path: "/settings", icon: "settings", description: "Connectors, Datenquellen und Projekt-Konfiguration.", status: "active", plannedWave: 1, section: "System", tier: "basic", dataStatus: "live" }
+  { label: "Einstellungen", path: "/settings", icon: "settings", description: "Connectors, Datenquellen und Projekt-Konfiguration.", status: "active", plannedWave: 1, section: "System", tier: "basic", dataStatus: "live" },
+  { label: "Glossar", path: "/glossar", icon: "info", description: "Alle Fachbegriffe einfach erklärt — von Backlink bis Visibility-Index, mit der A–E-Konfidenzskala.", status: "active", plannedWave: 1, section: "System", tier: "basic", dataStatus: "live" }
 ] as const satisfies readonly ModuleRoute[];
 
 export type ModulePath = (typeof moduleRoutes)[number]["path"];

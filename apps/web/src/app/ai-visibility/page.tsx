@@ -145,23 +145,25 @@ export default async function Page({
             (● zitiert · ◐ erwähnt · ○ nicht zitiert · – noch nicht geprüft). KI-Signal, kein Beleg.
           </p>
 
-          <form action={createPromptAction} className="form-row">
+          <form action={createPromptAction} className="form-card">
             <input type="hidden" name="projectId" value={projectId} />
-            <label>
-              Prompt
-              <input
-                type="text"
-                name="prompt"
-                placeholder="z. B. Beste SEO-Tools für kleine Unternehmen"
-                required
-              />
-            </label>
-            <label>
-              Markt (optional)
-              <input type="text" name="market" placeholder="z. B. de, en-US" />
-            </label>
+            <div className="form-row">
+              <label>
+                Frage (Prompt)
+                <input
+                  type="text"
+                  name="prompt"
+                  placeholder="z. B. Beste SEO-Tools für kleine Unternehmen"
+                  required
+                />
+              </label>
+              <label>
+                Markt (optional)
+                <input type="text" name="market" placeholder="z. B. de, en-US" />
+              </label>
+            </div>
             <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
-              Prompt aufnehmen
+              Frage aufnehmen
             </button>
           </form>
 
@@ -207,7 +209,7 @@ export default async function Page({
           </p>
 
           {data.selectedSite ? (
-            <form action={scanAeoAction}>
+            <form action={scanAeoAction} className="form-card">
               <input type="hidden" name="projectId" value={projectId} />
               <input type="hidden" name="siteId" value={data.selectedSite.id} />
               <div className="form-row">
@@ -275,7 +277,7 @@ export default async function Page({
             erst nach manueller Prüfung aktiviert — nichts wird automatisch produktiv geändert.
           </p>
 
-          <form action={createProposalAction}>
+          <form action={createProposalAction} className="form-card">
             <input type="hidden" name="projectId" value={projectId} />
             <div className="form-row">
               <label>
@@ -290,15 +292,15 @@ export default async function Page({
               </label>
               <label>
                 Titel
-                <input type="text" name="title" placeholder="Kurzbeschreibung des Proposals" required />
+                <input type="text" name="title" placeholder="Kurzbeschreibung des Vorschlags" required />
               </label>
             </div>
             <label>
               Beschreibung
-              <textarea name="body" rows={3} placeholder="Detaillierte Beschreibung des Proposals…" required />
+              <textarea name="body" rows={3} placeholder="Detaillierte Beschreibung des Vorschlags…" required />
             </label>
             <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
-              Proposal erstellen
+              Vorschlag erstellen
             </button>
           </form>
 

@@ -112,7 +112,8 @@ export default async function Page({
           title="Noch keine Optimierungschancen"
           text="Priorisierte Chancen mit Wirkung-/Aufwand-Matrix und Maßnahmen entstehen aus Ihrer Analyse. Starten Sie zuerst eine Analyse Ihrer Website."
           ctaHref="/technical-audit#crawl-start"
-          ctaLabel="Zur Analyse →"
+          ctaLabel="Analyse starten →"
+          ctaVariant="secondary"
         />
       ) : (
         <>
