@@ -1141,6 +1141,41 @@ paths:
                     type: object
         '404':
           description: No SERP snapshots
+  /projects/{projectId}/rank-snapshots/latest:
+    get:
+      summary: Latest rank snapshot position per keyword for a project (one bulk query)
+      operationId: latestKeywordPositions
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest position per keyword
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        keywordId:
+                          type: string
+                        position:
+                          type: integer
+                          nullable: true
+                        capturedAt:
+                          type: string
   /projects/{projectId}/visibility:
     get:
       summary: List visibility score history for a project

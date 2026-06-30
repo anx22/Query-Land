@@ -63,6 +63,27 @@ test("recording a rank snapshot persists a SERP + rank with history (empty until
   }
 });
 
+test("rank-snapshots/latest returns one latest position per keyword in a single call", async () => {
+  const { app, store } = await testApp();
+  try {
+    const { projectId, keywordId } = await projectWithKeyword(app, "latest");
+    // No snapshots yet -> empty list.
+    const empty = data<unknown[]>(await app("GET", `/projects/${projectId}/rank-snapshots/latest`));
+    assert.equal(empty.length, 0);
+
+    // Record two snapshots for the same keyword; the bulk endpoint must collapse to the latest one.
+    await app("POST", `/projects/${projectId}/keywords/${keywordId}/rank-snapshots`, {});
+    await app("POST", `/projects/${projectId}/keywords/${keywordId}/rank-snapshots`, {});
+    const latest = data<Array<{ keywordId: string; capturedAt: string }>>(
+      await app("GET", `/projects/${projectId}/rank-snapshots/latest`)
+    );
+    assert.equal(latest.length, 1, "one row per keyword regardless of history depth");
+    assert.equal(latest[0].keywordId, keywordId);
+  } finally {
+    await store.close();
+  }
+});
+
 test("serp-diff requires at least one snapshot", async () => {
   const { app, store } = await testApp();
   try {
