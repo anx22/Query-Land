@@ -50,7 +50,10 @@ export default async function Page({
     }),
   );
 
-  const score = data.visibility?.score ?? null;
+  // A score computed over zero tracked prompts is a meaningless 0 — a red "0 %" gauge reads as an
+  // error rather than "not measured yet". Only treat it as a real value when prompts were measured.
+  const hasAiScore = data.visibility != null && data.visibility.prompts > 0;
+  const score = hasAiScore ? data.visibility!.score : null;
 
   return (
     <AppShell activePath="/ai-visibility">

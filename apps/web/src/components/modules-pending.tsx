@@ -24,6 +24,9 @@ export interface ModulesPendingProps {
   ctaDisabled?: boolean;
   /** Reason shown under a disabled CTA. */
   disabledReason?: string;
+  /** CTA emphasis. "primary" (filled, default) or "secondary" (outline) — use secondary
+   *  when this panel's action is a soft "next step" rather than THE one orange CTA on screen. */
+  ctaVariant?: "primary" | "secondary";
 }
 
 export function ModulesPending({
@@ -34,6 +37,7 @@ export function ModulesPending({
   icon = "description",
   ctaDisabled = false,
   disabledReason,
+  ctaVariant = "primary",
 }: ModulesPendingProps) {
   return (
     <section className="card modules-pending" aria-label={title}>
@@ -53,7 +57,7 @@ export function ModulesPending({
           ) : null}
         </div>
       ) : (
-        <a className="button" href={ctaHref}>{ctaLabel}</a>
+        <a className={ctaVariant === "secondary" ? "button secondary" : "button"} href={ctaHref}>{ctaLabel}</a>
       )}
     </section>
   );

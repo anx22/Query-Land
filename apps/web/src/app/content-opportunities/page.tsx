@@ -49,7 +49,6 @@ export default async function Page({
     hasCrawl: data.hasCrawl,
   };
   const heroLock = actionLock(readiness, ["project", "site", "crawl"]);
-  const lockReason = !data.connected ? "Daten momentan nicht erreichbar." : heroLock.reason;
   const heroDisabled = !data.connected || heroLock.locked;
 
   return (
@@ -72,40 +71,39 @@ export default async function Page({
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}
-        <div className="action-row">
-          <div className="locked-action">
-            <form action={generateOpportunitiesAction}>
-              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-              <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-              <button className="button" type="submit" disabled={heroDisabled}>
-                Alle Optimierungschancen erzeugen
-              </button>
-            </form>
+        {/* Only show the generate/sync actions once an analysis exists. Before that the readiness
+            banner + the ModulesPending panel below carry the single "go analyse" next step — no row
+            of disabled buttons. */}
+        {!heroDisabled && (
+          <div className="action-row">
             <div className="locked-action">
-              <form action={syncSearchPerformanceAction}>
+              <form action={generateOpportunitiesAction}>
                 <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
                 <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-                <button className="button secondary" type="submit" disabled={heroDisabled || !data.hasIntegration}>
-                  Search Performance synchronisieren
+                <button className="button" type="submit">
+                  Alle Optimierungschancen erzeugen
                 </button>
               </form>
-              {/* Search-Performance sync pulls clicks/impressions from GSC — without a connected source it
-                  would do nothing, so gate it honestly instead of offering a silent no-op. */}
-              {!heroDisabled && !data.hasIntegration ? (
-                <span className="locked-action__reason">
-                  <Icon name="lock" />
-                  Zuerst Google Search Console verbinden — dann liefert die Synchronisierung echte Klick- und Ranking-Daten.
-                </span>
-              ) : null}
+              <div className="locked-action">
+                <form action={syncSearchPerformanceAction}>
+                  <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+                  <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+                  <button className="button secondary" type="submit" disabled={!data.hasIntegration}>
+                    Search Performance synchronisieren
+                  </button>
+                </form>
+                {/* Search-Performance sync pulls clicks/impressions from GSC — without a connected source it
+                    would do nothing, so gate it honestly instead of offering a silent no-op. */}
+                {!data.hasIntegration ? (
+                  <span className="locked-action__reason">
+                    <Icon name="lock" />
+                    Zuerst Google Search Console verbinden — dann liefert die Synchronisierung echte Klick- und Ranking-Daten.
+                  </span>
+                ) : null}
+              </div>
             </div>
-            {heroDisabled && lockReason ? (
-              <span className="locked-action__reason">
-                <Icon name="lock" />
-                {lockReason}
-              </span>
-            ) : null}
           </div>
-        </div>
+        )}
       </section>
 
       {opportunities.length === 0 ? (
@@ -113,10 +111,8 @@ export default async function Page({
           icon="lightbulb"
           title="Noch keine Optimierungschancen"
           text="Priorisierte Chancen mit Wirkung-/Aufwand-Matrix und Maßnahmen entstehen aus Ihrer Analyse. Starten Sie zuerst eine Analyse Ihrer Website."
-          ctaHref={heroDisabled ? "#" : "/technical-audit#crawl-start"}
-          ctaLabel="Analyse starten →"
-          ctaDisabled={heroDisabled}
-          disabledReason={lockReason ?? undefined}
+          ctaHref="/technical-audit#crawl-start"
+          ctaLabel="Zur Analyse →"
         />
       ) : (
         <>

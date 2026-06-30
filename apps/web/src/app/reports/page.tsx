@@ -55,6 +55,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const triggeredCount = countTriggered(data.alertEvents);
   const projectId = data.selectedProject?.id ?? "";
   const disabled = !data.connected || !data.selectedProject;
+  // Two-mode: a 4-card "0 / 0 / 0 / 0" grid on a fresh project is pure noise. Show the KPI grid only
+  // once at least one report, schedule or alert rule exists. The create form + the inventory cards
+  // below (each with its own empty state) carry the first-run flow.
+  const hasReportingData =
+    data.reports.length > 0 || data.schedules.length > 0 || data.alertRules.length > 0;
 
   // Build a per-metric chart model from rules + events (metric vs. threshold).
   const alertMetrics = metricsFromRules(data.alertRules);
@@ -116,7 +121,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </div>
       </section>
 
-      {/* Metric grid */}
+      {/* Metric grid — only once there is something to count (see hasReportingData). */}
+      {hasReportingData && (
       <section className="metric-grid">
         <MetricCard
           label="Berichte"
@@ -143,6 +149,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           note={`von ${data.alertEvents.length} geprüften Messungen`}
         />
       </section>
+      )}
 
       {/* Reports inventory */}
       <section className="card">
@@ -190,7 +197,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           </div>
         ) : (
           <div className="reports-empty">
-            <span className="reports-empty__glyph" aria-hidden="true">🗺️</span>
+            <span className="reports-empty__glyph" aria-hidden="true"><Icon name="description" /></span>
             <strong className="reports-empty__title">Noch kein Report vorhanden</strong>
             <span>Erstellen Sie oben den ersten Bericht, um den Stand Ihrer Sichtbarkeit festzuhalten.</span>
           </div>

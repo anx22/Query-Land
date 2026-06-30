@@ -69,4 +69,22 @@ describe("guard: forbidden user-facing copy is absent from the UI layer", () => 
       expect(hits, `"${phrase}" found in UI markup at:\n${hits.join("\n")}`).toEqual([]);
     });
   }
+
+  // Pictographic emoji (🗺️ 💡 🚀 …) keep creeping back into copy/empty-states. The design system
+  // uses the line-`Icon` component for all glyphs, never colour emoji. This scans the high Unicode
+  // plane (U+1F000–U+1FAFF) so arrows (→), dashes (—) and typographic quotes never false-positive.
+  const EMOJI = /[\u{1F000}-\u{1FAFF}]/u;
+  it("never renders pictographic emoji (use the Icon component instead)", () => {
+    const hits: string[] = [];
+    for (const file of files) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, i) => {
+        if (!isCommentLine(line)) {
+          const m = line.match(EMOJI);
+          if (m) hits.push(`${file.replace(SRC, "src")}:${i + 1} → ${m[0]}`);
+        }
+      });
+    }
+    expect(hits, `emoji found in UI markup at:\n${hits.join("\n")}`).toEqual([]);
+  });
 });

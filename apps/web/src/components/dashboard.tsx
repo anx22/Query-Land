@@ -189,6 +189,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
           text="Ihre Kennzahlen, der Sichtbarkeits-Verlauf und priorisierte Chancen erscheinen hier, sobald Sie die erste Analyse gestartet haben."
           ctaHref="/technical-audit#crawl-start"
           ctaLabel="Analyse starten →"
+          ctaVariant="secondary"
         />
       )}
 
