@@ -273,13 +273,13 @@ select {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-position: right center;
-  background-size: cover;
+  background-position: center top;
+  background-size: 100% auto;
   background-repeat: no-repeat;
   mix-blend-mode: multiply;
   opacity: 0.85;
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 30%, rgba(0, 0, 0, 0.6) 56%, #000 95%);
-  mask-image: linear-gradient(to right, transparent 0%, transparent 30%, rgba(0, 0, 0, 0.6) 56%, #000 95%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.8) 45%, rgba(0, 0, 0, 0.3) 75%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.8) 45%, rgba(0, 0, 0, 0.3) 75%, transparent 100%);
 }
 
 @media (max-width: 980px) {
@@ -1059,20 +1059,21 @@ select:disabled {
   border-bottom: 1px solid var(--line);
 }
 
-/* Topographic band — prominent, spanning the header; the orange contour ring  */
-/* sits upper-right, lines flow behind the headline (subtle on the far left).   */
+/* Topographic band — broad/dense at the TOP edge, tapering ("auslaufend") down.  */
+/* Full width, anchored top; vertical fade so the contours run out toward the     */
+/* cards below. (Assets are vertically flipped so the dense edge sits at top.)     */
 .overview-header__art {
   position: absolute;
-  inset: -20% -2% -10% 0;
+  inset: 0;
   background-image: url("/brand/overview-header.jpg");
   background-repeat: no-repeat;
-  background-position: right top;
-  background-size: cover;
+  background-position: center top;
+  background-size: 100% auto;
   mix-blend-mode: multiply;
-  opacity: 0.92;
+  opacity: 0.9;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.25) 24%, rgba(0, 0, 0, 0.7) 48%, #000 100%);
-  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.25) 24%, rgba(0, 0, 0, 0.7) 48%, #000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.85) 42%, rgba(0, 0, 0, 0.35) 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.85) 42%, rgba(0, 0, 0, 0.35) 72%, transparent 100%);
 }
 
 .overview-header__inner {
