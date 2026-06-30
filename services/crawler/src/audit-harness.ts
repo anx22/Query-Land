@@ -204,6 +204,35 @@ const SCENARIOS: Scenario[] = [
     ]
   },
   {
+    name: "robots_wildcard_disallow",
+    description: "robots.txt wildcard pattern (Disallow: /*.pdf$) blocks matching URLs.",
+    fetch: (url) => {
+      if (url.endsWith("/robots.txt")) return robotsTxt("User-agent: *\nDisallow: /*.pdf$\n");
+      if (url.endsWith("/sitemap.xml")) return xml("<urlset><url><loc>https://example.com</loc></url><url><loc>https://example.com/doc.pdf</loc></url></urlset>");
+      return page(pathOf(url));
+    },
+    checks: ({ cycle, fetchLog, assessmentByUrl }) => [
+      expectEq("status", cycle.status, "succeeded"),
+      expectEq("pdf blocked by robots", assessmentByUrl.get("https://example.com/doc.pdf")?.state, "blocked_by_robots"),
+      check("pdf not fetched", !fetchLog.includes("https://example.com/doc.pdf"), `fetchLog=${JSON.stringify(fetchLog)}`)
+    ]
+  },
+  {
+    name: "robots_sitemap_discovery",
+    description: "Sites without /sitemap.xml still expose URLs via robots.txt Sitemap: directives.",
+    fetch: (url) => {
+      if (url.endsWith("/robots.txt")) return robotsTxt("User-agent: *\nAllow: /\nSitemap: https://example.com/sitemaps/pages.xml\n");
+      if (url.endsWith("/sitemap.xml")) return httpStatus(404, "missing"); // no conventional sitemap
+      if (url.endsWith("/sitemaps/pages.xml")) return xml("<urlset><url><loc>https://example.com/from-robots</loc></url></urlset>");
+      return page(pathOf(url));
+    },
+    checks: ({ cycle, fetchLog, discovered }) => [
+      expectEq("status", cycle.status, "succeeded"),
+      check("robots-declared sitemap fetched", fetchLog.includes("https://example.com/sitemaps/pages.xml"), `fetchLog=${JSON.stringify(fetchLog)}`),
+      check("URL from robots sitemap discovered", discovered.some((url) => url.normalizedUrl === "https://example.com/from-robots"), `urls=${JSON.stringify(discovered.map((u) => u.normalizedUrl))}`)
+    ]
+  },
+  {
     name: "nofollow_not_followed_but_audited",
     description: "rel=nofollow link is not followed for discovery but is still checked for breakage.",
     fetch: (url) => {

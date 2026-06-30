@@ -66,9 +66,14 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
       throw new Error(`invalid sitemap: ${sitemapUrl}`);
     }
 
+    // Additionally honour Sitemap: directives from robots.txt — best-effort and
+    // lenient (a missing/garbage one is skipped, never fails the run). This is how
+    // sites without /sitemap.xml still expose their sitemaps.
+    const robotsSitemapDiscovered = await discoverFromRobotsSitemaps({ robotsPolicy, primarySitemapUrl: sitemapUrl, effectiveBase, scopeType, projectId: job.projectId, siteId, options, now });
+
     // --- Seed the frontier: seed URL (depth 0) + in-scope sitemap URLs (depth 0). ---
     const seedDiscovered = createDiscoveredUrl({ projectId: job.projectId, siteId, baseUrl: effectiveBase, url: effectiveBase, source: "seed", depth: 0, discoveredAt: now() });
-    const initial = dedupeByNormalized([seedDiscovered, ...sitemapDiscovered])
+    const initial = dedupeByNormalized([seedDiscovered, ...sitemapDiscovered, ...robotsSitemapDiscovered])
       .filter((url) => isInCrawlScope(url.normalizedUrl, effectiveBase, scopeType));
 
     const known = new Map<string, DiscoveredUrl>();
@@ -193,6 +198,48 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     }
     const completed = await options.apiClient.completeJob(job.id, "failed", errorMessage);
     return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, errorMessage };
+  }
+}
+
+const MAX_ROBOTS_SITEMAPS = 5;
+
+/** Discover page URLs from robots.txt `Sitemap:` directives (in-scope, bounded, lenient). */
+async function discoverFromRobotsSitemaps(input: {
+  robotsPolicy: RobotsPolicy;
+  primarySitemapUrl: string;
+  effectiveBase: string;
+  scopeType: CrawlScopeType;
+  projectId: string;
+  siteId: string;
+  options: CrawlWorkerCycleOptions;
+  now: () => string;
+}): Promise<DiscoveredUrl[]> {
+  const { robotsPolicy, effectiveBase, scopeType, projectId, siteId, options, now } = input;
+  const primary = normalizeCrawlUrl(input.primarySitemapUrl, effectiveBase);
+  const candidates = [...new Set((robotsPolicy.sitemaps ?? []).map((url) => safeNormalize(url, effectiveBase)).filter((url): url is string => url !== null))]
+    .filter((url) => url !== primary && isInCrawlScope(url, effectiveBase, scopeType))
+    .slice(0, MAX_ROBOTS_SITEMAPS);
+
+  const discovered: DiscoveredUrl[] = [];
+  for (const sitemapUrl of candidates) {
+    try {
+      const fetchResult = await fetchUrl({ url: sitemapUrl, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 3, userAgent: options.userAgent ?? DEFAULT_CRAWLER_USER_AGENT, maxBodyBytes: options.maxBodyBytes });
+      const ok = !!fetchResult.statusCode && fetchResult.statusCode >= 200 && fetchResult.statusCode < 300;
+      const sitemapXml = fetchResult.responseBody ?? "";
+      if (!ok || extractSitemapLocations(sitemapXml).length === 0) continue; // lenient: skip missing/garbage
+      discovered.push(...(await discoverUrlsFromSitemapIndex({ projectId, siteId, baseUrl: effectiveBase, sitemapUrl, sitemapXml, discoveredAt: now(), fetchImpl: options.fetchImpl, timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxIndexDepth: options.maxSitemapIndexDepth, maxSitemapFetches: options.maxSitemapFetches })));
+    } catch {
+      // Best-effort: a failing robots-declared sitemap must not fail the crawl.
+    }
+  }
+  return discovered;
+}
+
+function safeNormalize(rawUrl: string, baseUrl: string): string | null {
+  try {
+    return normalizeCrawlUrl(rawUrl, baseUrl);
+  } catch {
+    return null;
   }
 }
 

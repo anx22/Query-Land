@@ -73,6 +73,10 @@ export interface RobotsRule {
 export interface RobotsPolicy {
   rules: RobotsRule[];
   fetchedUrl: string;
+  /** Absolute Sitemap: URLs declared in robots.txt. */
+  sitemaps?: string[];
+  /** Crawl-delay (seconds) per user-agent token (lowercased). */
+  crawlDelays?: Record<string, number>;
 }
 
 export interface CrawlWorkerApiClient {
