@@ -6,6 +6,7 @@ import type {
   IndexabilityAssessment,
   UrlDiscoverySource
 } from "@seo-tool/domain-model";
+import type { ParsedPage } from "./html-parse.js";
 import type { CrawlScopeType } from "./url-normalization.js";
 
 export interface CrawlSeedInput {
@@ -55,6 +56,9 @@ export interface AuditPageInput {
   statusCode: number | null;
   headers?: Record<string, string>;
   html?: string;
+  /** DOM parse of `html` (links/title/canonical/robots). Set once by the crawl
+   *  cycle and reused by indexability + audit so a page is parsed only once. */
+  parsed?: ParsedPage;
   outgoingLinks?: Array<{ url: string; statusCode: number | null }>;
 }
 
