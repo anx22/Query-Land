@@ -88,6 +88,18 @@ export function citationStatusBadge(status: CitationStatus): string {
 }
 
 /** Human-readable German label for a proposal kind. */
+/** Human-readable German label for an AEO content check (never show the raw key). */
+export function aeoCheckLabel(check: string): string {
+  switch (check) {
+    case "h1":              return "H1-Überschrift";
+    case "structured_data": return "Strukturierte Daten (Schema.org)";
+    case "question_heading": return "Frage als Überschrift";
+    case "list":            return "Listen (Aufzählung)";
+    case "concise_answer":  return "Prägnante Antwort";
+    default:                return check;
+  }
+}
+
 export function proposalKindLabel(kind: ProposalKind): string {
   switch (kind) {
     case "dev_ticket":

@@ -12,7 +12,7 @@ import { WhyItMatters } from "../../components/why-it-matters";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { CitationMatrix } from "../../features/ai-visibility/citation-matrix";
 import { ProposalsList } from "../../features/ai-visibility/proposals-list";
-import { toMatrixRow, proposalKindLabel } from "../../features/ai-visibility/ai-logic";
+import { toMatrixRow, proposalKindLabel, aeoCheckLabel } from "../../features/ai-visibility/ai-logic";
 import { loadAiVisibilityOverview } from "../../lib/ai-visibility-api";
 import {
   createPromptAction,
@@ -324,7 +324,7 @@ function AeoRow({ assessment }: { assessment: AeoAssessment }) {
       <span className="muted">
         {assessment.checks.map((check) => (
           <span key={check.check} className={check.passed ? "check-pass" : "check-fail"}>
-            {check.passed ? "✓" : "✗"} {check.check}{" "}
+            {check.passed ? "✓" : "✗"} {aeoCheckLabel(check.check)}{" "}
           </span>
         ))}
       </span>
