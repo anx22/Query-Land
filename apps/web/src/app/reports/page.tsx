@@ -3,7 +3,6 @@ import "../../features/reports/reports.css";
 import {
   ALERT_COMPARATORS,
   ALERT_METRICS,
-  DELIVERY_CHANNELS,
   REPORT_CADENCES,
   REPORT_TYPES,
 } from "@seo-tool/domain-model";
@@ -224,14 +223,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <label>
                 Kanal
                 <select name="channel" defaultValue="email">
-                  {DELIVERY_CHANNELS.map((c) => (
-                    <option key={c} value={c}>{labelForChannel(c)}</option>
-                  ))}
+                  <option value="email">E-Mail</option>
+                  <option value="webhook">Webhook</option>
                 </select>
               </label>
               <label>
-                Ziel (E-Mail / Webhook)
-                <input type="text" name="target" placeholder="z. B. team@example.com" />
+                Empfänger
+                <input type="text" name="target" required placeholder="E-Mail-Adresse oder Webhook-URL" />
               </label>
               <div className="locked-action">
                 <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
@@ -246,6 +244,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <p className="form-hint muted">
               Webhook wird sofort zugestellt. E-Mail braucht einen konfigurierten Versand
               (<code>RESEND_API_KEY</code>) — sonst wird die Lieferung ehrlich als „übersprungen“ vermerkt.
+              Slack, Discord oder Zapier brauchst du nicht extra: trag einfach deren Webhook-URL als
+              Kanal „Webhook“ ein.
             </p>
           </div>
         ) : null}
@@ -311,15 +311,14 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <label>
               Lieferkanal (optional)
               <select name="channel">
-                <option value="">— keiner —</option>
-                {DELIVERY_CHANNELS.map((c) => (
-                  <option key={c} value={c}>{labelForChannel(c)}</option>
-                ))}
+                <option value="">— kein Versand —</option>
+                <option value="email">E-Mail</option>
+                <option value="webhook">Webhook</option>
               </select>
             </label>
             <label>
-              Ziel (optional)
-              <input type="text" name="target" placeholder="z. B. team@example.com" />
+              Empfänger (bei gewähltem Kanal)
+              <input type="text" name="target" placeholder="E-Mail-Adresse oder Webhook-URL" />
             </label>
             <button className="button" type="submit" disabled={disabled}>Lieferung planen</button>
           </form>
