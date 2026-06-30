@@ -44,7 +44,7 @@ export default async function Page({
     hasCrawl: data.hasCrawl,
   };
   const heroLock = actionLock(readiness, ["project", "site", "crawl"]);
-  const lockReason = !data.connected ? "API nicht erreichbar." : heroLock.reason;
+  const lockReason = !data.connected ? "Daten momentan nicht erreichbar." : heroLock.reason;
   const heroDisabled = !data.connected || heroLock.locked;
 
   return (
@@ -62,7 +62,7 @@ export default async function Page({
         </WhyItMatters>
         <div className="badge-row">
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}

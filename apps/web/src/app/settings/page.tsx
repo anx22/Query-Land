@@ -6,10 +6,18 @@ import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckActio
 
 export const dynamic = "force-dynamic";
 
-const connectorProviders = [
-  { provider: "gsc", label: "Google Search Console", confidence: "B", description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
-  { provider: "ga4", label: "Google Analytics 4", confidence: "A", description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." }
-] as const;
+type ConnectorProvider = {
+  provider: "gsc" | "ga4";
+  label: string;
+  confidence: string;
+  available: boolean;
+  description: string;
+};
+
+const connectorProviders: ConnectorProvider[] = [
+  { provider: "gsc", label: "Google Search Console", confidence: "B", available: true, description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
+  { provider: "ga4", label: "Google Analytics 4", confidence: "A", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." }
+];
 
 const sovereigntyItems = [
   { id: "self-hostable-core", label: "Selbst hostbar — kein Zwang zu externer Infrastruktur", status: "ready", statusClassName: "status succeeded" },
@@ -30,7 +38,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       status: integration.status,
       statusClassName: `status ${integration.status}`
     }))
-    : [{ id: "connector-empty", label: "Noch keine Datenquelle verbunden", status: "empty", statusClassName: "status blocked" }];
+    : [{ id: "connector-empty", label: "Noch keine Datenquelle verbunden", status: "empty", statusClassName: "status empty" }];
   const connectorJobs = data.jobs.filter((job) => job.type === "connector_sync");
   const jobItems = connectorJobs.length > 0
     ? connectorJobs.map((job) => ({
@@ -39,7 +47,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
       status: job.status,
       statusClassName: `status ${job.status}`
     }))
-    : [{ id: "job-empty", label: "Noch kein Datenabgleich geplant", status: "empty", statusClassName: "status blocked" }];
+    : [{ id: "job-empty", label: "Noch kein Datenabgleich geplant", status: "empty", statusClassName: "status empty" }];
 
   return (
     <AppShell activePath="/settings">
@@ -53,7 +61,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <div className="badge-row">
           <span className="badge primary">{data.integrations.filter((i) => i.status === "connected").length} verbundene Datenquellen</span>
           <span className="badge">{connectorJobs.length} geplante Abgleiche</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}
@@ -74,7 +82,17 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <h2>{connector.label}</h2>
                     <p>{connector.description}</p>
                   </div>
-                  {connector.provider === "gsc" ? (
+                  {!connector.available ? (
+                    // Honest gating: no real connect flow exists for this source yet. Never show a
+                    // button that fakes a connection (the dead "Verbindung vorhanden" pattern).
+                    <div className="locked-action">
+                      <span className="badge">Bald verfügbar</span>
+                      <span className="locked-action__reason">
+                        Diese Datenquelle wird bald anschließbar — aktuell liefert Google Search Console
+                        die echten Such-Daten.
+                      </span>
+                    </div>
+                  ) : connector.provider === "gsc" ? (
                     // Real Google OAuth: a GET redirect to the consent flow (not a server action).
                     selectedProject && data.connected ? (
                       <a className="button" href={`/api/oauth/google/authorize?projectId=${encodeURIComponent(selectedProject.id)}`}>
@@ -112,15 +130,32 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <div className="connector-grid compact">
             {connectorProviders.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
+              const isConnected = existing?.status === "connected";
+              // A sync only makes sense against a genuinely connected source. Gating on a mere
+              // "existing" (possibly pending) row would schedule a job that has nothing to fetch.
+              const canSchedule = Boolean(data.connected && selectedProject && connector.available && isConnected);
               return (
                 <form className="form-card" action={scheduleConnectorSyncAction} key={connector.provider}>
                   <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
                   <input type="hidden" name="provider" value={connector.provider} />
                   <strong>{connector.label}</strong>
                   <span>Plant einen täglichen Datenabgleich für {connector.label}.</span>
-                  <button className="button secondary" type="submit" disabled={!data.connected || !selectedProject || !existing}>
-                    Abgleich planen
-                  </button>
+                  <div className="locked-action">
+                    <button className="button secondary" type="submit" disabled={!canSchedule}>
+                      Abgleich planen
+                    </button>
+                    {!canSchedule ? (
+                      <span className="locked-action__reason">
+                        {!connector.available
+                          ? "Diese Datenquelle ist noch nicht anschließbar."
+                          : !data.connected
+                            ? "Daten momentan nicht erreichbar."
+                            : !selectedProject
+                              ? "Zuerst eine Website anlegen."
+                              : "Zuerst diese Datenquelle verbinden."}
+                      </span>
+                    ) : null}
+                  </div>
                 </form>
               );
             })}

@@ -367,7 +367,7 @@ export default async function Page({
         </p>
         <div className="badge-row">
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}

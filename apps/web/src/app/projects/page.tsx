@@ -94,48 +94,64 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </section>
       )}
 
-      <section className="card" id="website">
-        <p className="kicker">{hasProjects ? "Weitere Website hinzufügen" : "Erste Website hinzufügen"}</p>
-        <form action={createWebsiteAction} className="stack">
-          <label>
-            Website-Adresse
-            <input name="baseUrl" required type="url" placeholder="https://ihre-website.de" autoFocus={!hasProjects} />
-          </label>
-          <p className="form-hint muted">Eine Website = ein Projekt. Der Name wird aus der Adresse übernommen, wenn Sie keinen angeben.</p>
-          <details className="advanced-section">
-            <summary>
-              <span className="advanced-section__title">Erweitert</span>
-              <span className="advanced-section__hint">Name, Umfang, Prüf-Rhythmus und Wichtigkeit — sinnvolle Standards sind gesetzt.</span>
-            </summary>
-            <label>
-              Name (optional)
-              <input name="name" placeholder="wird aus der Adresse übernommen" />
-            </label>
-            <label>
-              Was soll analysiert werden?
-              <select name="scopeType" defaultValue="domain">
-                <option value="domain">Ganze Domain</option>
-                <option value="subdomain">Nur eine Subdomain</option>
-                <option value="folder">Nur ein Verzeichnis</option>
-              </select>
-            </label>
-            <label>
-              Wie oft prüfen?
-              <select name="crawlFrequency" defaultValue="weekly">
-                <option value="manual">Nur manuell</option>
-                <option value="daily">Täglich</option>
-                <option value="weekly">Wöchentlich</option>
-              </select>
-            </label>
-            <label>
-              Wie wichtig ist diese Website? (1–100)
-              <input name="businessValue" type="number" min="1" max="100" defaultValue="50" />
-            </label>
-          </details>
-          <button className="button button--block" type="submit" disabled={!data.connected}>Website hinzufügen</button>
-        </form>
-      </section>
+      {hasProjects ? (
+        // A website already exists. Adding more is a secondary action — collapse it so the
+        // page doesn't look like setup is unfinished (the user already has their website).
+        <details className="card add-website" id="website">
+          <summary className="add-website__summary">+ Weitere Website hinzufügen</summary>
+          {addWebsiteForm({ connected: data.connected, autoFocus: false })}
+        </details>
+      ) : (
+        // First run — no website yet. Show the form open and focused as the primary action.
+        <section className="card" id="website">
+          <p className="kicker">Erste Website hinzufügen</p>
+          {addWebsiteForm({ connected: data.connected, autoFocus: true })}
+        </section>
+      )}
     </AppShell>
+  );
+}
+
+function addWebsiteForm({ connected, autoFocus }: { connected: boolean; autoFocus: boolean }) {
+  return (
+    <form action={createWebsiteAction} className="stack">
+      <label>
+        Website-Adresse
+        <input name="baseUrl" required type="url" placeholder="https://ihre-website.de" autoFocus={autoFocus} />
+      </label>
+      <p className="form-hint muted">Eine Website = ein Projekt. Der Name wird aus der Adresse übernommen, wenn Sie keinen angeben.</p>
+      <details className="advanced-section">
+        <summary>
+          <span className="advanced-section__title">Erweitert</span>
+          <span className="advanced-section__hint">Name, Umfang, Prüf-Rhythmus und Wichtigkeit — sinnvolle Standards sind gesetzt.</span>
+        </summary>
+        <label>
+          Name (optional)
+          <input name="name" placeholder="wird aus der Adresse übernommen" />
+        </label>
+        <label>
+          Was soll analysiert werden?
+          <select name="scopeType" defaultValue="domain">
+            <option value="domain">Ganze Domain</option>
+            <option value="subdomain">Nur eine Subdomain</option>
+            <option value="folder">Nur ein Verzeichnis</option>
+          </select>
+        </label>
+        <label>
+          Wie oft prüfen?
+          <select name="crawlFrequency" defaultValue="weekly">
+            <option value="manual">Nur manuell</option>
+            <option value="daily">Täglich</option>
+            <option value="weekly">Wöchentlich</option>
+          </select>
+        </label>
+        <label>
+          Wie wichtig ist diese Website? (1–100)
+          <input name="businessValue" type="number" min="1" max="100" defaultValue="50" />
+        </label>
+      </details>
+      <button className="button button--block" type="submit" disabled={!connected}>Website hinzufügen</button>
+    </form>
   );
 }
 

@@ -70,7 +70,7 @@ export default async function Page({
           </p>
           <div className="badge-row">
             <span className={data.connected ? "badge success" : "badge danger"}>
-              {data.connected ? "API verbunden" : "API offline"}
+              {data.connected ? "Daten verbunden" : "Daten offline"}
             </span>
           </div>
 
@@ -215,7 +215,7 @@ export default async function Page({
                 {!data.connected || !data.selectedProject ? (
                   <span className="locked-action__reason">
                     <Icon name="lock" />
-                    {!data.connected ? "API nicht erreichbar." : "Zuerst eine Website anlegen."}
+                    {!data.connected ? "Daten momentan nicht erreichbar." : "Zuerst eine Website anlegen."}
                   </span>
                 ) : null}
               </div>

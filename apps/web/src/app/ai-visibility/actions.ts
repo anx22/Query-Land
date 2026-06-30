@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import type { ProposalKind, ProposalStatus } from "@seo-tool/domain-model";
 import { createAiPrompt, createProposal, recordAiSnapshot, scanAeo, transitionProposal } from "../../features/ai-visibility";
@@ -123,5 +124,5 @@ function optionalString(formData: FormData, key: string): string | undefined {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Aktion konnte nicht gespeichert werden.");
 }

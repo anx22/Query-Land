@@ -459,6 +459,12 @@ p {
   color: var(--danger);
 }
 
+/* Neutral "nothing here yet" — an optional step not started is not an error. */
+.status.empty {
+  background: var(--inactive-surface);
+  color: var(--inactive-ink);
+}
+
 .cta-row,
 .action-row {
   display: flex;
@@ -1779,6 +1785,29 @@ select:disabled {
 .advanced-section__hint {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+/* Collapsed "add another website" toggle on the websites index — keeps the add-form
+   a calm secondary action once a website already exists. */
+.add-website > summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 800;
+  color: var(--ink);
+  padding: 0.2rem 0;
+}
+.add-website > summary::-webkit-details-marker {
+  display: none;
+}
+.add-website > summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+.add-website[open] > summary::before {
+  content: "▾ ";
+}
+.add-website[open] > summary {
+  margin-bottom: 1rem;
 }
 
 /* Inline helper text under a form field/label (plain-language guidance). */

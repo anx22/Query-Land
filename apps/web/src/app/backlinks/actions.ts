@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import { importBacklinks } from "../../features/backlinks";
 
@@ -28,5 +29,5 @@ function requiredString(formData: FormData, key: string): string {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Backlink-Import konnte nicht gestartet werden.";
+  return friendlyActionError(error, "Backlink-Import konnte nicht gestartet werden.");
 }

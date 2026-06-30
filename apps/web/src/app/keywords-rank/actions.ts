@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import { apiPost } from "../../lib/api-client";
 
@@ -87,5 +88,5 @@ function optionalString(formData: FormData, key: string): string | undefined {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Keyword-Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Keyword-Aktion konnte nicht gespeichert werden.");
 }

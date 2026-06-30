@@ -84,7 +84,8 @@ export function labelForChannel(channel: string | null | undefined): string {
     case "webhook":
       return "Webhook";
     case "slack":
-      return "Slack";
+      // Slack is no longer an offered channel; legacy rows must not look like a working delivery.
+      return "Slack (nicht mehr unterstützt)";
     case null:
     case undefined:
     case "":

@@ -33,7 +33,7 @@ export function CrawlStartPanel({ project, site, lock, connected, runningRun }: 
   const disabled = lock.locked || !connected || running;
 
   const reason = !connected
-    ? "API nicht erreichbar."
+    ? "Daten momentan nicht erreichbar."
     : running
       ? "Analyse läuft bereits."
       : lock.reason;

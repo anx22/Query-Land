@@ -50,7 +50,7 @@ export default async function Page({
         <div className="badge-row">
           <span className="badge">{data.groups.length} Cluster</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
@@ -66,7 +66,7 @@ export default async function Page({
             {!data.connected || !data.project ? (
               <span className="locked-action__reason">
                 <Icon name="lock" />
-                {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+                {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
               </span>
             ) : null}
           </div>
@@ -172,7 +172,7 @@ export default async function Page({
               {!data.connected || !data.project ? (
                 <span className="locked-action__reason">
                   <Icon name="lock" />
-                  {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+                  {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
                 </span>
               ) : null}
             </div>
@@ -194,7 +194,7 @@ export default async function Page({
               {!data.connected || !data.project ? (
                 <span className="locked-action__reason">
                   <Icon name="lock" />
-                  {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+                  {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
                 </span>
               ) : null}
             </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import { drainCrawlJobs } from "../../lib/crawl-cron";
 import { callInternalApi } from "../../lib/server-api";
@@ -107,5 +108,5 @@ function requiredString(formData: FormData, key: string): string {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Technical-Audit-Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Technical-Audit-Aktion konnte nicht gespeichert werden.");
 }

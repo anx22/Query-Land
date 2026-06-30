@@ -83,7 +83,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           eine festgelegte Schwelle über- oder unterschreitet.
         </p>
         <div className="badge-row">
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}
@@ -110,7 +110,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           {disabled ? (
             <span className="locked-action__reason">
               <Icon name="lock" />
-              {!data.connected ? "API nicht erreichbar." : PREREQUISITE_META.project.reason}
+              {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
             </span>
           ) : null}
         </div>
@@ -238,16 +238,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 {!data.connected ? (
                   <span className="locked-action__reason">
                     <Icon name="lock" />
-                    API nicht erreichbar.
+                    Daten momentan nicht erreichbar — bitte später erneut versuchen.
                   </span>
                 ) : null}
               </div>
             </form>
             <p className="form-hint muted">
-              Webhook wird sofort zugestellt. E-Mail braucht einen konfigurierten Versand
-              (<code>RESEND_API_KEY</code>) — sonst wird die Lieferung ehrlich als „übersprungen“ vermerkt.
-              Slack, Discord oder Zapier brauchst du nicht extra: trag einfach deren Webhook-URL als
-              Kanal „Webhook“ ein.
+              Ein Webhook wird sofort zugestellt. Der E-Mail-Versand funktioniert, sobald er vom Betreiber
+              eingerichtet wurde — bis dahin wird eine E-Mail-Lieferung ehrlich als „übersprungen“ vermerkt.
+              Für Slack, Discord oder Zapier tragen Sie einfach deren Webhook-URL als Kanal „Webhook“ ein.
             </p>
           </div>
         ) : null}
@@ -261,8 +260,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <WhyItMatters>Automatische Lieferungen halten alle Beteiligten ohne manuelles Nachfassen auf dem Laufenden.</WhyItMatters>
           <p className="notice">
             Fällige Zeitpläne werden täglich automatisch erzeugt und zugestellt: <strong>Webhook</strong>{" "}
-            sofort, <strong>E-Mail</strong> sobald ein Versand konfiguriert ist (<code>RESEND_API_KEY</code>).
-            Ohne Konfiguration bleibt die E-Mail-Zustellung ehrlich „übersprungen“ — Berichte stehen
+            sofort, <strong>E-Mail</strong> sobald der Versand vom Betreiber eingerichtet ist.
+            Bis dahin bleibt die E-Mail-Zustellung ehrlich „übersprungen“ — Berichte stehen
             jederzeit als Export (CSV/HTML/PDF) bereit.
           </p>
 
@@ -443,11 +442,29 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   );
 }
 
-function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger"; message: string } | null {
+function feedbackMessage(params: Record<string, string | string[] | undefined> | undefined): { kind: "success" | "danger" | "warning"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
   if (singleParam(params?.generated)) return { kind: "success", message: "Bericht erfolgreich erstellt." };
-  if (singleParam(params?.delivered)) return { kind: "success", message: "Bericht erfolgreich versendet." };
+  const delivered = singleParam(params?.delivered);
+  if (delivered) {
+    if (delivered === "sent") return { kind: "success", message: "Bericht erfolgreich versendet." };
+    if (delivered === "skipped") {
+      return {
+        kind: "warning",
+        message:
+          "Versand übersprungen — der E-Mail-Versand ist noch nicht eingerichtet. Nutzen Sie solange den Export oder einen Webhook.",
+      };
+    }
+    if (delivered === "failed") {
+      return {
+        kind: "danger",
+        message: "Der Versand ist fehlgeschlagen. Bitte prüfen Sie die Zieladresse und versuchen Sie es erneut.",
+      };
+    }
+    // Unknown/legacy status — stay honest rather than claim success.
+    return { kind: "warning", message: "Versand abgeschlossen — bitte Status der Lieferung prüfen." };
+  }
   if (singleParam(params?.schedule)) return { kind: "success", message: "Lieferung geplant." };
   const due = singleParam(params?.due);
   if (due !== undefined) return { kind: "success", message: `Fällige Lieferungen ausgeführt — ${due} Bericht(e) erstellt.` };

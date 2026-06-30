@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACTIVE_PROJECT_COOKIE, ACTIVE_SITE_COOKIE } from "../../lib/active-project-cookie";
@@ -188,5 +189,5 @@ function integerString(formData: FormData, key: string, min: number, max: number
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Aktion konnte nicht gespeichert werden.";
+  return friendlyActionError(error, "Aktion konnte nicht gespeichert werden.");
 }

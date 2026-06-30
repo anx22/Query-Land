@@ -64,7 +64,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <div className="badge-row">
             <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
             <ConfidenceBadge level="B" />
-            <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "API verbunden" : "API offline"}</span>
+            <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
           </div>
           {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
           {!data.connected ? <OfflineNotice /> : null}

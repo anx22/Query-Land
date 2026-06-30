@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import {
   createAlertRule,
@@ -24,16 +25,24 @@ export async function generateReportAction(formData: FormData) {
 }
 
 export async function deliverReportAction(formData: FormData) {
+  let status = "sent";
   try {
     const reportId = requiredString(formData, "reportId");
     const channel = requiredString(formData, "channel") as Parameters<typeof deliverReport>[1];
     const target = formData.get("target");
-    await deliverReport(reportId, channel, typeof target === "string" && target.trim() ? target.trim() : undefined);
+    const delivery = await deliverReport(
+      reportId,
+      channel,
+      typeof target === "string" && target.trim() ? target.trim() : undefined
+    );
+    status = delivery.status;
   } catch (error) {
     redirect(`/reports?error=${encodeURIComponent(messageFor(error))}`);
   }
   revalidateReportViews();
-  redirect("/reports?delivered=1");
+  // Honest feedback: only report success when the channel actually delivered.
+  // "skipped" (e.g. e-mail dispatch not configured) and "failed" must not look like a success.
+  redirect(`/reports?delivered=${encodeURIComponent(status)}`);
 }
 
 export async function createScheduleAction(formData: FormData) {
@@ -41,13 +50,20 @@ export async function createScheduleAction(formData: FormData) {
     const projectId = requiredString(formData, "projectId");
     const type = requiredString(formData, "type") as Parameters<typeof createReportSchedule>[1]["type"];
     const cadence = requiredString(formData, "cadence") as Parameters<typeof createReportSchedule>[1]["cadence"];
-    const channel = formData.get("channel");
-    const target = formData.get("target");
+    const channelRaw = formData.get("channel");
+    const targetRaw = formData.get("target");
+    const channel = typeof channelRaw === "string" && channelRaw.trim() ? channelRaw.trim() : undefined;
+    const target = typeof targetRaw === "string" && targetRaw.trim() ? targetRaw.trim() : undefined;
+    // A channel without a recipient would record every run as "skipped" forever —
+    // looks configured but never delivers. Require a recipient when a channel is chosen.
+    if (channel && !target) {
+      throw new Error("Bitte geben Sie einen Empfänger an (E-Mail-Adresse oder Webhook-URL).");
+    }
     await createReportSchedule(projectId, {
       type,
       cadence,
-      channel: typeof channel === "string" && channel.trim() ? (channel.trim() as Parameters<typeof createReportSchedule>[1]["channel"]) : undefined,
-      target: typeof target === "string" && target.trim() ? target.trim() : undefined,
+      channel: channel as Parameters<typeof createReportSchedule>[1]["channel"],
+      target,
     });
   } catch (error) {
     redirect(`/reports?error=${encodeURIComponent(messageFor(error))}`);
@@ -111,5 +127,5 @@ function requiredString(formData: FormData, key: string): string {
 }
 
 function messageFor(error: unknown): string {
-  return error instanceof Error ? error.message : "Report-Aktion konnte nicht ausgeführt werden.";
+  return friendlyActionError(error, "Report-Aktion konnte nicht ausgeführt werden.");
 }

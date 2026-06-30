@@ -103,7 +103,7 @@ export default async function Page({
           <span className="badge primary">{data.project?.name ?? "kein Projekt"}</span>
           <span className="badge">{data.site?.baseUrl ?? "keine Website"}</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "API verbunden" : "API offline"}
+            {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
         {!data.connected ? <OfflineNotice /> : null}
