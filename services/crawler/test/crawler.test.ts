@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
+import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parsePage, parseRobotsTxt } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
   const urls = discoverUrlsFromSitemap({
@@ -79,6 +79,71 @@ test("extracts and normalizes outgoing links", () => {
   assert.deepEqual(links, ["https://example.com/a", "https://example.com/b", "https://outside.example/c"]);
 });
 
+
+test("parsePage ignores links inside comments, scripts and styles (DOM, not regex)", () => {
+  const html = `
+    <html><body>
+      <!-- <a href="/commented-out">ghost</a> -->
+      <script>var s = '<a href="/from-script">x</a>';</script>
+      <style>.x { background: url('/from-style'); }</style>
+      <a href="/real">real</a>
+    </body></html>`;
+  assert.deepEqual(parsePage(html, "https://example.com/").links.map((l) => l.url), ["https://example.com/real"]);
+});
+
+test("parsePage resolves relative links against <base href>", () => {
+  const html = `<html><head><base href="https://example.com/sub/"></head><body><a href="page">P</a><a href="../top">T</a></body></html>`;
+  assert.deepEqual(parsePage(html, "https://example.com/other/where").links.map((l) => l.url), ["https://example.com/sub/page", "https://example.com/top"]);
+});
+
+test("parsePage flags rel=nofollow links and decodes entity-encoded hrefs", () => {
+  const html = `<a href="/keep?a=1&amp;b=2">k</a><a href="/skip" rel="nofollow ugc">s</a>`;
+  const links = parsePage(html, "https://example.com/").links;
+  assert.deepEqual(links, [
+    { url: "https://example.com/keep?a=1&b=2", nofollow: false },
+    { url: "https://example.com/skip", nofollow: true }
+  ]);
+});
+
+test("parsePage extracts canonical/robots/title robustly (token rel, multi-space title)", () => {
+  const html = `<html><head>
+    <title>  Spaced   &amp;   Title  </title>
+    <link rel="alternate canonical" href="https://example.com/canon">
+    <meta name="ROBOTS" content="noindex, follow">
+  </head></html>`;
+  const parsed = parsePage(html, "https://example.com/x");
+  assert.equal(parsed.title, "Spaced & Title");
+  assert.equal(parsed.canonicalUrl, "https://example.com/canon");
+  assert.equal(parsed.robotsMeta, "noindex, follow");
+});
+
+test("crawl frontier does not follow rel=nofollow links but still audits them for breakage", async () => {
+  const store = await createStore("sqlite::memory:");
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: "https://example.com", payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+
+  const fetched: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const requestedUrl = String(url);
+    fetched.push(requestedUrl);
+    if (requestedUrl.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (requestedUrl.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    if (requestedUrl.endsWith("/nofollowed")) return new Response("gone", { status: 404, headers: { "content-type": "text/html" } });
+    return new Response('<html><head><title>Seed</title></head><body><a href="/nofollowed" rel="nofollow">nf</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+  };
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", maxOutgoingLinkChecks: 5 });
+  assert.equal(result.status, "succeeded");
+  // The nofollow target is NOT followed into the frontier (seed only is fetched as a page)…
+  assert.equal(result.fetchedUrls, 1);
+  assert.equal(result.discoveredUrls, 1);
+  // …but the broken-link audit still probes it and reports the 404.
+  assert.equal(fetched.includes("https://example.com/nofollowed"), true);
+  const issues = envelopeData<Array<{ rule: string; message: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
+  assert.equal(issues.some((issue) => issue.rule === "broken_link" && issue.message.includes("https://example.com/nofollowed")), true);
+  await store.close();
+});
 
 test("fetchUrl retries deterministic network errors before classifying the fetch", async () => {
   let attempts = 0;

@@ -1,22 +1,26 @@
 import type { AuditIssue } from "@seo-tool/domain-model";
+import { parsePage, type ParsedPage } from "./html-parse.js";
 import type { AuditPageInput } from "./types.js";
 import { normalizeCrawlUrl, stableSlug } from "./url-normalization.js";
 
 export function evaluateAuditIssues(pages: AuditPageInput[]): AuditIssue[] {
   const issues: AuditIssue[] = [];
+  // Parse each page once (reusing the crawl-cycle parse when present) and share
+  // the result across the title-dedupe pass and the per-page rule pass.
+  const parsedByIndex: ParsedPage[] = pages.map((page) => page.parsed ?? parsePage(page.html ?? "", page.finalUrl ?? page.url));
   const titleCounts = new Map<string, number>();
 
-  for (const page of pages) {
-    const title = extractTitle(page.html ?? "");
-    if (title) {
-      titleCounts.set(title, (titleCounts.get(title) ?? 0) + 1);
+  for (const parsed of parsedByIndex) {
+    if (parsed.title) {
+      titleCounts.set(parsed.title, (titleCounts.get(parsed.title) ?? 0) + 1);
     }
   }
 
-  for (const page of pages) {
-    const title = extractTitle(page.html ?? "");
+  pages.forEach((page, index) => {
+    const parsed = parsedByIndex[index]!;
+    const title = parsed.title;
     const finalUrl = page.finalUrl ?? page.url;
-    const canonicalUrl = extractCanonical(page.html ?? "");
+    const canonicalUrl = parsed.canonicalUrl;
 
     if (page.statusCode === null || page.statusCode >= 400) {
       issues.push(issue(page.url, "http_error", page.statusCode !== null && page.statusCode >= 500 ? "critical" : "high", `HTTP fetch returned ${page.statusCode ?? "network error"}.`));
@@ -41,26 +45,11 @@ export function evaluateAuditIssues(pages: AuditPageInput[]): AuditIssue[] {
         issues.push(issue(page.url, "broken_link", "high", `Broken outgoing link: ${link.url}.`));
       }
     }
-  }
+  });
 
   return issues;
 }
 
 function issue(url: string, rule: AuditIssue["rule"], severity: AuditIssue["severity"], message: string): AuditIssue {
   return { id: `issue-${stableSlug(`${url}-${rule}-${message}`)}`, url, rule, severity, message };
-}
-
-function extractTitle(html: string): string | null {
-  const match = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-  const title = match?.[1]?.trim();
-  return title ? decodeXml(title) : null;
-}
-
-function extractCanonical(html: string): string | null {
-  const match = html.match(/<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']+)["'][^>]*>/i) ?? html.match(/<link[^>]+href=["']([^"']+)["'][^>]*rel=["']canonical["'][^>]*>/i);
-  return match?.[1]?.trim() ?? null;
-}
-
-function decodeXml(value: string): string {
-  return value.replaceAll("&amp;", "&").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&quot;", '"').replaceAll("&apos;", "'");
 }

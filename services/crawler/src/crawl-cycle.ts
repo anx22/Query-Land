@@ -3,7 +3,7 @@ import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_DEPTH, DEFAULT_MAX_URLS } from 
 import { assessIndexability } from "./indexability.js";
 import { evaluateAuditIssues } from "./audit-rules.js";
 import { fetchUrl } from "./fetch-url.js";
-import { extractOutgoingLinks } from "./link-extraction.js";
+import { parsePage } from "./html-parse.js";
 import { isRobotsAllowed, loadRobotsPolicy } from "./robots.js";
 import { createDiscoveredUrl, discoverUrlsFromSitemapIndex, extractSitemapLocations } from "./sitemap.js";
 import type { AuditPageInput, CrawlWorkerCycleOptions, CrawlWorkerCycleResult, RobotsPolicy } from "./types.js";
@@ -117,12 +117,16 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
           ?? await fetchUrl({ url, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent });
         fetchesByUrl.set(url, fetchResult);
         const storedFetch = await options.apiClient.recordFetchResult(job.projectId, siteId, stored.id, fetchResult);
+        const html = fetchResult.responseBody ?? "";
         const page: AuditPageInput = {
           url,
           finalUrl: fetchResult.finalUrl,
           statusCode: fetchResult.statusCode,
           headers: fetchResult.headers,
-          html: fetchResult.responseBody ?? "",
+          html,
+          // Parse the DOM once here; indexability, audit rules and link-following
+          // all reuse this result instead of re-parsing the same HTML.
+          parsed: parsePage(html, fetchResult.finalUrl ?? url),
           outgoingLinks: []
         };
         pages.push(page);
@@ -130,9 +134,12 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
         await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, stored.id, { ...assessment, fetchResultId: storedFetch.id, assessedAt: now() });
         fetchedUrls += 1;
 
-        // --- Frontier growth: follow in-scope links one level deeper. ---
+        // --- Frontier growth: follow in-scope, followable links one level deeper.
+        //     nofollow links are skipped for discovery (still checked for breakage). ---
         if (depth < maxDepth) {
-          const links = extractOutgoingLinks(page.html ?? "", page.finalUrl ?? url)
+          const links = (page.parsed?.links ?? [])
+            .filter((link) => !link.nofollow)
+            .map((link) => link.url)
             .filter((link) => isInCrawlScope(link, effectiveBase, scopeType));
           const fresh = links.filter((link) => !enqueued.has(link));
           if (fresh.length > 0) {
@@ -214,7 +221,9 @@ async function populateOutgoingLinkStatuses(input: {
   const limit = Math.max(0, input.options.maxOutgoingLinkChecks ?? DEFAULT_MAX_OUTGOING_LINK_CHECKS);
 
   for (const page of input.pages) {
-    const links = extractOutgoingLinks(page.html ?? "", page.finalUrl ?? page.url)
+    const parsed = page.parsed ?? parsePage(page.html ?? "", page.finalUrl ?? page.url);
+    const links = parsed.links
+      .map((link) => link.url)
       .filter((link) => isInCrawlScope(link, input.baseUrl, input.scopeType))
       .filter((link) => isRobotsAllowed(link, input.robotsPolicy, input.userAgent));
 

@@ -21,8 +21,9 @@
     "start:once": "CRAWLER_ONCE=1 node dist/src/worker.js"
   },
   "dependencies": {
-    "@seo-tool/domain-model": "0.1.0",
     "@seo-tool/api": "0.1.0",
-    "@seo-tool/shared-config": "0.1.0"
+    "@seo-tool/domain-model": "0.1.0",
+    "@seo-tool/shared-config": "0.1.0",
+    "node-html-parser": "^7.1.0"
   }
 }

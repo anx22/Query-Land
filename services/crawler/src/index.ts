@@ -23,6 +23,7 @@ export { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_RETRY_BASE_DELAY_MS, DEFAULT_RETRY_
 export { evaluateAuditIssues } from "./audit-rules.js";
 export { runCrawlWorkerCycle } from "./crawl-cycle.js";
 export { fetchUrl } from "./fetch-url.js";
+export { parsePage, type ParsedLink, type ParsedPage } from "./html-parse.js";
 export { assessIndexability } from "./indexability.js";
 export { extractOutgoingLinks } from "./link-extraction.js";
 export { isRobotsAllowed, loadRobotsPolicy, parseRobotsTxt } from "./robots.js";
