@@ -4,6 +4,7 @@ import type { AeoAssessment, ProposalStatus } from "@seo-tool/domain-model";
 import { PROPOSAL_KINDS } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { Icon } from "../../components/icon";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
@@ -72,9 +73,7 @@ export default async function Page({
             dafür gut aufbereitet sind.
           </p>
           <div className="badge-row">
-            <span className={data.connected ? "badge success" : "badge danger"}>
-              {data.connected ? "Daten verbunden" : "Daten offline"}
-            </span>
+            <ConnectionBadge connected={data.connected} />
           </div>
 
           {/* MANDATORY Class-E notice — serious-zone, strict, factual */}

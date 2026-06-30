@@ -2,6 +2,7 @@ import "../../features/content-opportunities/board.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { HeroBand } from "../../components/hero-band";
 import { Icon } from "../../components/icon";
 import { MetricCard } from "../../components/metric-card";
@@ -65,9 +66,7 @@ export default async function Page({
           Die Wirkung-/Aufwand-Matrix zeigt die günstigsten Hebel zuerst — schnelle Erfolge vor großen Projekten.
         </WhyItMatters>
         <div className="badge-row">
-          <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "Daten verbunden" : "Daten offline"}
-          </span>
+          <ConnectionBadge connected={data.connected} />
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
 import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { HeroBand } from "../../components/hero-band";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -71,9 +72,7 @@ async function KeywordsRankBody({
         </WhyItMatters>
         <div className="badge-row">
           <span className="badge">{data.groups.length} Cluster</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "Daten verbunden" : "Daten offline"}
-          </span>
+          <ConnectionBadge connected={data.connected} />
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}

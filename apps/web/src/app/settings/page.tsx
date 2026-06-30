@@ -1,5 +1,6 @@
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { StatusList } from "../../components/status-list";
 import { loadFoundationDashboardData } from "../../lib/foundation-api";
 import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckAction, scheduleConnectorSyncAction } from "./actions";
@@ -63,7 +64,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <div className="badge-row">
           <span className="badge primary">{data.integrations.filter((i) => i.status === "connected").length} verbundene Datenquellen</span>
           <span className="badge">{connectorJobs.length} geplante Abgleiche</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
+          <ConnectionBadge connected={data.connected} />
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}

@@ -1,5 +1,6 @@
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { createSiteAction, createWebsiteAction, deleteWebsiteAction, setActiveProjectAction } from "./actions";
 import { loadProjectControlData } from "../../lib/foundation-api";
 
@@ -26,7 +27,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.projects.length} {data.projects.length === 1 ? "Website" : "Websites"}</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
+          <ConnectionBadge connected={data.connected} />
         </div>
         {feedback ? (
           <div className={`notice ${feedback.kind} notice--cta`}>

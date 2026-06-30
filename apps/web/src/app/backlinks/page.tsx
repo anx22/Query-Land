@@ -2,6 +2,7 @@ import "../../features/backlinks/backlinks.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
@@ -67,7 +68,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <div className="badge-row">
             <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
             <ConfidenceBadge level="B" />
-            <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
+            <ConnectionBadge connected={data.connected} />
           </div>
           {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
           {!data.connected ? <OfflineNotice /> : null}

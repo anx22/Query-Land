@@ -8,6 +8,7 @@ import {
 } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
@@ -88,7 +89,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           eine festgelegte Schwelle über- oder unterschreitet.
         </p>
         <div className="badge-row">
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
+          <ConnectionBadge connected={data.connected} />
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
 import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -119,9 +120,7 @@ async function ContentWorkspaceBody({
         <div className="badge-row">
           <span className="badge primary">{data.project?.name ?? "kein Projekt"}</span>
           <span className="badge">{data.site?.baseUrl ?? "keine Website"}</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "Daten verbunden" : "Daten offline"}
-          </span>
+          <ConnectionBadge connected={data.connected} />
         </div>
         {!data.connected ? <OfflineNotice /> : null}
         {data.connected && (!data.project || !data.site) ? (
