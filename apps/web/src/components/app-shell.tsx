@@ -56,8 +56,10 @@ export async function AppShell({
                 <button className="button secondary compact" type="submit">Abmelden</button>
               </form>
             ) : activePath === "/login" ? null : (
-              // A real control, not a status pill — and never shown on the login page itself.
-              <a className="button secondary compact" href="/login">Anmelden</a>
+              // Soft-login beta: the app is usable without an account, so a persistent "Anmelden"
+              // button on every screen reads as a logged-out error mid-use. Offer login quietly as a
+              // text link (reachable, not shouting); logged-in users get "Abmelden" above.
+              <a className="topbar__signin" href="/login">Anmelden</a>
             )}
           </div>
         </header>

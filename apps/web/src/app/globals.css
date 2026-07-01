@@ -857,6 +857,19 @@ select:disabled {
   align-self: start;
 }
 
+/* Soft-login sign-in: a quiet, optional text link in the top bar — not a button that reads as a
+   logged-out error while the app is in use. */
+.topbar__signin {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.topbar__signin:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
 /* NextStep — waterfall hand-off card: a calm row, hint left + secondary CTA right. */
 .next-step {
   display: flex;
