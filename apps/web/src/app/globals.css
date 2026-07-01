@@ -94,6 +94,32 @@ select {
   font: inherit;
 }
 
+/* Baseline for text-like form controls, so a field that isn't wrapped in .form-card/.form-row never
+   renders as raw browser HTML (no border-radius, no padding). This is the design-system default;
+   component classes (.cw-input, filter bars, .project-switcher__select, compact controls) still
+   override where they need a different shape. Excludes toggles/file/color and button-type inputs. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="image"]),
+textarea,
+select {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  padding: 0.6rem 0.8rem;
+}
+
+/* Bare <label> that directly wraps a control (label text + input on one line) reads as raw HTML —
+   the input crowds the caption. Stack them like the .form-card labels do. Scoped to labels that are
+   NOT inside an already-styled form group so we don't double-apply. */
+form:not(.form-card) > label:not(.cw-field),
+.stack > label:not(.cw-field) {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
 .shell {
   display: grid;
   min-height: 100vh;
