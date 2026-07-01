@@ -1,3 +1,4 @@
+import { gunzipSync } from "node:zlib";
 import type { FetchResult } from "@seo-tool/domain-model";
 import { DEFAULT_ACCEPT_HEADER, DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_BODY_BYTES, DEFAULT_RETRY_BASE_DELAY_MS, DEFAULT_RETRY_MAX_DELAY_MS, backoffDelayMs } from "./config.js";
 import type { FetchWorkerInput } from "./types.js";
@@ -79,7 +80,11 @@ async function fetchWithRedirectLimit(input: FetchWorkerInput, fetchImpl: typeof
       const contentType = headers["content-type"] ?? "";
       const maxBodyBytes = Math.max(0, input.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES);
       let responseBody = "";
-      if (shouldReadBody(contentType)) {
+      if (isGzipResource(currentUrl, contentType)) {
+        // Gzipped payloads (e.g. sitemap .xml.gz served as application/gzip) are
+        // read as bytes and inflated — content-type gating would otherwise drop them.
+        responseBody = await readGzipBody(response, maxBodyBytes);
+      } else if (shouldReadBody(contentType)) {
         responseBody = await readBodyCapped(response, maxBodyBytes, contentType);
       } else {
         await discardBody(response);
@@ -160,9 +165,13 @@ function shouldReadBody(contentType: string): boolean {
 async function readBodyCapped(response: Response, maxBytes: number, contentType: string): Promise<string> {
   const reader = response.body?.getReader?.();
   if (!reader) {
-    const text = await response.text().catch(() => "");
-    return text;
+    return await response.text().catch(() => "");
   }
+  return decodeBody(await readBytesCapped(reader, maxBytes), contentType);
+}
+
+/** Read a response body stream into a Buffer, capped at `maxBytes` (cancels the rest). */
+async function readBytesCapped(reader: ReadableStreamDefaultReader<Uint8Array>, maxBytes: number): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   let total = 0;
   try {
@@ -174,7 +183,6 @@ async function readBodyCapped(response: Response, maxBytes: number, contentType:
         const remaining = maxBytes - total;
         if (remaining > 0) chunks.push(value.subarray(0, remaining));
         await reader.cancel().catch(() => undefined);
-        total = maxBytes;
         break;
       }
       chunks.push(value);
@@ -183,8 +191,29 @@ async function readBodyCapped(response: Response, maxBytes: number, contentType:
   } catch {
     // Treat a mid-stream read error as "what we have so far".
   }
-  const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
-  return decodeBody(buffer, contentType);
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+}
+
+/** A gzipped payload (by .gz URL or gzip content-type) that we must inflate, not text-decode. */
+function isGzipResource(url: string, contentType: string): boolean {
+  const type = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return /\.gz($|\?)/i.test(url) || type === "application/gzip" || type === "application/x-gzip" || type === "gzip";
+}
+
+/** Read bytes (capped) and gunzip when the gzip magic is present; else decode as UTF-8. */
+async function readGzipBody(response: Response, maxBytes: number): Promise<string> {
+  const reader = response.body?.getReader?.();
+  const buffer = reader
+    ? await readBytesCapped(reader, maxBytes)
+    : Buffer.from(await response.arrayBuffer().catch(() => new ArrayBuffer(0))).subarray(0, maxBytes);
+  if (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
+    try {
+      return gunzipSync(buffer).toString("utf-8");
+    } catch {
+      return buffer.toString("utf-8");
+    }
+  }
+  return buffer.toString("utf-8");
 }
 
 /** Drain/cancel a body we will not parse, so the connection is released promptly. */
