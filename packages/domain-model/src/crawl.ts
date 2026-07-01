@@ -116,6 +116,15 @@ export interface CrawlHealthScore {
   generatedAt: string;
 }
 
+/** A single URL in a crawl run's resumable BFS frontier (migration 016). */
+export interface CrawlFrontierEntry {
+  crawlRunId: string;
+  normalizedUrl: string;
+  depth: number;
+  discoveredFrom: string | null;
+  status: "pending" | "in_progress" | "done";
+}
+
 /** Lightweight projection of an audit issue as it appears in a crawl-diff result. */
 export interface CrawlRunDiffIssue {
   id: string;
