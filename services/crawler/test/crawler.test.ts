@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { gzipSync } from "node:zlib";
 import test from "node:test";
+import type { CrawlFrontierEntry } from "@seo-tool/domain-model";
 import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, hasRepeatedSegments, isInCrawlScope, isRobotsAllowed, loadRobotsPolicy, normalizeCrawlUrl, parsePage, parseRobotsTxt, robotsCrawlDelaySeconds } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
@@ -485,7 +486,25 @@ function apiClientForStore(store: Store): CrawlWorkerApiClient {
     recordAuditIssues: (projectId, siteId, issues, checkedDiscoveredUrlIds) => post(`/projects/${projectId}/sites/${siteId}/audit-issues`, { issues, checkedDiscoveredUrlIds }),
     computeHealthScore: (projectId, siteId) => post(`/projects/${projectId}/sites/${siteId}/health-scores/compute`, {}),
     completeCrawlRun: (projectId, siteId, crawlRunId, status, errorMessage) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/complete`, { status, errorMessage }),
-    completeJob: (jobId, status, lastError) => post(`/jobs/${jobId}/complete`, { status, lastError })
+    completeJob: (jobId, status, lastError) => post(`/jobs/${jobId}/complete`, { status, lastError }),
+    // Resumable-crawl extensions (migrations 016/017).
+    enqueueCrawlFrontier: (projectId, siteId, crawlRunId, entries) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier`, { entries }),
+    claimCrawlFrontier: async (projectId, siteId, crawlRunId, limit) => {
+      const response = await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier/claim`, { limit });
+      const body = response.body as { data: CrawlFrontierEntry[]; meta?: { pending?: number } };
+      return { items: body.data, pending: Number(body.meta?.pending ?? 0) };
+    },
+    completeCrawlFrontier: (projectId, siteId, crawlRunId, normalizedUrls) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier/complete`, { normalizedUrls }),
+    countPendingCrawlFrontier: async (projectId, siteId, crawlRunId) => {
+      const response = await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier`);
+      return Number((response.body as { data: { pending: number } }).data.pending);
+    },
+    recordCrawlPageSignals: (projectId, siteId, crawlRunId, signals) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/page-signals`, { signals }),
+    listCrawlPageSignals: async (projectId, siteId, crawlRunId) => {
+      const response = await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/page-signals`);
+      return envelopeData(response);
+    },
+    createCrawlSeedJob: (projectId, subject, payload) => post(`/jobs`, { projectId, type: "crawl_seed", subject, payload })
   };
 }
 
@@ -581,6 +600,45 @@ test("crawl worker fetches pages concurrently up to maxConcurrency", async () =>
   assert.equal(result.status, "succeeded");
   assert.equal(result.fetchedUrls, 4); // same coverage as the serial BFS
   assert.ok(maxInFlight >= 2, `expected overlapping fetches under maxConcurrency, max in-flight was ${maxInFlight}`);
+  await store.close();
+});
+
+test("resumable crawl finalizes correctly across continuation invocations", async () => {
+  const store = await createStore("sqlite::memory:");
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: `https://example.com:run:${run.id}`, payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    if (path === "/missing") return new Response("gone", { status: 404, headers: { "content-type": "text/html" } });
+    const links = path === "/" ? ["/a", "/missing"] : [];
+    return new Response(`<html><head><title>${path}</title></head><body>${links.map((l) => `<a href="${l}">x</a>`).join("")}</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+
+  const apiClient = apiClientForStore(store);
+  // Tiny per-cycle budget + batch size 1 forces the crawl to span several
+  // continuation invocations — exercising bootstrap → resume → finalize.
+  let invocations = 0;
+  for (let i = 0; i < 30; i += 1) {
+    const result = await runCrawlWorkerCycle({ apiClient, fetchImpl, now: () => "2026-06-03T10:00:00.000Z", timeBudgetMs: 0, frontierBatchSize: 1, maxConcurrency: 1 });
+    if (!result.claimed) break;
+    invocations += 1;
+  }
+  assert.ok(invocations >= 2, `expected continuation across multiple invocations, got ${invocations}`);
+
+  // The run is finalized, all three pages captured, and the audit — computed from
+  // persisted signals gathered across DIFFERENT invocations — caught the issues.
+  const runs = envelopeData<Array<{ id: string; status: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs`));
+  assert.equal(runs.find((r) => r.id === run.id)?.status, "succeeded");
+  const signals = envelopeData<Array<{ normalizedUrl: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs/${run.id}/page-signals`));
+  assert.equal(signals.length, 3); // seed + /a + /missing
+  const issues = envelopeData<Array<{ rule: string; url: string; message: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
+  assert.equal(issues.some((iss) => iss.rule === "http_error" && iss.url === "https://example.com/missing"), true);
+  assert.equal(issues.some((iss) => iss.rule === "broken_link" && iss.message.includes("https://example.com/missing")), true);
   await store.close();
 });
 

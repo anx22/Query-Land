@@ -39,6 +39,12 @@ export const DEFAULT_MAX_CRAWL_DELAY_MS = 10_000;
 /** Default number of page fetches in flight at once (forced to 1 when a crawl-delay applies). */
 export const DEFAULT_MAX_CONCURRENCY = 4;
 
+/** Default URLs claimed from the persisted frontier per batch in the resumable path. */
+export const DEFAULT_FRONTIER_BATCH = 25;
+
+/** Default per-invocation wall-clock budget (ms) for the resumable path. */
+export const DEFAULT_TIME_BUDGET_MS = 45_000;
+
 /** Accept header sent on crawl fetches — we want HTML/XML, tolerate anything. */
 export const DEFAULT_ACCEPT_HEADER =
   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";

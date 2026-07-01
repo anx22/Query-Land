@@ -1,5 +1,7 @@
 import type {
   AuditIssue,
+  CrawlFrontierEntry,
+  CrawlPageSignal,
   DiscoveredUrl,
   FetchResult,
   FoundationJob,
@@ -89,6 +91,17 @@ export interface CrawlWorkerApiClient {
   computeHealthScore(projectId: string, siteId: string): Promise<unknown>;
   completeCrawlRun(projectId: string, siteId: string, crawlRunId: string, status: "succeeded" | "failed", errorMessage?: string): Promise<unknown>;
   completeJob(jobId: string, status: "succeeded" | "failed", lastError?: string): Promise<FoundationJob>;
+  // --- Resumable-crawl extensions. Optional: present on the HTTP + in-process
+  //     clients; when absent (or without timeBudgetMs) the cycle runs the classic
+  //     single-invocation in-memory path unchanged. ---
+  enqueueCrawlFrontier?(projectId: string, siteId: string, crawlRunId: string, entries: Array<{ normalizedUrl: string; depth: number; discoveredFrom: string | null }>): Promise<{ enqueued: number; pending: number }>;
+  claimCrawlFrontier?(projectId: string, siteId: string, crawlRunId: string, limit: number): Promise<{ items: CrawlFrontierEntry[]; pending: number }>;
+  completeCrawlFrontier?(projectId: string, siteId: string, crawlRunId: string, normalizedUrls: string[]): Promise<{ done: number; pending: number }>;
+  countPendingCrawlFrontier?(projectId: string, siteId: string, crawlRunId: string): Promise<number>;
+  recordCrawlPageSignals?(projectId: string, siteId: string, crawlRunId: string, signals: Array<Omit<CrawlPageSignal, "crawlRunId">>): Promise<{ recorded: number }>;
+  listCrawlPageSignals?(projectId: string, siteId: string, crawlRunId: string): Promise<CrawlPageSignal[]>;
+  /** Enqueue a continuation crawl_seed job (same crawlRunId, resume:true). */
+  createCrawlSeedJob?(projectId: string, subject: string, payload: Record<string, unknown>): Promise<unknown>;
 }
 
 export interface CrawlWorkerCycleOptions {
@@ -120,6 +133,11 @@ export interface CrawlWorkerCycleOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Max page fetches in flight at once. Forced to 1 when a crawl-delay applies. Default DEFAULT_MAX_CONCURRENCY. */
   maxConcurrency?: number;
+  /** When set (and the client supports the frontier), run the resumable path: process a
+   *  time-bounded batch, persist the frontier, and enqueue a continuation job if work remains. */
+  timeBudgetMs?: number;
+  /** URLs claimed from the frontier per batch in the resumable path. Default DEFAULT_FRONTIER_BATCH. */
+  frontierBatchSize?: number;
 }
 
 export interface CrawlWorkerCycleResult {
