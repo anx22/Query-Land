@@ -87,6 +87,45 @@ export function completeCrawlRunRequest(body: unknown): CompleteCrawlRunRequest 
   };
 }
 
+export function enqueueCrawlFrontierRequest(body: unknown): { entries: Array<{ normalizedUrl: string; depth: number; discoveredFrom: string | null }> } {
+  const input = objectBody(body);
+  if (!Array.isArray(input.entries)) {
+    throw new RequestError(400, "missing_field", "entries is required", { field: "entries" });
+  }
+  return {
+    entries: input.entries.map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        throw new RequestError(400, "invalid_frontier_entry", "Each frontier entry must be an object", { index });
+      }
+      const entry = item as Record<string, unknown>;
+      return {
+        normalizedUrl: urlField(entry, "normalizedUrl"),
+        depth: integerField(entry, "depth", 0),
+        discoveredFrom: entry.discoveredFrom === null || entry.discoveredFrom === undefined ? null : urlField(entry, "discoveredFrom")
+      };
+    })
+  };
+}
+
+export function claimCrawlFrontierRequest(body: unknown): { limit: number } {
+  return { limit: integerField(objectBody(body), "limit", 1) };
+}
+
+export function completeCrawlFrontierRequest(body: unknown): { normalizedUrls: string[] } {
+  const input = objectBody(body);
+  if (!Array.isArray(input.normalizedUrls)) {
+    throw new RequestError(400, "missing_field", "normalizedUrls is required", { field: "normalizedUrls" });
+  }
+  return {
+    normalizedUrls: input.normalizedUrls.map((value, index) => {
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new RequestError(400, "invalid_normalized_url", "Each normalizedUrl must be a non-empty string", { index });
+      }
+      return value;
+    })
+  };
+}
+
 export function recordAuditIssuesRequest(body: unknown): RecordAuditIssuesRequest {
   const input = objectBody(body);
   if (!Array.isArray(input.issues)) {

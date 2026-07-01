@@ -1,7 +1,7 @@
 import { computeCrawlRunDiff, createCrawlSeedJobInput } from "@seo-tool/domain-model";
 import { json } from "../http.js";
 import { RequestError } from "../stores/store-errors.js";
-import { completeCrawlRunRequest, createCrawlRunRequest, scheduleCrawlSeedRequest } from "../request-validators.js";
+import { claimCrawlFrontierRequest, completeCrawlFrontierRequest, completeCrawlRunRequest, createCrawlRunRequest, enqueueCrawlFrontierRequest, scheduleCrawlSeedRequest } from "../request-validators.js";
 import { enumQuery, pageMeta, paginationOptions, type ResourceRoute } from "./shared.js";
 
 export const routeCrawlRuns: ResourceRoute = async (store, method, pathname, searchParams, body) => {
@@ -54,6 +54,34 @@ export const routeCrawlRuns: ResourceRoute = async (store, method, pathname, sea
     const crawlSeedJob = createCrawlSeedJobInput({ siteId: scheduleMatch[2], baseUrl: input.baseUrl, crawlRunId: crawlRun.id, sitemapUrl: input.sitemapUrl, scopeType: site?.scopeType });
     const result = await store.createJob(scheduleMatch[1], crawlSeedJob.type, crawlSeedJob.subject, { ...crawlSeedJob.payload });
     return json(result.idempotent ? 200 : 201, { data: { crawlRun, job: result.job }, idempotent: result.idempotent });
+  }
+
+  // --- Resumable BFS frontier (migration 016), scoped to a crawl run. ---
+  const frontierClaimMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/([^/]+)\/frontier\/claim$/);
+  if (method === "POST" && frontierClaimMatch) {
+    const input = claimCrawlFrontierRequest(body);
+    const result = await store.claimCrawlFrontier(frontierClaimMatch[1], frontierClaimMatch[2], frontierClaimMatch[3], input.limit);
+    return json(200, { data: result.items, meta: { pending: result.pending } });
+  }
+
+  const frontierCompleteMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/([^/]+)\/frontier\/complete$/);
+  if (method === "POST" && frontierCompleteMatch) {
+    const input = completeCrawlFrontierRequest(body);
+    const result = await store.completeCrawlFrontier(frontierCompleteMatch[1], frontierCompleteMatch[2], frontierCompleteMatch[3], input.normalizedUrls);
+    return json(200, { data: result });
+  }
+
+  const frontierMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/([^/]+)\/frontier$/);
+  if (frontierMatch) {
+    if (method === "GET") {
+      return json(200, { data: { pending: await store.countPendingCrawlFrontier(frontierMatch[1], frontierMatch[2], frontierMatch[3]) } });
+    }
+    if (method === "POST") {
+      const input = enqueueCrawlFrontierRequest(body);
+      const result = await store.enqueueCrawlFrontier(frontierMatch[1], frontierMatch[2], frontierMatch[3], input.entries);
+      return json(201, { data: result });
+    }
+    return null;
   }
 
   const completeMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/([^/]+)\/complete$/);
