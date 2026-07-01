@@ -18,7 +18,7 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Opportunity, OpportunityStatus } from "@seo-tool/domain-model";
+import { nextOpportunityStatuses, type Opportunity, type OpportunityStatus } from "@seo-tool/domain-model";
 import { Sparkline } from "../../components/charts/sparkline";
 import { PriorityMatrix, type PriorityBubble } from "../../components/charts/priority-matrix";
 import { ConfidenceBadge } from "../../components/confidence-badge";
@@ -148,6 +148,24 @@ export function OpportunityBoardClient({
   );
   const allChecked = filteredIds.length > 0 && checkedInView.length === filteredIds.length;
 
+  // Only offer bulk targets the status model allows for EVERY selected item — otherwise the bar
+  // offered e.g. "Validiert" for fresh "open" items, which the server rejects, producing a
+  // "0 aktualisiert, N übersprungen" dead-end. Intersection of valid next-statuses across the
+  // selection.
+  const statusById = useMemo(
+    () => new Map(opportunities.map((o) => [o.id, o.status])),
+    [opportunities]
+  );
+  const validBulkTargets = useMemo(() => {
+    const statuses = checkedInView
+      .map((id) => statusById.get(id))
+      .filter((s): s is OpportunityStatus => Boolean(s));
+    if (statuses.length === 0) return [];
+    return BULK_TARGETS.filter((target) =>
+      statuses.every((s) => nextOpportunityStatuses(s).includes(target.status))
+    );
+  }, [checkedInView, statusById]);
+
   const toggleOne = useCallback((id: string) => {
     setCheckedIds((prev) => {
       const next = new Set(prev);
@@ -184,7 +202,9 @@ export function OpportunityBoardClient({
       setBulkMessage(null);
       startBulk(async () => {
         const result = await onBulkTransition(ids, status);
-        const failedSuffix = result.failed > 0 ? `, ${result.failed} übersprungen (Übergang nicht erlaubt)` : "";
+        // We only offer transitions valid for the whole selection, so any failure here is a real
+        // error (e.g. the item changed underneath us), not a disallowed transition.
+        const failedSuffix = result.failed > 0 ? `, ${result.failed} fehlgeschlagen` : "";
         setBulkMessage(`${result.ok} aktualisiert${failedSuffix}.`);
         setCheckedIds(new Set());
         router.refresh();
@@ -260,6 +280,7 @@ export function OpportunityBoardClient({
       {onBulkTransition && (checkedInView.length > 0 || bulkMessage) ? (
         <BulkBar
           count={checkedInView.length}
+          targets={validBulkTargets}
           message={bulkMessage}
           pending={isBulkPending}
           onAction={runBulk}
@@ -276,12 +297,14 @@ export function OpportunityBoardClient({
 
 function BulkBar({
   count,
+  targets,
   message,
   pending,
   onAction,
   onClear,
 }: {
   count: number;
+  targets: Array<{ status: OpportunityStatus; label: string }>;
   message: string | null;
   pending: boolean;
   onAction: (status: OpportunityStatus) => void;
@@ -294,7 +317,10 @@ function BulkBar({
         {message ? <span className="board-bulkbar__msg muted">{message}</span> : null}
       </span>
       <div className="board-bulkbar__actions">
-        {BULK_TARGETS.map((target) => (
+        {count > 0 && targets.length === 0 ? (
+          <span className="board-bulkbar__msg muted">Kein gemeinsamer Statuswechsel für diese Auswahl möglich.</span>
+        ) : null}
+        {targets.map((target) => (
           <button
             key={target.status}
             type="button"
