@@ -2307,3 +2307,25 @@ form:has(button[data-pending]) {
   .cards-2, .cards-3 { grid-template-columns: 1fr; }
   .overview-hero { grid-template-columns: 1fr; }
 }
+
+/* =====================================================================
+   Native select normalization. The base baseline gave selects a border,
+   radius and padding but left the OS-native dropdown arrow (and popup).
+   Kill the native arrow everywhere and draw our own 1px charcoal chevron
+   (the oneline-icon language). !important defeats the component background
+   shorthands (filter-row, project-switcher, site-switcher, form-*, cw-input,
+   audit-diff-select, board-table__select) without editing each one: the
+   image overrides, the component background-color is untouched.
+   NOTE: only the CLOSED control is styleable; the open option list is
+   OS-rendered (a cross-browser limitation short of a JS listbox rewrite).
+   ===================================================================== */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMiIgaGVpZ2h0PSI4IiB2aWV3Qm94PSIwIDAgMTIgOCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNzY2YjYyIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMSAxLjc1IDYgNi4yNSAxMSAxLjc1Ii8+PC9zdmc+") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.8rem center !important;
+  background-size: 0.72rem !important;
+  padding-right: 2.1rem !important;
+}
