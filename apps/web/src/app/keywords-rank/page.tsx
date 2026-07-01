@@ -16,6 +16,7 @@ import { PositionDistribution } from "../../components/charts/position-distribut
 import { TrendChart } from "../../components/charts/trend-chart";
 import { KeywordTableClient } from "../../features/keyword-rank";
 import { NextStep } from "../../components/next-step";
+import { SubmitButton } from "../../components/submit-button";
 import { loadKeywordsRankData } from "../../lib/keywords-api";
 import { addKeywordsAction, computeVisibilityAction, createKeywordGroupAction } from "./actions";
 
@@ -82,9 +83,9 @@ async function KeywordsRankBody({
             <div className="locked-action">
               <form action={computeVisibilityAction}>
                 <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
-                <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+                <SubmitButton className="button secondary" pendingLabel="wird berechnet …" disabled={!data.connected || !data.project}>
                   Visibility neu berechnen
-                </button>
+                </SubmitButton>
               </form>
               {!data.connected || !data.project ? (
                 <span className="locked-action__reason">
@@ -197,9 +198,9 @@ async function KeywordsRankBody({
               <input name="brandTerms" placeholder="query-land, acme" />
             </label>
             <div className="locked-action">
-              <button className="button" type="submit" disabled={!data.connected || !data.project}>
+              <SubmitButton className="button" pendingLabel="wird gespeichert …" disabled={!data.connected || !data.project}>
                 Klassifizieren &amp; speichern
-              </button>
+              </SubmitButton>
               {!data.connected || !data.project ? (
                 <span className="locked-action__reason">
                   <Icon name="lock" />
@@ -219,9 +220,9 @@ async function KeywordsRankBody({
             <label>Name<input name="name" placeholder="Pricing" required /></label>
             <label>Thema (optional)<input name="topic" placeholder="Money pages" /></label>
             <div className="locked-action">
-              <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+              <SubmitButton className="button secondary" pendingLabel="wird angelegt …" disabled={!data.connected || !data.project}>
                 Cluster anlegen
-              </button>
+              </SubmitButton>
               {!data.connected || !data.project ? (
                 <span className="locked-action__reason">
                   <Icon name="lock" />

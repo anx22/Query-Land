@@ -9,6 +9,7 @@ import {
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
+import { SubmitButton } from "../../components/submit-button";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
@@ -107,13 +108,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 ))}
               </select>
             </label>
-            <button className="button" type="submit" disabled={disabled}>Bericht erstellen</button>
+            <SubmitButton className="button" pendingLabel="wird erstellt …" disabled={disabled}>Bericht erstellen</SubmitButton>
           </form>
           {/* Only relevant once a schedule exists — until then it's a dead control on an empty screen. */}
           {data.schedules.length > 0 ? (
             <form action={runDueAction}>
               <input type="hidden" name="projectId" value={projectId} />
-              <button className="button secondary" type="submit" disabled={disabled}>Fällige Lieferungen ausführen</button>
+              <SubmitButton className="button secondary" pendingLabel="wird ausgeführt …" disabled={disabled}>Fällige Lieferungen ausführen</SubmitButton>
             </form>
           ) : null}
           {disabled ? (
@@ -245,7 +246,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 <input type="text" name="target" required placeholder="E-Mail-Adresse oder Webhook-URL" />
               </label>
               <div className="locked-action">
-                <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
+                <SubmitButton className="button" pendingLabel="wird versendet …" disabled={!data.connected}>Versenden</SubmitButton>
                 {!data.connected ? (
                   <span className="locked-action__reason">
                     <Icon name="lock" />
@@ -332,7 +333,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               Empfänger (bei gewähltem Kanal)
               <input type="text" name="target" placeholder="E-Mail-Adresse oder Webhook-URL" />
             </label>
-            <button className="button" type="submit" disabled={disabled}>Lieferung planen</button>
+            <SubmitButton className="button" pendingLabel="wird geplant …" disabled={disabled}>Lieferung planen</SubmitButton>
           </form>
         </div>
 
@@ -412,12 +413,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <input type="number" name="threshold" step="any" placeholder="z. B. 50" required />
             </label>
             </div>
-            <button className="button" type="submit" disabled={disabled}>Regel anlegen</button>
+            <SubmitButton className="button" pendingLabel="wird angelegt …" disabled={disabled}>Regel anlegen</SubmitButton>
           </form>
 
           <form action={evaluateAlertsAction} className="action-row">
             <input type="hidden" name="projectId" value={projectId} />
-            <button className="button secondary" type="submit" disabled={disabled}>Warnungen prüfen</button>
+            <SubmitButton className="button secondary" pendingLabel="wird geprüft …" disabled={disabled}>Warnungen prüfen</SubmitButton>
           </form>
 
           {/* Recent alert events — factual list with severity */}

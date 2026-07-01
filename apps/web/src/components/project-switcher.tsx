@@ -40,6 +40,13 @@ export function ProjectSwitcher({ projects, activeProjectId }: ProjectSwitcherPr
     );
   }
 
+  // With a single website there is nothing to switch — the dropdown would just duplicate the
+  // "Websites"/"Übersicht" nav and the active-site crumb in the top bar. Only surface the switcher
+  // once there are at least two websites to choose between.
+  if (projects.length === 1) {
+    return null;
+  }
+
   function onChange(event: React.ChangeEvent<HTMLSelectElement>) {
     const id = event.target.value;
     document.cookie = `${ACTIVE_PROJECT_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=31536000; samesite=lax`;

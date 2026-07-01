@@ -1,6 +1,7 @@
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
+import { SubmitButton } from "../../components/submit-button";
 import { StatusList } from "../../components/status-list";
 import { loadFoundationDashboardData } from "../../lib/foundation-api";
 import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckAction, scheduleConnectorSyncAction } from "./actions";
@@ -148,9 +149,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <strong>{connector.label}</strong>
                   <span>Plant einen täglichen Datenabgleich für {connector.label}.</span>
                   <div className="locked-action">
-                    <button className="button secondary" type="submit" disabled={!canSchedule}>
+                    <SubmitButton className="button secondary" pendingLabel="wird geplant …" disabled={!canSchedule}>
                       Abgleich planen
-                    </button>
+                    </SubmitButton>
                     {!canSchedule ? (
                       <span className="locked-action__reason">
                         {!connector.available

@@ -845,6 +845,36 @@ select:disabled {
   color: var(--muted);
 }
 
+/* SubmitButton in-flight state — spinner + label so a click never feels like nothing happened. */
+.submit-button__pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.4s; }
+}
+
+/* A form action in flight dims the whole form slightly — a second, quiet "working" cue. */
+form:has(button[data-pending]) {
+  opacity: 0.85;
+}
+
 .connector-card h2 {
   margin: 0.75rem 0 0.35rem;
 }

@@ -1,6 +1,7 @@
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
+import { SubmitButton } from "../../components/submit-button";
 import { createSiteAction, createWebsiteAction, deleteWebsiteAction, setActiveProjectAction } from "./actions";
 import { loadProjectControlData } from "../../lib/foundation-api";
 
@@ -19,11 +20,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   return (
     <AppShell activePath="/projects">
       <section className="card hero-card">
-        <p className="kicker">Projekte</p>
+        <p className="kicker">Start · Websites verwalten</p>
         <h1>Ihre Websites</h1>
         <p>
-          Jede Website ist ein eigenes Projekt — mit Analyse, Rankings und Optimierungschancen.
-          Fügen Sie eine Website hinzu; alles andere baut darauf auf.
+          Hier <strong>verwalten</strong> Sie Ihre Website(s): Adresse, Analyse-Umfang und -Rhythmus,
+          hinzufügen oder entfernen. Die Auswertung — Sichtbarkeit, Health Score und Chancen — sehen
+          Sie in der <a href="/">Übersicht</a>.
         </p>
         <div className="badge-row">
           <span className="badge primary">{data.projects.length} {data.projects.length === 1 ? "Website" : "Websites"}</span>
@@ -70,7 +72,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                       ) : (
                         <form action={setActiveProjectAction}>
                           <input type="hidden" name="projectId" value={project.id} />
-                          <button className="button secondary" type="submit">Öffnen</button>
+                          <SubmitButton className="button secondary" pendingLabel="wird geöffnet …">Öffnen</SubmitButton>
                         </form>
                       )}
                     </div>
@@ -86,7 +88,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                       Website-Adresse ergänzen
                       <input name="baseUrl" required type="url" placeholder="https://ihre-website.de" />
                     </label>
-                    <button className="button" type="submit" disabled={!data.connected}>Adresse speichern</button>
+                    <SubmitButton className="button" pendingLabel="wird gespeichert …" disabled={!data.connected}>Adresse speichern</SubmitButton>
                   </form>
                 )}
 
@@ -99,9 +101,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   </p>
                   <form action={deleteWebsiteAction}>
                     <input type="hidden" name="projectId" value={project.id} />
-                    <button className="button danger" type="submit" disabled={!data.connected}>
+                    <SubmitButton className="button danger" pendingLabel="wird gelöscht …" disabled={!data.connected}>
                       Endgültig löschen
-                    </button>
+                    </SubmitButton>
                   </form>
                 </details>
               </article>
@@ -166,7 +168,7 @@ function addWebsiteForm({ connected, autoFocus }: { connected: boolean; autoFocu
           <input name="businessValue" type="number" min="1" max="100" defaultValue="50" />
         </label>
       </details>
-      <button className="button button--block" type="submit" disabled={!connected}>Website hinzufügen</button>
+      <SubmitButton className="button button--block" pendingLabel="wird hinzugefügt …" disabled={!connected}>Website hinzufügen</SubmitButton>
     </form>
   );
 }

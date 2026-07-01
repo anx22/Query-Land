@@ -10,6 +10,7 @@ import { WhyItMatters } from "../../components/why-it-matters";
 import { OpportunityBoardClient } from "../../features/content-opportunities";
 import { ModulesPending } from "../../components/modules-pending";
 import { NextStep } from "../../components/next-step";
+import { SubmitButton } from "../../components/submit-button";
 import { loadOpportunityBoard } from "../../lib/board-api";
 import { actionLock, type ReadinessState } from "../../lib/readiness";
 import {
@@ -80,17 +81,17 @@ export default async function Page({
               <form action={generateOpportunitiesAction}>
                 <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
                 <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-                <button className="button" type="submit">
+                <SubmitButton className="button" pendingLabel="werden erzeugt …">
                   Alle Optimierungschancen erzeugen
-                </button>
+                </SubmitButton>
               </form>
               <div className="locked-action">
                 <form action={syncSearchPerformanceAction}>
                   <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
                   <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-                  <button className="button secondary" type="submit" disabled={!data.hasIntegration}>
+                  <SubmitButton className="button secondary" pendingLabel="wird synchronisiert …" disabled={!data.hasIntegration}>
                     Search Performance synchronisieren
-                  </button>
+                  </SubmitButton>
                 </form>
                 {/* Search-Performance sync pulls clicks/impressions from GSC — without a connected source it
                     would do nothing, so gate it honestly instead of offering a silent no-op. */}

@@ -5,6 +5,7 @@ import { PROPOSAL_KINDS } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
+import { SubmitButton } from "../../components/submit-button";
 import { Icon } from "../../components/icon";
 import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
@@ -161,9 +162,9 @@ export default async function Page({
                 <input type="text" name="market" placeholder="z. B. de, en-US" />
               </label>
             </div>
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
+            <SubmitButton className="button" pendingLabel="wird aufgenommen …" disabled={!data.connected || !data.selectedProject}>
               Frage aufnehmen
-            </button>
+            </SubmitButton>
           </form>
 
           <CitationMatrix rows={matrixRows} />
@@ -233,9 +234,9 @@ export default async function Page({
                 </label>
               </details>
               <div className="locked-action">
-                <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
+                <SubmitButton className="button" pendingLabel="wird analysiert …" disabled={!data.connected || !data.selectedProject}>
                   Seite analysieren
-                </button>
+                </SubmitButton>
                 {!data.connected || !data.selectedProject ? (
                   <span className="locked-action__reason">
                     <Icon name="lock" />
@@ -298,9 +299,9 @@ export default async function Page({
               Beschreibung
               <textarea name="body" rows={3} placeholder="Detaillierte Beschreibung des Vorschlags…" required />
             </label>
-            <button className="button" type="submit" disabled={!data.connected || !data.selectedProject}>
+            <SubmitButton className="button" pendingLabel="wird erstellt …" disabled={!data.connected || !data.selectedProject}>
               Vorschlag erstellen
-            </button>
+            </SubmitButton>
           </form>
 
           <ProposalsList proposals={data.proposals} connected={data.connected} />

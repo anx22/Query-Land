@@ -11,6 +11,7 @@ import { WhyItMatters } from "../../components/why-it-matters";
 import { HelpDisclosure } from "../../components/help-disclosure";
 import { ModulesPending } from "../../components/modules-pending";
 import { NextStep } from "../../components/next-step";
+import { SubmitButton } from "../../components/submit-button";
 import { BriefEditor } from "../../features/content-workspace/brief-editor";
 import {
   availableTransitions,
@@ -446,9 +447,9 @@ async function ContentWorkspaceBody({
               </label>
             </div>
             <div className="cw-editor__actions">
-              <button type="submit" className="button">
+              <SubmitButton className="button" pendingLabel="wird erstellt …">
                 Brief erstellen
-              </button>
+              </SubmitButton>
             </div>
           </form>
         ) : (
