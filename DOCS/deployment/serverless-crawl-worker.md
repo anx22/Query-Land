@@ -40,6 +40,23 @@ ob Vercel-Cron, GitHub Action oder ein externer Scheduler ihn aufruft.
 
 ```bash
 curl -H "Authorization: Bearer <CRON_SECRET>" \
-  https://queryland-mikadesign.vercel.app/api/cron/crawl
+  https://<ihre-vercel-domain>/api/cron/crawl
 # -> {"ok":true,"processed":N,"stoppedReason":"empty|maxJobs|timeBudget","cycles":[...]}
 ```
+
+## Crawler-Smoke (Reproduzierbarkeit)
+
+Der deterministische Fixture-Smoke ist Teil von `npm run check` / `npm test` (kein Netzwerk):
+
+```bash
+npm test -- --test-name-pattern "crawl worker claims crawl_seed job and persists crawl artifacts end-to-end"
+```
+
+Ein echter End-to-End-Crawl gegen eine eigene Site ist ein **manuelles** Script (nicht in CI):
+
+```bash
+SMOKE_BASE_URL="https://example.com/" npm run smoke:crawl   # Exit 0 nur, wenn alle Kriterien bestehen
+```
+
+Nur eigene / berechtigte Sites crawlen. Der Runner respektiert `robots.txt` und sendet den User-Agent
+`SeoToolBot/1.0` (überschreibbar via `CRAWLER_USER_AGENT`). Details/Kriterien: `services/crawler/src/smoke.ts`.

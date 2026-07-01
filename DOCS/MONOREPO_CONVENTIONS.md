@@ -12,7 +12,7 @@
 | `packages/domain-model` | Shared domain types, pure validators, scoring helpers | no apps/services |
 | `packages/shared-config` | Runtime config and stack decisions | no apps/services |
 | `infra/*` | SQL, Docker, migrations, fixtures | n/a |
-| `DOCS/*` | Source-of-truth docs, specs, task backlogs | n/a |
+| `DOCS/*` | Source-of-truth docs (product spec, roadmap, architecture, decisions, deployment) | n/a |
 
 ## Import direction
 

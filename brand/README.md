@@ -3,8 +3,8 @@
 Heimat **aller** Marken- und Website-Assets. Bewusst auf Repo-Ebene neben `apps/`, `packages/`,
 `services/` — Brand-Assets sind Produkt-Assets, **keine** Dokumentation.
 
-> **Design-Direction & Spec (einzige Doku):** `DOCS/design/brand-identity.md` · Token-Quelle: `apps/web/src/app/globals.css`
-> · Voice: `DOCS/design/ux-ui-sprint.md` (Teil 1).
+> **Design-Direction, Spec & Voice (einzige Doku):** `DOCS/design/brand-identity.md` (Voice: §7) ·
+> Token-Quelle: `apps/web/src/app/globals.css`.
 >
 > **Format:** aktuell **JPG** (Referenz-/Arbeitsstand). Finale, skalierbare **SVGs** (Logo, Header, Favicon)
 > folgen später und ersetzen die JPGs in `logo/`, `header/`, `favicon/`.

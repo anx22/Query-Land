@@ -70,7 +70,7 @@ export const appRoutes: AppRoute[] = [
 
 export const seoMemory: SeoMemorySnapshot = {
   deliveryWave: "foundation",
-  sourceOfTruth: ["DOCS/docs/PRODUCT_MASTER_SPEC.md", "DOCS/docs/UX_FLOWS.md", "DOCS/specs/project-control.md", "DOCS/specs/integrations.md", "DOCS/specs/source-map.md"],
+  sourceOfTruth: ["DOCS/PRODUCT_MASTER_SPEC.md", "DOCS/ARCHITECTURE.md", "DOCS/ROADMAP.md"],
   principles: [
     "First-party before third-party",
     "Action over dashboards",
