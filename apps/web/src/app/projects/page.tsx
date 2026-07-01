@@ -79,7 +79,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   </>
                 ) : (
                   // Legacy project without a site — let the user complete it with one address.
-                  <form action={createSiteAction} className="stack stack--sm">
+                  <form action={createSiteAction} className="form-card">
                     <input type="hidden" name="projectId" value={project.id} />
                     <input type="hidden" name="scopeType" value="domain" />
                     <input type="hidden" name="crawlFrequency" value="weekly" />
@@ -132,7 +132,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
 function addWebsiteForm({ connected, autoFocus }: { connected: boolean; autoFocus: boolean }) {
   return (
-    <form action={createWebsiteAction} className="stack">
+    <form action={createWebsiteAction} className="form-card">
       <label>
         Website-Adresse
         <input name="baseUrl" required type="url" placeholder="https://ihre-website.de" autoFocus={autoFocus} />
