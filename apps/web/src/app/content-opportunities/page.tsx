@@ -3,10 +3,10 @@ import "../../features/content-opportunities/board.css";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
-import { HeroBand } from "../../components/hero-band";
 import { Icon } from "../../components/icon";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
+import { HelpDisclosure } from "../../components/help-disclosure";
 import { OpportunityBoardClient } from "../../features/content-opportunities";
 import { ModulesPending } from "../../components/modules-pending";
 import { NextStep } from "../../components/next-step";
@@ -56,28 +56,25 @@ export default async function Page({
 
   return (
     <AppShell activePath="/content-opportunities">
-      <section className="card hero-card">
-        <HeroBand src="/brand/hdr-content-opportunities.jpg" />
-        <p className="kicker">Content &amp; Chancen</p>
-        <h1>Optimierungschancen</h1>
-        <p>
-          Konkrete Verbesserungen für Ihre Website, nach Wirkung sortiert. Jede Chance folgt dem
-          Muster: Beobachtung → Evidenz → Maßnahme → messbares Ergebnis.
-        </p>
-        <WhyItMatters>
-          Die Wirkung-/Aufwand-Matrix zeigt die günstigsten Hebel zuerst — schnelle Erfolge vor großen Projekten.
-        </WhyItMatters>
-        <div className="badge-row">
-          <ConnectionBadge connected={data.connected} />
+      {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+      {!data.connected ? <OfflineNotice /> : null}
+
+      <header className="page-header">
+        <div className="page-header__titles">
+          <p className="kicker">Content &amp; Chancen</p>
+          <h1>Optimierungschancen</h1>
+          <p className="page-header__purpose">
+            Konkrete Verbesserungen für Ihre Website, nach Wirkung sortiert. Jede Chance folgt dem
+            Muster: Beobachtung → Evidenz → Maßnahme → messbares Ergebnis.
+          </p>
         </div>
-        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <OfflineNotice /> : null}
-        {/* Only show the generate/sync actions once an analysis exists. Before that the readiness
-            banner + the ModulesPending panel below carry the single "go analyse" next step — no row
-            of disabled buttons. */}
-        {!heroDisabled && (
-          <div className="action-row">
-            <div className="locked-action">
+        <div className="page-header__aside">
+          <ConnectionBadge connected={data.connected} />
+          {/* Only show the generate/sync actions once an analysis exists. Before that the readiness
+              banner + the ModulesPending panel below carry the single "go analyse" next step — no row
+              of disabled buttons. */}
+          {!heroDisabled ? (
+            <>
               <form action={generateOpportunitiesAction}>
                 <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
                 <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
@@ -102,10 +99,10 @@ export default async function Page({
                   </span>
                 ) : null}
               </div>
-            </div>
-          </div>
-        )}
-      </section>
+            </>
+          ) : null}
+        </div>
+      </header>
 
       {opportunities.length === 0 ? (
         <ModulesPending
@@ -118,7 +115,14 @@ export default async function Page({
         />
       ) : (
         <>
-          <section className="metric-grid">
+          <HelpDisclosure summary="So lesen Sie die Optimierungschancen">
+            <WhyItMatters>
+              Die Wirkung-/Aufwand-Matrix zeigt die günstigsten Hebel zuerst — schnelle Erfolge vor großen Projekten.
+            </WhyItMatters>
+          </HelpDisclosure>
+
+          {/* At-a-glance verdict: the four numbers that frame the opportunity backlog */}
+          <div className="verdict-strip verdict-strip--4">
             <MetricCard label="Opportunities" value={String(data.meta.total)} note={`${opportunities.length} geladen`} />
             <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
             <MetricCard label="Quick Wins" value={String(quickWins)} note="hohe Wirkung, niedriger Aufwand" />
@@ -127,7 +131,7 @@ export default async function Page({
               value={String(validatedCount)}
               note={topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt"}
             />
-          </section>
+          </div>
 
           <OpportunityBoardClient
             opportunities={opportunities}
