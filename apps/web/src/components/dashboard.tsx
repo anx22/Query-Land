@@ -174,7 +174,7 @@ export function Dashboard({ data }: { data: OverviewData }) {
       {/* ------------------------------------------------------------------ */}
       {/* O-1 Editorial page header — serif claim + Ridges contour band       */}
       {/* ------------------------------------------------------------------ */}
-      <OverviewHeader projectName={project?.name ?? null} />
+      <OverviewHeader projectName={project?.name ?? null} hasData={hasData} />
 
       {/* ------------------------------------------------------------------ */}
       {/* Offline / API-not-reachable notice                                  */}

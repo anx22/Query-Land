@@ -30,9 +30,10 @@ export function ProjectSwitcher({ projects, activeProjectId }: ProjectSwitcherPr
   const [isPending, startTransition] = useTransition();
 
   if (projects.length === 0) {
+    // No website exists yet — an "Aktive Website" caption would name a state that isn't true (and
+    // contradicts the top-bar "Keine Website — zuerst hinzufügen"). Show just the add action.
     return (
       <div className="project-switcher project-switcher--empty">
-        <span className="project-switcher__label">Aktive Website</span>
         <a className="project-switcher__cta" href="/projects">
           + Website hinzufügen
         </a>
