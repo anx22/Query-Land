@@ -11,7 +11,8 @@
     "build:deps": "npm --workspace @seo-tool/domain-model run build && npm --workspace @seo-tool/shared-config run build && npm --workspace @seo-tool/api run build && npm --workspace @seo-tool/crawler run build",
     "vercel-build": "npm run build:deps && npm run build:next",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:css-classes": "node scripts/check-css-classes.mjs"
   },
   "dependencies": {
     "@seo-tool/api": "0.1.0",

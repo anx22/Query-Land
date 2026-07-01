@@ -2,8 +2,9 @@ import "../../features/url-dossier/dossier.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
-import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
+import { MetricCard } from "../../components/metric-card";
+import { HelpDisclosure } from "../../components/help-disclosure";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { Sparkline } from "../../components/charts/sparkline";
@@ -56,10 +57,48 @@ export default async function Page({
 
   return (
     <AppShell activePath="/url-dossier">
-      <section className="card hero-card">
-        <HeroBand src="/brand/hdr-url-dossier.jpg" />
-        <p className="kicker">Eine Seite, alle SEO-Infos</p>
-        <h1>URL-Dossier</h1>
+      <header className="page-header">
+        <div className="page-header__titles">
+          <p className="kicker">Eine Seite, alle SEO-Infos</p>
+          <h1>URL-Dossier</h1>
+          <p className="page-header__purpose">
+            Alles zu einer einzelnen Seite an einem Ort: Indexierbarkeit, Such-Leistung, Rankings,
+            Links, Web Vitals, Probleme und Chancen.
+          </p>
+        </div>
+        <div className="page-header__aside">
+          <span className={data.connected ? "badge success" : "badge danger"}>
+            {data.connected ? "Daten verbunden" : "Daten offline"}
+          </span>
+          {data.urlOptions.length > 0 ? (
+            <form className="filter-row" action="/url-dossier">
+              <label>
+                URL
+                <select name="pageUrl" defaultValue={data.selectedUrl ?? ""}>
+                  {data.urlOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="button secondary" type="submit">
+                Öffnen
+              </button>
+            </form>
+          ) : null}
+        </div>
+      </header>
+
+      {!data.connected ? <OfflineNotice /> : null}
+      {data.urlOptions.length === 0 ? (
+        <p className="notice">
+          Für diese Website wurden noch keine Seiten gefunden. Starten Sie zuerst eine Analyse —{" "}
+          <a href="/technical-audit#crawl-start">zum Technical Audit →</a>
+        </p>
+      ) : null}
+
+      <HelpDisclosure summary="So lesen Sie das URL-Dossier">
         <p>
           Alles zu einer einzelnen Seite an einem Ort: ob Google sie findet
           (<TermTooltip term="indexierbarkeit">Indexierbarkeit</TermTooltip>), wie sie in der Suche
@@ -67,38 +106,38 @@ export default async function Page({
           Chancen — inklusive Hinweis auf die zuständige{" "}
           <TermTooltip term="quell-verknüpfung">Code-Stelle</TermTooltip>.
         </p>
-        <div className="badge-row">
-          <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "Daten verbunden" : "Daten offline"}
-          </span>
-        </div>
-        {!data.connected ? <OfflineNotice /> : null}
-        {data.urlOptions.length > 0 ? (
-          <form className="filter-row" action="/url-dossier">
-            <label>
-              URL
-              <select name="pageUrl" defaultValue={data.selectedUrl ?? ""}>
-                {data.urlOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="button secondary" type="submit">
-              Öffnen
-            </button>
-          </form>
-        ) : (
-          <p className="notice">
-            Für diese Website wurden noch keine Seiten gefunden. Starten Sie zuerst eine Analyse —{" "}
-            <a href="/technical-audit#crawl-start">zum Technical Audit →</a>
-          </p>
-        )}
-      </section>
+      </HelpDisclosure>
 
       {data.selectedUrl ? (
         <>
+          {/* At-a-glance verdict: top status KPIs for the selected URL */}
+          <div className="verdict-strip verdict-strip--5">
+            <MetricCard
+              label="HTTP-Status"
+              value={data.latestFetch ? String(data.latestFetch.statusCode ?? "network") : "—"}
+              info="HTTP-Statuscode des letzten Abrufs dieser URL."
+            />
+            <MetricCard
+              label="Indexierbar"
+              value={data.latestIndexability ? (data.latestIndexability.isIndexable ? "ja" : "nein") : "—"}
+              info="Ob die Seite nach Abruf & Bewertung indexierbar ist."
+            />
+            <MetricCard
+              label="Klicks"
+              value={data.gsc ? formatCount(data.gsc.clicks) : "—"}
+              info="Klicks aus der Google-Suche auf diese URL."
+            />
+            <MetricCard
+              label="Impressionen"
+              value={data.gsc ? formatCount(data.gsc.impressions) : "—"}
+              info="Wie oft diese URL in den Suchergebnissen erschien."
+            />
+            <MetricCard
+              label="Ø Position"
+              value={data.gsc ? formatPosition(data.gsc.position) : "—"}
+              info="Durchschnittliche Ranking-Position in der Google-Suche."
+            />
+          </div>
           {/* 1 — Identität + Quell-Verknüpfung */}
           <section className="content-grid">
             <SectionCard

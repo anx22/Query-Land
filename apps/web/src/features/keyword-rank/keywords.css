@@ -254,6 +254,19 @@
   align-items: center;
 }
 
+/* Base chip layout; --gain/--loss add the semantic tint below. */
+.kw-diff__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-muted);
+}
+
 .kw-diff__chip--gain {
   background: var(--conf-a-soft, var(--surface-muted));
   color: var(--success, var(--ink));

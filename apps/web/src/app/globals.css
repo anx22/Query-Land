@@ -243,6 +243,10 @@ select {
 }
 
 .main {
+  /* Width guard — brand-identity §6 "zentraler Content max ~1280px". Without    */
+  /* this, single panels sprawl full-bleed on wide screens (the panel-stack look).*/
+  max-width: var(--content-max, 84rem);
+  margin-inline: auto;
   padding: 1.75rem 2rem 2.5rem;
 }
 
@@ -2018,3 +2022,79 @@ select:disabled {
 
 /* Notice that carries a follow-up CTA button (e.g. "Erste Analyse starten →" after website creation). */
 .notice--cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+
+/* =====================================================================
+   Layout composition system (whole-app density redesign)
+   brand-identity.md §6 (12-col broadsheet, intentional voids) +
+   ux-ui-sprint.md Teil 3 §B–J. Every screen: header → verdict → lead →
+   focus → advanced. All grids collapse to 1 column at the 980px breakpoint.
+   ===================================================================== */
+
+/* 1. Compact page header — replaces the hand-rolled .hero-card blocks.       */
+.page-header { display: flex; justify-content: space-between; align-items: flex-end;
+  gap: var(--space-5); margin-bottom: var(--space-5); }
+.page-header__titles { max-width: 60ch; }
+.page-header__titles h1 { margin-bottom: var(--space-2); }
+.page-header__purpose { margin: 0; color: var(--muted); }        /* ONE sentence */
+.page-header__aside { display: flex; gap: var(--space-2); align-items: center;
+  flex-wrap: wrap; justify-content: flex-end; }
+
+/* 2. Verdict strip — strengths & weaknesses "auf einen Blick".               */
+.verdict-strip { display: grid; gap: var(--space-4); margin-bottom: var(--space-5); }
+.verdict-strip--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.verdict-strip--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.verdict-strip--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+/* 3. Lead composition — primary viz + side facts/secondary viz.             */
+.split-lead { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.9fr);
+  gap: var(--space-5); margin-bottom: var(--space-5); align-items: start; }
+.side-rail { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.split-lead > * { min-width: 0; }
+
+/* 4. Even card rows for demoted low-content panels sitting side-by-side.     */
+.cards-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.cards-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+
+/* ---- Definitions for layout-wrapper classes that were used in TSX with no  */
+/* ---- CSS rule (caught by check:css-classes). Making intended layouts real. */
+
+/* Overview hero: TrendChart + ScoreGauge side-by-side (was stacking).        */
+.overview-hero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 1fr);
+  gap: var(--space-4); margin-top: var(--space-4); align-items: stretch; }
+.overview-hero__trend, .overview-hero__gauge { min-width: 0; }
+.overview-section-header { display: flex; align-items: baseline;
+  justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.overview-cockpit-empty { display: flex; flex-direction: column; gap: var(--space-3); }
+.overview-opportunity-item__type { font-weight: 600; }
+
+/* Inline create/action forms (fields in a row, not stacked full-width).      */
+.form-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; }
+/* Each labelled field becomes a caption-over-control column that fills width, */
+/* so multi-field rows (incl. a following textarea) don't collapse/overlap.    */
+.form-row > label { display: flex; flex: 1 1 12rem; flex-direction: column;
+  gap: var(--space-1); min-width: 0; }
+.form-row > label > input, .form-row > label > select, .form-row > label > textarea,
+.form-row > input, .form-row > select, .form-row > textarea { width: 100%; }
+.inline-form { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+
+/* Minimal text input — brand-identity §7.1 (1px line, focus = primary).      */
+.input { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--line);
+  border-radius: 0.6rem; background: var(--surface); color: var(--ink); }
+.input:focus { outline: none; border-color: var(--primary); }
+.input.compact { width: auto; padding: 0.4rem 0.6rem; }
+
+/* AEO check pass/fail markers — functional color + text (never color alone). */
+.check-pass, .check-fail { display: inline-flex; align-items: center; gap: 0.35rem;
+  font-size: 0.8rem; font-weight: 600; }
+.check-pass { color: var(--success); }
+.check-fail { color: var(--danger); }
+
+@media (max-width: 980px) {
+  .page-header { flex-direction: column; align-items: stretch; }
+  .page-header__aside { justify-content: flex-start; }
+  .verdict-strip--3, .verdict-strip--4, .verdict-strip--5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .split-lead { grid-template-columns: 1fr; }
+  .cards-2, .cards-3 { grid-template-columns: 1fr; }
+  .overview-hero { grid-template-columns: 1fr; }
+}

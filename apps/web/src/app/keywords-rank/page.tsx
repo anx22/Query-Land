@@ -2,11 +2,11 @@ import "../../features/keyword-rank/keywords.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
-import { HeroBand } from "../../components/hero-band";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { TermTooltip } from "../../components/term-tooltip";
 import { GlossarLink } from "../../components/glossar-link";
+import { HelpDisclosure } from "../../components/help-disclosure";
 import { Icon } from "../../components/icon";
 import { PREREQUISITE_META } from "../../lib/readiness";
 import { PositionDistribution } from "../../components/charts/position-distribution";
@@ -37,27 +37,20 @@ export default async function Page({
 
   return (
     <AppShell activePath="/keywords-rank">
-      <section className="card hero-card">
-        <HeroBand src="/brand/hdr-keywords-rank.jpg" />
-        <p className="kicker">Suchbegriffe &amp; Platzierungen</p>
-        <h1>Keywords &amp; Rankings</h1>
-        <p>
-          Für welche Suchbegriffe Ihre Website bei Google erscheint — und auf welcher Position. Jede
-          Zeile zeigt den Positions-Trend und die Veränderung seit der letzten Messung.
-        </p>
-        <WhyItMatters>
-          <TermTooltip term="Striking Distance">Striking-Distance</TermTooltip>-Keywords (Position 11–20)
-          sind die günstigsten Hebel — ein paar Plätze entscheiden über Sichtbarkeit.
-        </WhyItMatters>
-        <div className="badge-row">
+      <header className="page-header">
+        <div className="page-header__titles">
+          <p className="kicker">Suchbegriffe &amp; Platzierungen</p>
+          <h1>Keywords &amp; Rankings</h1>
+          <p className="page-header__purpose">
+            Für welche Suchbegriffe Ihre Website bei Google erscheint — und auf welcher Position, mit
+            Positions-Trend und Veränderung seit der letzten Messung.
+          </p>
+        </div>
+        <div className="page-header__aside">
           <span className="badge">{data.groups.length} Cluster</span>
           <span className={data.connected ? "badge success" : "badge danger"}>
             {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
-        </div>
-        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <OfflineNotice /> : null}
-        <div className="action-row">
           <div className="locked-action">
             <form action={computeVisibilityAction}>
               <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
@@ -73,9 +66,22 @@ export default async function Page({
             ) : null}
           </div>
         </div>
-      </section>
+      </header>
 
-      <section className="metric-grid">
+      {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+      {!data.connected ? <OfflineNotice /> : null}
+
+      <HelpDisclosure summary="So lesen Sie Keywords & Rankings">
+        <p>
+          <TermTooltip term="Striking Distance">Striking-Distance</TermTooltip>-Keywords (Position 11–20)
+          sind die günstigsten Hebel — ein paar Plätze entscheiden über Sichtbarkeit. Der{" "}
+          <GlossarLink term="Visibility-Index">Visibility-Index</GlossarLink> bündelt die
+          positionsgewichtete Sichtbarkeit über das eigene Keyword-Set zu einer Zahl.
+        </p>
+      </HelpDisclosure>
+
+      {/* At-a-glance verdict: the numbers that frame visibility & reach */}
+      <div className="verdict-strip verdict-strip--4">
         <MetricCard
           label="Visibility-Index"
           value={visScore != null ? String(visScore) : "—"}
@@ -111,7 +117,7 @@ export default async function Page({
           info="Keywords mit der eigenen Marke (Brand). Sie ranken meist leicht und sagen wenig über Wachstumspotenzial."
           note="von den geladenen Keywords"
         />
-      </section>
+      </div>
 
       {/* Charts: PositionDistribution + Visibility TrendChart */}
       <section className="kw-charts">
@@ -136,8 +142,15 @@ export default async function Page({
       {/* Interactive keyword table + FilterBar + Inspector */}
       <KeywordTableClient rows={data.rows} inspectors={data.inspectors} />
 
-      {/* Curation forms (reframed in voice) */}
-      <section className="content-grid">
+      {/* Curation forms (reframed in voice) — collapsed by default */}
+      <details className="advanced-section">
+        <summary>
+          <span className="advanced-section__title">Keywords &amp; Cluster verwalten</span>
+          <span className="advanced-section__hint">
+            Neue Begriffe hinzufügen und thematische Cluster anlegen.
+          </span>
+        </summary>
+        <div className="cards-2">
         <div className="card">
           <p className="kicker">Keywords hinzufügen</p>
           <WhyItMatters showIcon={false}>
@@ -204,7 +217,8 @@ export default async function Page({
             </div>
           </form>
         </div>
-      </section>
+        </div>
+      </details>
     </AppShell>
   );
 }

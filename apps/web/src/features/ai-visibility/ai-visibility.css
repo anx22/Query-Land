@@ -9,28 +9,18 @@
   gap: 1.25rem;
 }
 
-/* --- Class-E mandatory notice (serious-zone) --- */
+/* --- Class-E mandatory notice (serious-zone) — compact one-liner --- */
 .ai-classE-notice {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  border: 1px solid var(--conf-e, var(--line));
-  border-left: 4px solid var(--conf-e, var(--warning));
-  border-radius: 0.85rem;
-  background: var(--conf-e-soft, var(--surface-muted));
-  padding: 0.9rem 1.05rem;
-}
-
-.ai-classE-notice__head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem;
-}
-
-.ai-classE-notice__title {
-  font-weight: 700;
-  color: var(--ink);
+  margin: 0;
+  border: 1px solid var(--conf-e, var(--line));
+  border-left: 4px solid var(--conf-e, var(--warning));
+  border-radius: 0.85rem;
+  background: var(--conf-e-soft, var(--surface-muted));
+  padding: 0.7rem 1.05rem;
 }
 
 .ai-classE-notice__text {

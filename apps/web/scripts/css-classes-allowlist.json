@@ -1,0 +1,17 @@
+{
+  "_comment": "Class tokens used in TSX that intentionally have no CSS rule (styled inline, chart-internal, or deferred cosmetics). Layout-relevant no-op classes are NOT here — they are defined in CSS. Keep this list small and justified.",
+  "allow": [
+    "overview-chart-tooltip*",
+    "board-matrix-tooltip*",
+    "overview-dist-empty*",
+    "overview-trend-empty*",
+    "score-gauge*",
+    "confidence-badge__letter",
+    "cw-*",
+    "crawl-start",
+    "audit-diff-list",
+    "add-website__summary",
+    "follow",
+    "redirect"
+  ]
+}

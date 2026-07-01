@@ -14,8 +14,9 @@
     "typecheck": "tsc -b --pretty false",
     "dev": "node scripts/dev.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:css-classes": "npm --workspace @seo-tool/web run check:css-classes",
     "validate:openapi": "node scripts/validate-openapi.mjs",
-    "check": "npm run typecheck && npm run check:boundaries && npm run validate:openapi && npm test",
+    "check": "npm run typecheck && npm run check:boundaries && npm run check:css-classes && npm run validate:openapi && npm test",
     "migrate:sqlite": "npm --workspace @seo-tool/api run build && node apps/api/dist/src/migrate-legacy.js",
     "smoke:crawl": "npm run build && node services/crawler/dist/src/smoke.js",
     "build:web": "npm --workspace @seo-tool/web run build"

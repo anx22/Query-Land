@@ -2,7 +2,7 @@ import "../../features/technical-audit/audit.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
-import { HeroBand } from "../../components/hero-band";
+import { MetricCard } from "../../components/metric-card";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
 import { SectionTreemap } from "../../components/charts/section-treemap";
@@ -11,7 +11,7 @@ import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
-import { HelpPanel } from "../../components/help-panel";
+import { HelpDisclosure } from "../../components/help-disclosure";
 import { GlossarLink } from "../../components/glossar-link";
 import { IssueGroups } from "../../features/technical-audit/issue-groups";
 import { IssueFilterBar } from "../../features/technical-audit/issue-filter-bar";
@@ -339,6 +339,11 @@ export default async function Page({
   const crawlLock = actionLock(data.readiness, ["project", "site"]);
   const feedback = feedbackMessage(params);
 
+  // Verdict values — the "auf einen Blick" strip under the header.
+  const indexableStage = data.funnelStages.find((s) => s.key === "indexable");
+  const indexableValue = indexableStage && indexableStage.value !== null ? indexableStage.value : null;
+  const fmt = (n: number) => n.toLocaleString("de-DE");
+
   return (
     <AppShell activePath="/technical-audit">
       {actionBanner ? (
@@ -354,49 +359,64 @@ export default async function Page({
         </p>
       ) : null}
 
-      <section className="card hero-card">
-        <HeroBand src="/brand/hdr-technical-audit.jpg" />
-        <p className="kicker">Technical Audit</p>
-        <h1>
-          <TermTooltip term="crawl">Analyse</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
-        </h1>
-        <p>
-          Wo verlieren wir URLs auf dem Weg in den Index, wie gesund sind unsere Website-Bereiche und
-          welche Probleme kosten am meisten? Dieser Überblick priorisiert technische SEO-Arbeit nach
-          Wirkung.
-        </p>
-        <div className="badge-row">
+      <header className="page-header">
+        <div className="page-header__titles">
+          <p className="kicker">Technical Audit</p>
+          <h1>
+            <TermTooltip term="crawl">Analyse</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
+          </h1>
+          <p className="page-header__purpose">
+            Wo verlieren wir URLs auf dem Weg in den Index, wie gesund sind die Bereiche und welche
+            Probleme kosten am meisten — nach Wirkung priorisiert.
+          </p>
+        </div>
+        <div className="page-header__aside">
           <span className={data.connected ? "badge success" : "badge danger"}>
             {data.connected ? "Daten verbunden" : "Daten offline"}
           </span>
         </div>
-        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <OfflineNotice /> : null}
-      </section>
+      </header>
 
-      {/* Primary action: start a crawl (the entry point of the whole loop) */}
-      <CrawlStartPanel
-        project={data.project}
-        site={data.site}
-        lock={crawlLock}
-        connected={data.connected}
-        runningRun={runningRun}
-      />
+      {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+      {!data.connected ? <OfflineNotice /> : null}
 
-      {/* Help zone — layout-separated from the productive panels below */}
-      <HelpPanel title="So lesen Sie das Technical Audit">
+      <HelpDisclosure summary="So lesen Sie das Technical Audit">
         <p>
-          Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt,
-          wo URLs auf dem Weg in den Google-Index verloren gehen. Der{" "}
-          <GlossarLink term="health score">Health Score</GlossarLink> bündelt alle offenen
-          Issues zu einer Zahl. Die Treemap verrät, welche Website-Bereiche die meisten
-          Probleme tragen — dort lohnt sich die Arbeit zuerst.
+          Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt, wo URLs
+          auf dem Weg in den Google-Index verloren gehen. Der{" "}
+          <GlossarLink term="health score">Health Score</GlossarLink> bündelt alle offenen Issues zu
+          einer Zahl. Die Treemap verrät, welche Website-Bereiche die meisten Probleme tragen — dort
+          lohnt sich die Arbeit zuerst.
         </p>
-      </HelpPanel>
+      </HelpDisclosure>
 
-      {/* Health gauge + indexability funnel */}
-      <section className="audit-overview-grid">
-        <div className="card">
+      {/* At-a-glance verdict: the three numbers that frame strengths & weaknesses */}
+      <div className="verdict-strip verdict-strip--3">
+        <MetricCard
+          label="Health Score"
+          value={healthValue !== null ? String(healthValue) : "—"}
+          note={
+            data.latestHealthScore ? `${fmt(data.latestHealthScore.totalIssues)} gewertete Issues` : "Noch nicht berechnet"
+          }
+          info="Aggregierter technischer Gesundheitswert aus offenen Issues und deren Schwere (0–100)."
+        />
+        <MetricCard
+          label="Offene Issues"
+          value={fmt(data.openIssueTotal)}
+          note="nach Regel & Schweregrad gruppiert"
+          info="Alle aktuell offenen technischen Befunde über die zuletzt gecrawlten URLs."
+        />
+        <MetricCard
+          label="Indexierbar"
+          value={indexableValue !== null ? fmt(indexableValue) : "—"}
+          note="URLs am Ende des Funnels"
+          info="URLs, die nach Abruf & Rendering nicht blockiert und damit indexierbar sind."
+        />
+      </div>
+
+      {/* Lead: indexability funnel (primary) beside the start action + health gauge */}
+      <div className="split-lead">
+        <section className="card">
           <p className="kicker">
             <TermTooltip term="indexierbarkeit">Indexierbarkeit</TermTooltip>-Funnel
             <InfoTip>
@@ -405,36 +425,38 @@ export default async function Page({
             </InfoTip>
           </p>
           <p className="muted">
-            Wo verliert die Seite URLs auf dem Weg zu Google? Entdeckt → Gecrawlt → Indexierbar
-            (aus der letzten Analyse).
+            Wo verliert die Seite URLs auf dem Weg zu Google? Entdeckt → Gecrawlt → Indexierbar (aus
+            der letzten Analyse).
           </p>
           <IndexabilityFunnel stages={data.funnelStages} />
           <WhyItMatters>
             Jeder Abfall zwischen den Stufen ist Traffic, der nie im Index ankommt — hier wird er
             sichtbar.
           </WhyItMatters>
-        </div>
+        </section>
 
-        <div className="card">
-          <p className="kicker">
-            <TermTooltip term="health score">Health Score</TermTooltip>
-          </p>
-          <ScoreGauge value={healthValue} label="Health" />
-          <div className="audit-gauge-row">
-            {healthDelta !== null ? <DeltaChip value={healthDelta} unit=" Punkte" /> : null}
-            <ConfidenceBadge level="A" />
+        <div className="side-rail">
+          <CrawlStartPanel
+            project={data.project}
+            site={data.site}
+            lock={crawlLock}
+            connected={data.connected}
+            runningRun={runningRun}
+          />
+          <div className="card">
+            <p className="kicker">
+              <TermTooltip term="health score">Health Score</TermTooltip>
+            </p>
+            <ScoreGauge value={healthValue} label="Health" />
+            <div className="audit-gauge-row">
+              {healthDelta !== null ? <DeltaChip value={healthDelta} unit=" Punkte" /> : null}
+              <ConfidenceBadge level="A" />
+            </div>
           </div>
-          <p className="muted">
-            {data.latestHealthScore
-              ? `${data.latestHealthScore.totalIssues} gewertete Issues · Stand ${new Date(
-                  data.latestHealthScore.generatedAt
-                ).toLocaleString("de-DE")}`
-              : "Noch kein Health Score berechnet."}
-          </p>
         </div>
-      </section>
+      </div>
 
-      {/* Section treemap */}
+      {/* Section treemap — wants width, stays full-bleed */}
       <section className="card">
         <p className="kicker">Gesundheit nach Website-Bereich</p>
         <p className="muted">
@@ -455,12 +477,9 @@ export default async function Page({
             </span>
           </div>
         ) : null}
-        <WhyItMatters>
-          Zeigt auf einen Blick, welche Bereiche der Website die meisten Probleme tragen.
-        </WhyItMatters>
       </section>
 
-      {/* Issue groups */}
+      {/* Issue groups — the primary triage surface */}
       <section className="card">
         <p className="kicker">Issue-Gruppen</p>
         <p className="muted">
@@ -543,63 +562,72 @@ export default async function Page({
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
       </section>
 
-      {/* Next-step guidance — only once there is at least one analysis to act on. */}
-      {data.recentCrawlRuns.length > 0 ? (
-        <section className="card">
-          <p className="kicker">Nächster Schritt</p>
-          <h2>Aus den Befunden Wirkung machen</h2>
-          <p className="muted">
-            Die Analyse liegt vor — so geht es weiter: Verbesserungschancen priorisieren oder eine
-            einzelne Seite im Detail prüfen.
-          </p>
-          <div className="cluster">
-            <a className="button" href="/content-opportunities">Chancen ansehen →</a>
-            <a className="button secondary" href="/url-dossier">Einzelne Seite prüfen →</a>
-          </div>
-        </section>
-      ) : null}
+      {/* Secondary: run comparison, history & next steps — collapsed by default */}
+      <details className="advanced-section">
+        <summary>
+          <span className="advanced-section__title">Verlauf, Vergleich &amp; nächste Schritte</span>
+          <span className="advanced-section__hint">
+            Zwei Analysen gegenüberstellen, die Historie ansehen und weiterführende Aktionen wählen.
+          </span>
+        </summary>
 
-      {/* Crawl-Vergleich (crawl-diff) */}
-      <CrawlDiffSection data={data} currentParams={currentParams} />
-
-      {/* Recent crawl runs */}
-      <section className="card">
-        <p className="kicker">Letzte Analysen</p>
         {data.recentCrawlRuns.length > 0 ? (
-          <div className="audit-runs">
-            {data.recentCrawlRuns.map((run) => (
-              <div className="audit-run" key={run.id}>
-                <div className="audit-run__meta">
-                  <span className="audit-run__when">
-                    {new Date(run.startedAt).toLocaleString("de-DE")} · {crawlTriggerLabel(run.trigger)}
-                  </span>
-                  <span className="audit-run__detail">
-                    {run.summary.discoveredUrls.toLocaleString("de-DE")} URLs entdeckt ·{" "}
-                    {run.summary.openIssues.toLocaleString("de-DE")} offene Issues
-                    {run.summary.healthScore !== null ? ` · Health ${run.summary.healthScore}` : ""}
+          <section className="card">
+            <p className="kicker">Nächster Schritt</p>
+            <h2>Aus den Befunden Wirkung machen</h2>
+            <p className="muted">
+              Die Analyse liegt vor — so geht es weiter: Verbesserungschancen priorisieren oder eine
+              einzelne Seite im Detail prüfen.
+            </p>
+            <div className="cluster">
+              <a className="button" href="/content-opportunities">Chancen ansehen →</a>
+              <a className="button secondary" href="/url-dossier">Einzelne Seite prüfen →</a>
+            </div>
+          </section>
+        ) : null}
+
+        {/* Crawl-Vergleich (crawl-diff) */}
+        <CrawlDiffSection data={data} currentParams={currentParams} />
+
+        {/* Recent crawl runs */}
+        <section className="card">
+          <p className="kicker">Letzte Analysen</p>
+          {data.recentCrawlRuns.length > 0 ? (
+            <div className="audit-runs">
+              {data.recentCrawlRuns.map((run) => (
+                <div className="audit-run" key={run.id}>
+                  <div className="audit-run__meta">
+                    <span className="audit-run__when">
+                      {new Date(run.startedAt).toLocaleString("de-DE")} · {crawlTriggerLabel(run.trigger)}
+                    </span>
+                    <span className="audit-run__detail">
+                      {run.summary.discoveredUrls.toLocaleString("de-DE")} URLs entdeckt ·{" "}
+                      {run.summary.openIssues.toLocaleString("de-DE")} offene Issues
+                      {run.summary.healthScore !== null ? ` · Health ${run.summary.healthScore}` : ""}
+                    </span>
+                  </div>
+                  <span
+                    className={`badge ${
+                      run.status === "succeeded"
+                        ? "success"
+                        : run.status === "failed"
+                          ? "danger"
+                          : "primary"
+                    }`}
+                  >
+                    {RUN_STATUS_LABEL[run.status] ?? run.status}
                   </span>
                 </div>
-                <span
-                  className={`badge ${
-                    run.status === "succeeded"
-                      ? "success"
-                      : run.status === "failed"
-                        ? "danger"
-                        : "primary"
-                  }`}
-                >
-                  {RUN_STATUS_LABEL[run.status] ?? run.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="muted">
-            Noch keine Analyse. Starten Sie eine Analyse, um Indexierbarkeit und Issues zu erfassen.
-          </p>
-        )}
-        <Pagination page={runPage} currentParams={currentParams} param="runOffset" />
-      </section>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">
+              Noch keine Analyse. Starten Sie eine Analyse, um Indexierbarkeit und Issues zu erfassen.
+            </p>
+          )}
+          <Pagination page={runPage} currentParams={currentParams} param="runOffset" />
+        </section>
+      </details>
     </AppShell>
   );
 }
