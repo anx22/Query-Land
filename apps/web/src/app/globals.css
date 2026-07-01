@@ -2329,3 +2329,11 @@ select {
   background-size: 0.72rem !important;
   padding-right: 2.1rem !important;
 }
+
+/* Native number spinners read as raw HTML; hide them (fields are plain numeric entry). */
+input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Tint native checkboxes/radios to the brand so they are not default-blue OS controls. */
+input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }
