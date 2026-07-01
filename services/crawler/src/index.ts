@@ -28,5 +28,5 @@ export { assessIndexability } from "./indexability.js";
 export { extractOutgoingLinks } from "./link-extraction.js";
 export { isRobotsAllowed, loadRobotsPolicy, parseRobotsTxt, robotsCrawlDelaySeconds } from "./robots.js";
 export { createDiscoveredUrl, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, extractSitemapIndexLocations, extractSitemapLocations, extractUrlsetLocations } from "./sitemap.js";
-export { isInCrawlScope, normalizeCrawlUrl } from "./url-normalization.js";
+export { hasRepeatedSegments, isInCrawlScope, normalizeCrawlUrl } from "./url-normalization.js";
 export type * from "./types.js";

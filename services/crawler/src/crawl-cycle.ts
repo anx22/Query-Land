@@ -1,13 +1,13 @@
 import { validateCrawlSeedJobPayload, type DiscoveredUrl, type FetchResult } from "@seo-tool/domain-model";
-import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_DEPTH, DEFAULT_MAX_URLS } from "./config.js";
+import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_CRAWL_DELAY_MS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_DISTINCT_QUERY_PER_PATH, DEFAULT_MAX_URL_LENGTH, DEFAULT_MAX_URLS } from "./config.js";
 import { assessIndexability } from "./indexability.js";
 import { evaluateAuditIssues } from "./audit-rules.js";
 import { fetchUrl } from "./fetch-url.js";
 import { parsePage } from "./html-parse.js";
-import { isRobotsAllowed, loadRobotsPolicy } from "./robots.js";
+import { isRobotsAllowed, loadRobotsPolicy, robotsCrawlDelaySeconds } from "./robots.js";
 import { createDiscoveredUrl, discoverUrlsFromSitemapIndex, extractSitemapLocations } from "./sitemap.js";
 import type { AuditPageInput, CrawlWorkerCycleOptions, CrawlWorkerCycleResult, RobotsPolicy } from "./types.js";
-import { isInCrawlScope, normalizeCrawlUrl, type CrawlScopeType } from "./url-normalization.js";
+import { hasRepeatedSegments, isInCrawlScope, normalizeCrawlUrl, type CrawlScopeType } from "./url-normalization.js";
 
 const DEFAULT_MAX_OUTGOING_LINK_CHECKS = 50;
 
@@ -93,6 +93,15 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     let pageErrors = 0;
     let truncated = false;
 
+    // --- Politeness: honour robots Crawl-delay between same-host fetches (capped). ---
+    const crawlDelayMs = Math.min((robotsCrawlDelaySeconds(robotsPolicy, userAgent) ?? 0) * 1000, options.maxCrawlDelayMs ?? DEFAULT_MAX_CRAWL_DELAY_MS);
+    const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    // Seed/robots/sitemap already hit the base host, so it counts as "fetched"
+    // — the first in-scope page fetch then honours the crawl-delay.
+    const fetchedHosts = new Set<string>([safeHostOf(effectiveBase)]);
+    // --- Trap guard: cap distinct query-string variants enqueued per path. ---
+    const distinctQueryByPath = new Map<string, number>();
+
     // --- BFS over the frontier, bounded by maxUrls + maxDepth. ---
     while (queue.length > 0) {
       if (fetchedUrls + pageErrors >= maxUrls) {
@@ -118,8 +127,16 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
           continue;
         }
 
-        const fetchResult = fetchesByUrl.get(url)
-          ?? await fetchUrl({ url, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent, maxBodyBytes: options.maxBodyBytes });
+        let fetchResult = fetchesByUrl.get(url);
+        if (!fetchResult) {
+          // Politeness: wait the crawl-delay before a repeat hit on the same host.
+          if (crawlDelayMs > 0) {
+            const host = new URL(url).host;
+            if (fetchedHosts.has(host)) await sleep(crawlDelayMs);
+            fetchedHosts.add(host);
+          }
+          fetchResult = await fetchUrl({ url, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent, maxBodyBytes: options.maxBodyBytes });
+        }
         fetchesByUrl.set(url, fetchResult);
         const storedFetch = await options.apiClient.recordFetchResult(job.projectId, siteId, stored.id, fetchResult);
         const html = fetchResult.responseBody ?? "";
@@ -146,7 +163,7 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
             .filter((link) => !link.nofollow)
             .map((link) => link.url)
             .filter((link) => isInCrawlScope(link, effectiveBase, scopeType));
-          const fresh = links.filter((link) => !enqueued.has(link));
+          const fresh = links.filter((link) => !enqueued.has(link) && passesFrontierGuards(link, distinctQueryByPath, options));
           if (fresh.length > 0) {
             const discovered = fresh.map((link) => createDiscoveredUrl({ projectId: job.projectId, siteId, baseUrl: effectiveBase, url: link, source: "link", depth: depth + 1, discoveredFrom: url, discoveredAt: now() }));
             await recordNew(discovered);
@@ -235,12 +252,45 @@ async function discoverFromRobotsSitemaps(input: {
   return discovered;
 }
 
+function safeHostOf(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return "";
+  }
+}
+
 function safeNormalize(rawUrl: string, baseUrl: string): string | null {
   try {
     return normalizeCrawlUrl(rawUrl, baseUrl);
   } catch {
     return null;
   }
+}
+
+/**
+ * Trap/limit guards applied before a link enters the frontier: reject
+ * over-long URLs, spider-trap paths (repeated segments), and cap the number of
+ * distinct query-string variants enqueued per path (faceted-nav explosions).
+ * Mutates `distinctQueryByPath` as a side effect when it accepts a query URL.
+ */
+function passesFrontierGuards(link: string, distinctQueryByPath: Map<string, number>, options: CrawlWorkerCycleOptions): boolean {
+  if (link.length > (options.maxUrlLength ?? DEFAULT_MAX_URL_LENGTH)) return false;
+  let url: URL;
+  try {
+    url = new URL(link);
+  } catch {
+    return false;
+  }
+  if (hasRepeatedSegments(url.pathname)) return false;
+  if (url.search) {
+    const cap = options.maxDistinctQueryPerPath ?? DEFAULT_MAX_DISTINCT_QUERY_PER_PATH;
+    const key = `${url.origin}${url.pathname}`;
+    const count = distinctQueryByPath.get(key) ?? 0;
+    if (count >= cap) return false;
+    distinctQueryByPath.set(key, count + 1);
+  }
+  return true;
 }
 
 function dedupeByNormalized(urls: DiscoveredUrl[]): DiscoveredUrl[] {

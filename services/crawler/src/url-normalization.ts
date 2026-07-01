@@ -1,6 +1,12 @@
 /** Crawl scope strategy (mirrors sites.scope_type). */
 export type CrawlScopeType = "domain" | "subdomain" | "folder";
 
+/** Known tracking/analytics query params dropped so URLs dedupe to one canonical key. */
+const TRACKING_PARAMS = new Set([
+  "gclid", "gbraid", "wbraid", "fbclid", "msclkid", "dclid", "yclid",
+  "mc_cid", "mc_eid", "igshid", "ref", "ref_src", "_ga", "_gl", "spm", "mkt_tok"
+]);
+
 export function normalizeCrawlUrl(rawUrl: string, baseUrl: string): string {
   const url = new URL(rawUrl.trim(), baseUrl);
   url.hash = "";
@@ -10,7 +16,43 @@ export function normalizeCrawlUrl(rawUrl: string, baseUrl: string): string {
   if (url.pathname !== "/" && url.pathname.endsWith("/")) {
     url.pathname = url.pathname.slice(0, -1);
   }
+  stripAndSortQuery(url);
   return url.toString();
+}
+
+/**
+ * Drop known tracking params (utm_* and the set above) and sort the remaining
+ * query params, so `?utm_source=x`, `?b=2&a=1` and `?a=1&b=2` all collapse to
+ * the same normalized key. Only *known* tracking params are removed — meaningful
+ * params (e.g. `?id=5`, `?page=2`) are preserved.
+ */
+function stripAndSortQuery(url: URL): void {
+  const params = url.searchParams;
+  for (const key of [...params.keys()]) {
+    const lower = key.toLowerCase();
+    if (lower.startsWith("utm_") || TRACKING_PARAMS.has(lower)) {
+      params.delete(key);
+    }
+  }
+  params.sort();
+}
+
+/**
+ * Spider-trap signal: a path with the same segment repeated more than `maxRepeats`
+ * times consecutively (e.g. `/a/a/a`, common with mis-resolved relative links).
+ */
+export function hasRepeatedSegments(pathname: string, maxRepeats = 2): boolean {
+  const segments = pathname.split("/").filter(Boolean);
+  let run = 1;
+  for (let index = 1; index < segments.length; index += 1) {
+    if (segments[index] === segments[index - 1]) {
+      run += 1;
+      if (run > maxRepeats) return true;
+    } else {
+      run = 1;
+    }
+  }
+  return false;
 }
 
 /** Lower-cased host with a leading "www." removed — the apex we compare against. */
