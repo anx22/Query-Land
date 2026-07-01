@@ -642,6 +642,45 @@ test("resumable crawl finalizes correctly across continuation invocations", asyn
   await store.close();
 });
 
+test("resumable crawl continuations that only complete robots-blocked URLs still drain the frontier", async () => {
+  // Regression: when a continuation invocation records no new page signal (every
+  // claimed URL is robots-blocked), a page-signal-based continuation cursor would
+  // repeat the previous subject → the job queue dedupes it → the frontier is stranded
+  // and the run stays "running" forever. The monotonic continuation counter avoids that.
+  const store = await createStore("sqlite::memory:");
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: `https://example.com:run:${run.id}`, payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const u = String(url);
+    // Disallow the two child paths so their frontier rows complete WITHOUT a page signal.
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nDisallow: /a\nDisallow: /b\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    return new Response(`<html><head><title>seed</title></head><body><a href="/a">x</a><a href="/b">y</a></body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+
+  // Capture every continuation subject to prove they never collide (which would drop a job).
+  const seedJobSubjects: string[] = [];
+  const baseClient = apiClientForStore(store);
+  const apiClient = { ...baseClient, createCrawlSeedJob: (p: string, subject: string, payload: Record<string, unknown>) => { seedJobSubjects.push(subject); return baseClient.createCrawlSeedJob!(p, subject, payload); } };
+
+  let invocations = 0;
+  for (let i = 0; i < 30; i += 1) {
+    const result = await runCrawlWorkerCycle({ apiClient, fetchImpl, now: () => "2026-06-03T10:00:00.000Z", timeBudgetMs: 0, frontierBatchSize: 1, maxConcurrency: 1 });
+    if (!result.claimed) break;
+    invocations += 1;
+  }
+
+  assert.ok(invocations >= 2, `expected continuation across multiple invocations, got ${invocations}`);
+  assert.equal(new Set(seedJobSubjects).size, seedJobSubjects.length, `continuation subjects must be unique, got ${JSON.stringify(seedJobSubjects)}`);
+  const runs = envelopeData<Array<{ id: string; status: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs`));
+  assert.equal(runs.find((r) => r.id === run.id)?.status, "succeeded");
+  const pending = (await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs/${run.id}/frontier`)).body as { data: { pending: number } };
+  assert.equal(pending.data.pending, 0);
+  await store.close();
+});
+
 test("crawl worker creates a crawl run when legacy crawl_seed payload has no crawlRunId", async () => {
   const store = await createStore("sqlite::memory:");
   const { app, projectId, siteId } = await setupSite(store);

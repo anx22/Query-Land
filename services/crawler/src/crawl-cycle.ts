@@ -334,8 +334,11 @@ async function runResumableCrawlWorkerCycle(options: CrawlWorkerCycleOptions): P
     // Always process at least one batch per invocation (guarantees forward progress
     // even under a tiny budget), then stop once the wall-clock budget is spent.
     for (;;) {
-      if (baselineProcessed + fetchedThisRun >= maxUrls) { capReached = true; break; }
-      const { items } = await api.claimCrawlFrontier!(projectId, siteId, crawlRunId, batchSize);
+      const remaining = maxUrls - baselineProcessed - fetchedThisRun;
+      if (remaining <= 0) { capReached = true; break; }
+      // Never claim more than the remaining URL budget: every claimed item is fetched
+      // and recorded, so an oversized batch would overshoot maxUrls by up to a batch.
+      const { items } = await api.claimCrawlFrontier!(projectId, siteId, crawlRunId, Math.min(batchSize, remaining));
       if (items.length === 0) break;
 
       await mapWithConcurrency(items, concurrency, async (item) => {
@@ -391,10 +394,14 @@ async function runResumableCrawlWorkerCycle(options: CrawlWorkerCycleOptions): P
 
     // Work remains and we're under the cap → continuation job; leave the run running.
     if (pending > 0 && !capReached) {
-      // Unique subject per continuation (progress cursor) so the job-queue
-      // idempotency key does not collide with the original / earlier continuations.
-      const continuationSubject = `${makeCrawlSeedJobSubject(baseUrl, crawlRunId)}:c${baselineProcessed + fetchedThisRun}`;
-      await api.createCrawlSeedJob!(projectId, continuationSubject, { siteId, baseUrl, crawlRunId, sitemapUrl: payload.sitemapUrl, scopeType, resume: true });
+      // Monotonic counter carried in the payload — strictly increments on every
+      // continuation regardless of how much work an invocation did. This makes the
+      // subject (and thus the job-queue idempotency key) unique per continuation even
+      // when an invocation only completes robots-blocked / errored URLs and records
+      // no new page signal (in which case a page-signal cursor would repeat).
+      const nextContinuation = (payload.continuation ?? 0) + 1;
+      const continuationSubject = `${makeCrawlSeedJobSubject(baseUrl, crawlRunId)}:c${nextContinuation}`;
+      await api.createCrawlSeedJob!(projectId, continuationSubject, { siteId, baseUrl, crawlRunId, sitemapUrl: payload.sitemapUrl, scopeType, resume: true, continuation: nextContinuation });
       const completed = await api.completeJob(job.id, "succeeded");
       return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, fetchedUrls: fetchedThisRun, pageErrors, truncated: true, durationMs: Date.now() - cycleStartMs };
     }

@@ -24,6 +24,12 @@ export interface CrawlSeedJobPayload {
   scopeType?: "domain" | "subdomain" | "folder";
   /** True for a continuation job: resume from the persisted crawl_frontier, do not re-bootstrap. */
   resume?: boolean;
+  /**
+   * Monotonic continuation counter (0 for the original job, N for the Nth continuation).
+   * Guarantees a unique job subject per continuation so the queue's idempotency key never
+   * collides with an earlier continuation, even when an invocation records no new page signal.
+   */
+  continuation?: number;
 }
 
 export interface ScheduledCrawlSeedJobPayload extends CrawlSeedJobPayload {
@@ -77,6 +83,9 @@ export function validateCrawlSeedJobPayload(input: unknown): CrawlSeedJobPayload
   }
   if (value.resume === true) {
     payload.resume = true;
+  }
+  if (typeof value.continuation === "number" && Number.isInteger(value.continuation) && value.continuation >= 0) {
+    payload.continuation = value.continuation;
   }
   return payload;
 }
