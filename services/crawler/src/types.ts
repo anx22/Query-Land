@@ -118,6 +118,8 @@ export interface CrawlWorkerCycleOptions {
   maxCrawlDelayMs?: number;
   /** Injectable sleep for the per-host politeness wait (tests assert without real timers). */
   sleep?: (ms: number) => Promise<void>;
+  /** Max page fetches in flight at once. Forced to 1 when a crawl-delay applies. Default DEFAULT_MAX_CONCURRENCY. */
+  maxConcurrency?: number;
 }
 
 export interface CrawlWorkerCycleResult {

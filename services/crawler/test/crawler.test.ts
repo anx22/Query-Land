@@ -542,6 +542,31 @@ test("crawl worker per-URL error boundary: one failing page does not abort the r
   await store.close();
 });
 
+test("crawl worker fetches pages concurrently up to maxConcurrency", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    inFlight -= 1;
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    const links = LINK_GRAPH[path] ?? [];
+    return new Response(`<html><head><title>${path}</title></head><body>${links.map((l) => `<a href="${l}">x</a>`).join("")}</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", maxConcurrency: 3 });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.fetchedUrls, 4); // same coverage as the serial BFS
+  assert.ok(maxInFlight >= 2, `expected overlapping fetches under maxConcurrency, max in-flight was ${maxInFlight}`);
+  await store.close();
+});
+
 test("crawl worker creates a crawl run when legacy crawl_seed payload has no crawlRunId", async () => {
   const store = await createStore("sqlite::memory:");
   const { app, projectId, siteId } = await setupSite(store);

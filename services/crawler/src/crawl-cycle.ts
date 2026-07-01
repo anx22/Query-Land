@@ -1,5 +1,5 @@
 import { validateCrawlSeedJobPayload, type DiscoveredUrl, type FetchResult } from "@seo-tool/domain-model";
-import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_CRAWL_DELAY_MS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_DISTINCT_QUERY_PER_PATH, DEFAULT_MAX_URL_LENGTH, DEFAULT_MAX_URLS } from "./config.js";
+import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_CRAWL_DELAY_MS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_DISTINCT_QUERY_PER_PATH, DEFAULT_MAX_URL_LENGTH, DEFAULT_MAX_URLS } from "./config.js";
 import { assessIndexability } from "./indexability.js";
 import { evaluateAuditIssues } from "./audit-rules.js";
 import { fetchUrl } from "./fetch-url.js";
@@ -85,12 +85,13 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     await recordNew(initial);
 
     const enqueued = new Set<string>(initial.map((u) => u.normalizedUrl));
-    const queue: Array<{ url: string; depth: number }> = initial.map((u) => ({ url: u.normalizedUrl, depth: u.depth ?? 0 }));
+    let frontier: Array<{ url: string; depth: number }> = initial.map((u) => ({ url: u.normalizedUrl, depth: u.depth ?? 0 }));
 
     const pages: AuditPageInput[] = [];
     const checkedDiscoveredUrlIds: string[] = [];
     let fetchedUrls = 0;
     let pageErrors = 0;
+    let reserved = 0; // slots reserved for an actual fetch (fetched + errored); caps at maxUrls
     let truncated = false;
 
     // --- Politeness: honour robots Crawl-delay between same-host fetches (capped). ---
@@ -99,22 +100,19 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     // Seed/robots/sitemap already hit the base host, so it counts as "fetched"
     // — the first in-scope page fetch then honours the crawl-delay.
     const fetchedHosts = new Set<string>([safeHostOf(effectiveBase)]);
+    // A crawl-delay forces serial fetching (per-host politeness); otherwise fan out.
+    const concurrency = crawlDelayMs > 0 ? 1 : Math.max(1, options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY);
     // --- Trap guard: cap distinct query-string variants enqueued per path. ---
     const distinctQueryByPath = new Map<string, number>();
 
-    // --- BFS over the frontier, bounded by maxUrls + maxDepth. ---
-    while (queue.length > 0) {
-      if (fetchedUrls + pageErrors >= maxUrls) {
-        truncated = queue.length > 0;
-        break;
-      }
-      const { url, depth } = queue.shift()!;
+    // Process one frontier URL: fetch/assess/record and return the in-scope,
+    // followable child links (deduped + guarded later, once per generation).
+    const processOne = async (url: string, depth: number): Promise<Array<{ url: string; depth: number; from: string }>> => {
       const stored = known.get(url);
-      if (!stored) continue;
-      checkedDiscoveredUrlIds.push(stored.id);
-
+      if (!stored) return [];
       try {
         if (!isRobotsAllowed(url, robotsPolicy, userAgent)) {
+          checkedDiscoveredUrlIds.push(stored.id);
           await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, stored.id, {
             url,
             state: "blocked_by_robots",
@@ -124,8 +122,17 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
             fetchResultId: null,
             assessedAt: now()
           });
-          continue;
+          return [];
         }
+
+        // Reserve a fetch slot synchronously (no await between check and increment)
+        // so bounded concurrency can never exceed maxUrls.
+        if (reserved >= maxUrls) {
+          truncated = true;
+          return [];
+        }
+        reserved += 1;
+        checkedDiscoveredUrlIds.push(stored.id);
 
         let fetchResult = fetchesByUrl.get(url);
         if (!fetchResult) {
@@ -156,23 +163,12 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
         await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, stored.id, { ...assessment, fetchResultId: storedFetch.id, assessedAt: now() });
         fetchedUrls += 1;
 
-        // --- Frontier growth: follow in-scope, followable links one level deeper.
-        //     nofollow links are skipped for discovery (still checked for breakage). ---
-        if (depth < maxDepth) {
-          const links = (page.parsed?.links ?? [])
-            .filter((link) => !link.nofollow)
-            .map((link) => link.url)
-            .filter((link) => isInCrawlScope(link, effectiveBase, scopeType));
-          const fresh = links.filter((link) => !enqueued.has(link) && passesFrontierGuards(link, distinctQueryByPath, options));
-          if (fresh.length > 0) {
-            const discovered = fresh.map((link) => createDiscoveredUrl({ projectId: job.projectId, siteId, baseUrl: effectiveBase, url: link, source: "link", depth: depth + 1, discoveredFrom: url, discoveredAt: now() }));
-            await recordNew(discovered);
-            for (const link of fresh) {
-              enqueued.add(link);
-              queue.push({ url: link, depth: depth + 1 });
-            }
-          }
-        }
+        if (depth >= maxDepth) return [];
+        return (page.parsed?.links ?? [])
+          .filter((link) => !link.nofollow)
+          .map((link) => link.url)
+          .filter((link) => isInCrawlScope(link, effectiveBase, scopeType))
+          .map((link) => ({ url: link, depth: depth + 1, from: url }));
       } catch (pageError) {
         // Per-URL error boundary: one bad page must not abort the whole run.
         pageErrors += 1;
@@ -186,8 +182,32 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
           fetchResultId: null,
           assessedAt: now()
         }).catch(() => undefined);
+        return [];
       }
+    };
+
+    // --- BFS over the frontier by generation, each generation fetched with
+    //     bounded concurrency, bounded overall by maxUrls + maxDepth. ---
+    while (frontier.length > 0 && reserved < maxUrls) {
+      const childLists = await mapWithConcurrency(frontier, concurrency, (item) => processOne(item.url, item.depth));
+
+      // Grow the frontier once per generation: dedupe + guard + persist in a
+      // single batch (no concurrent writes / no races on `enqueued`).
+      const next: Array<{ url: string; depth: number }> = [];
+      const freshDiscovered: DiscoveredUrl[] = [];
+      for (const children of childLists) {
+        for (const child of children) {
+          if (enqueued.has(child.url)) continue;
+          if (!passesFrontierGuards(child.url, distinctQueryByPath, options)) continue;
+          enqueued.add(child.url);
+          freshDiscovered.push(createDiscoveredUrl({ projectId: job.projectId, siteId, baseUrl: effectiveBase, url: child.url, source: "link", depth: child.depth, discoveredFrom: child.from, discoveredAt: now() }));
+          next.push({ url: child.url, depth: child.depth });
+        }
+      }
+      if (freshDiscovered.length > 0) await recordNew(freshDiscovered);
+      frontier = next;
     }
+    if (frontier.length > 0) truncated = true;
 
     // Broken-link statuses for the audit rules (reuses BFS fetches; checks a bounded extra set).
     await populateOutgoingLinkStatuses({ pages, baseUrl: effectiveBase, scopeType, robotsPolicy, fetchesByUrl, options, now, userAgent });
@@ -250,6 +270,26 @@ async function discoverFromRobotsSitemaps(input: {
     }
   }
   return discovered;
+}
+
+/**
+ * Map `fn` over `items` with at most `limit` calls in flight, preserving result
+ * order. Workers pull the next index synchronously, so the shared reservation
+ * counter in `processOne` stays a correct concurrency gate.
+ */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () => worker()));
+  return results;
 }
 
 function safeHostOf(rawUrl: string): string {
