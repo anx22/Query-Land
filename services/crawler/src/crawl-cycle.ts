@@ -1,5 +1,5 @@
-import { validateCrawlSeedJobPayload, type DiscoveredUrl, type FetchResult } from "@seo-tool/domain-model";
-import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_CRAWL_DELAY_MS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_DISTINCT_QUERY_PER_PATH, DEFAULT_MAX_URL_LENGTH, DEFAULT_MAX_URLS } from "./config.js";
+import { makeCrawlSeedJobSubject, validateCrawlSeedJobPayload, type DiscoveredUrl, type FetchResult } from "@seo-tool/domain-model";
+import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_FRONTIER_BATCH, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_CRAWL_DELAY_MS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_DISTINCT_QUERY_PER_PATH, DEFAULT_MAX_URL_LENGTH, DEFAULT_MAX_URLS, DEFAULT_TIME_BUDGET_MS } from "./config.js";
 import { assessIndexability } from "./indexability.js";
 import { evaluateAuditIssues } from "./audit-rules.js";
 import { fetchUrl } from "./fetch-url.js";
@@ -11,7 +11,18 @@ import { hasRepeatedSegments, isInCrawlScope, normalizeCrawlUrl, type CrawlScope
 
 const DEFAULT_MAX_OUTGOING_LINK_CHECKS = 50;
 
+/** True when the client exposes the frontier + page-signal endpoints needed to resume. */
+function supportsResumable(api: CrawlWorkerCycleOptions["apiClient"]): boolean {
+  return Boolean(api.claimCrawlFrontier && api.enqueueCrawlFrontier && api.completeCrawlFrontier && api.countPendingCrawlFrontier && api.recordCrawlPageSignals && api.listCrawlPageSignals && api.createCrawlSeedJob);
+}
+
 export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Promise<CrawlWorkerCycleResult> {
+  // Resumable path is opt-in: only when a time budget is set AND the client can
+  // persist/read the frontier. Otherwise the classic single-invocation in-memory
+  // path below runs unchanged.
+  if (options.timeBudgetMs != null && supportsResumable(options.apiClient)) {
+    return runResumableCrawlWorkerCycle(options);
+  }
   const cycleStartMs = Date.now();
   const job = await options.apiClient.claimNextJob();
   if (!job) {
@@ -229,6 +240,187 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     const completed = await options.apiClient.completeJob(job.id, "succeeded");
 
     return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, discoveredUrls: known.size, fetchedUrls, issues: issues.length, pageErrors, truncated, durationMs: Date.now() - cycleStartMs };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown crawl worker error";
+    if (siteId && crawlRunId) {
+      await options.apiClient.completeCrawlRun(job.projectId, siteId, crawlRunId, "failed", errorMessage).catch(() => undefined);
+    }
+    const completed = await options.apiClient.completeJob(job.id, "failed", errorMessage);
+    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, errorMessage, durationMs: Date.now() - cycleStartMs };
+  }
+}
+
+/**
+ * Resumable crawl path (opt-in via timeBudgetMs). Processes a time-bounded batch
+ * of the persisted crawl_frontier, records per-page audit signals, and either
+ * enqueues a continuation job (work remains) or finalizes the run from the stored
+ * signals (frontier drained). This lets a large site be crawled across several
+ * serverless invocations while keeping the audit correct (see migrations 016/017).
+ */
+async function runResumableCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Promise<CrawlWorkerCycleResult> {
+  const cycleStartMs = Date.now();
+  const api = options.apiClient;
+  const job = await api.claimNextJob();
+  if (!job) return { claimed: false };
+  if (job.type !== "crawl_seed") {
+    const completed = await api.completeJob(job.id, "succeeded");
+    return { claimed: true, jobId: job.id, status: completed.status };
+  }
+
+  let siteId = "";
+  let crawlRunId = "";
+  try {
+    const payload = validateCrawlSeedJobPayload(job.payload ?? {});
+    const projectId = job.projectId;
+    siteId = payload.siteId;
+    const baseUrl = payload.baseUrl;
+    const scopeType: CrawlScopeType = payload.scopeType ?? "domain";
+    const maxUrls = options.maxUrls ?? DEFAULT_MAX_URLS;
+    const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
+    const now = options.now ?? (() => new Date().toISOString());
+    const userAgent = options.userAgent ?? DEFAULT_CRAWLER_USER_AGENT;
+    const timeBudgetMs = options.timeBudgetMs ?? DEFAULT_TIME_BUDGET_MS;
+    const batchSize = Math.max(1, options.frontierBatchSize ?? DEFAULT_FRONTIER_BATCH);
+    const fetchOpts = { fetchImpl: options.fetchImpl, timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxRedirects: options.maxRedirects ?? 5, userAgent, maxBodyBytes: options.maxBodyBytes } as const;
+
+    crawlRunId = payload.crawlRunId ?? "";
+    if (!crawlRunId) {
+      const created = await api.createCrawlRun(projectId, siteId, "manual");
+      if (!created?.id) throw new Error(`createCrawlRun returned no crawl run id for project ${projectId} / site ${siteId}`);
+      crawlRunId = created.id;
+    }
+
+    // Effective base + robots resolved each invocation (needed for scope + robots + politeness).
+    const seedFetch = await fetchUrl({ url: baseUrl, fetchedAt: now(), ...fetchOpts });
+    const effectiveBase = seedFetch.finalUrl && /^https?:/i.test(seedFetch.finalUrl) ? seedFetch.finalUrl : baseUrl;
+    const robotsPolicy = await loadRobotsPolicy({ baseUrl: effectiveBase, fetchImpl: options.fetchImpl, fetchedAt: now(), timeoutMs: options.fetchTimeoutMs, retry: options.retry, userAgent });
+    const crawlDelayMs = Math.min((robotsCrawlDelaySeconds(robotsPolicy, userAgent) ?? 0) * 1000, options.maxCrawlDelayMs ?? DEFAULT_MAX_CRAWL_DELAY_MS);
+    const concurrency = crawlDelayMs > 0 ? 1 : Math.max(1, options.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY);
+
+    const fetchesByUrl = new Map<string, FetchResult>();
+    fetchesByUrl.set(normalizeCrawlUrl(effectiveBase, effectiveBase), seedFetch);
+    // The discovered_url id is deterministic from (project, site, normalizedUrl);
+    // source/depth don't affect it, so this resolves the id without a DB lookup.
+    const discoveredIdFor = (normalizedUrl: string): string => createDiscoveredUrl({ projectId, siteId, baseUrl: effectiveBase, url: normalizedUrl, source: "link" }).id;
+
+    // --- Bootstrap the frontier on the first invocation (skipped on resume). ---
+    if (!payload.resume) {
+      const sitemapUrl = payload.sitemapUrl ?? normalizeCrawlUrl("/sitemap.xml", effectiveBase);
+      const sitemapFetch = await fetchUrl({ url: sitemapUrl, fetchedAt: now(), ...fetchOpts });
+      const sitemapXml = sitemapFetch.responseBody ?? "";
+      const sitemapOk = !!sitemapFetch.statusCode && sitemapFetch.statusCode >= 200 && sitemapFetch.statusCode < 300;
+      const sitemapDiscovered = sitemapOk
+        ? await discoverUrlsFromSitemapIndex({ projectId, siteId, baseUrl: effectiveBase, sitemapUrl, sitemapXml, discoveredAt: now(), fetchImpl: options.fetchImpl, timeoutMs: options.fetchTimeoutMs, retry: options.retry, maxIndexDepth: options.maxSitemapIndexDepth, maxSitemapFetches: options.maxSitemapFetches })
+        : [];
+      if (sitemapOk && extractSitemapLocations(sitemapXml).length === 0) {
+        throw new Error(`invalid sitemap: ${sitemapUrl}`);
+      }
+      const robotsSitemapDiscovered = await discoverFromRobotsSitemaps({ robotsPolicy, primarySitemapUrl: sitemapUrl, effectiveBase, scopeType, projectId, siteId, options, now });
+      const seedDiscovered = createDiscoveredUrl({ projectId, siteId, baseUrl: effectiveBase, url: effectiveBase, source: "seed", depth: 0, discoveredAt: now() });
+      const initial = dedupeByNormalized([seedDiscovered, ...sitemapDiscovered, ...robotsSitemapDiscovered]).filter((u) => isInCrawlScope(u.normalizedUrl, effectiveBase, scopeType));
+      await api.recordDiscoveredUrls(projectId, siteId, initial);
+      await api.enqueueCrawlFrontier!(projectId, siteId, crawlRunId, initial.map((u) => ({ normalizedUrl: u.normalizedUrl, depth: u.depth ?? 0, discoveredFrom: u.discoveredFrom ?? null })));
+    }
+
+    // --- Process time-bounded batches from the persisted frontier. ---
+    const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    const fetchedHosts = new Set<string>([safeHostOf(effectiveBase)]);
+    const distinctQueryByPath = new Map<string, number>();
+    const baselineProcessed = payload.resume ? (await api.listCrawlPageSignals!(projectId, siteId, crawlRunId)).length : 0;
+    let fetchedThisRun = 0;
+    let pageErrors = 0;
+    let capReached = false;
+
+    // Always process at least one batch per invocation (guarantees forward progress
+    // even under a tiny budget), then stop once the wall-clock budget is spent.
+    for (;;) {
+      if (baselineProcessed + fetchedThisRun >= maxUrls) { capReached = true; break; }
+      const { items } = await api.claimCrawlFrontier!(projectId, siteId, crawlRunId, batchSize);
+      if (items.length === 0) break;
+
+      await mapWithConcurrency(items, concurrency, async (item) => {
+        const url = item.normalizedUrl;
+        const depth = item.depth;
+        const storedId = discoveredIdFor(url);
+        try {
+          if (!isRobotsAllowed(url, robotsPolicy, userAgent)) {
+            await api.recordIndexabilityAssessment(projectId, siteId, storedId, { url, state: "blocked_by_robots", isIndexable: false, reasons: [`robots.txt disallows ${new URL(url).pathname}`], canonicalUrl: null, fetchResultId: null, assessedAt: now() });
+            await api.completeCrawlFrontier!(projectId, siteId, crawlRunId, [url]);
+            return;
+          }
+          let fetchResult = fetchesByUrl.get(url);
+          if (!fetchResult) {
+            if (crawlDelayMs > 0) {
+              const host = new URL(url).host;
+              if (fetchedHosts.has(host)) await sleep(crawlDelayMs);
+              fetchedHosts.add(host);
+            }
+            fetchResult = await fetchUrl({ url, fetchedAt: now(), ...fetchOpts });
+          }
+          fetchesByUrl.set(url, fetchResult);
+          const storedFetch = await api.recordFetchResult(projectId, siteId, storedId, fetchResult);
+          const html = fetchResult.responseBody ?? "";
+          const parsed = parsePage(html, fetchResult.finalUrl ?? url);
+          const page: AuditPageInput = { url, finalUrl: fetchResult.finalUrl, statusCode: fetchResult.statusCode, headers: fetchResult.headers, html, parsed, outgoingLinks: [] };
+          const assessment = assessIndexability(page);
+          await api.recordIndexabilityAssessment(projectId, siteId, storedId, { ...assessment, fetchResultId: (storedFetch as { id: string }).id, assessedAt: now() });
+          fetchedThisRun += 1;
+
+          const inScopeLinks = parsed.links.map((l) => l.url).filter((l) => isInCrawlScope(l, effectiveBase, scopeType));
+          await api.recordCrawlPageSignals!(projectId, siteId, crawlRunId, [{ normalizedUrl: url, finalUrl: fetchResult.finalUrl, statusCode: fetchResult.statusCode, title: parsed.title, canonicalUrl: parsed.canonicalUrl, outgoingLinks: inScopeLinks.map((l) => ({ url: l, statusCode: null })) }]);
+
+          if (depth < maxDepth && baselineProcessed + fetchedThisRun < maxUrls) {
+            const fresh = parsed.links.filter((l) => !l.nofollow).map((l) => l.url).filter((l) => isInCrawlScope(l, effectiveBase, scopeType)).filter((l) => passesFrontierGuards(l, distinctQueryByPath, options));
+            if (fresh.length > 0) {
+              await api.recordDiscoveredUrls(projectId, siteId, fresh.map((l) => createDiscoveredUrl({ projectId, siteId, baseUrl: effectiveBase, url: l, source: "link", depth: depth + 1, discoveredFrom: url, discoveredAt: now() })));
+              await api.enqueueCrawlFrontier!(projectId, siteId, crawlRunId, fresh.map((l) => ({ normalizedUrl: l, depth: depth + 1, discoveredFrom: url })));
+            }
+          }
+          await api.completeCrawlFrontier!(projectId, siteId, crawlRunId, [url]);
+        } catch (pageError) {
+          pageErrors += 1;
+          const message = pageError instanceof Error ? pageError.message : "page processing failed";
+          await api.recordIndexabilityAssessment(projectId, siteId, storedId, { url, state: "blocked_by_status", isIndexable: false, reasons: [`crawl error: ${message}`], canonicalUrl: null, fetchResultId: null, assessedAt: now() }).catch(() => undefined);
+          await api.completeCrawlFrontier!(projectId, siteId, crawlRunId, [url]).catch(() => undefined);
+        }
+      });
+      if (Date.now() - cycleStartMs >= timeBudgetMs) break;
+    }
+
+    const pending = await api.countPendingCrawlFrontier!(projectId, siteId, crawlRunId);
+
+    // Work remains and we're under the cap → continuation job; leave the run running.
+    if (pending > 0 && !capReached) {
+      // Unique subject per continuation (progress cursor) so the job-queue
+      // idempotency key does not collide with the original / earlier continuations.
+      const continuationSubject = `${makeCrawlSeedJobSubject(baseUrl, crawlRunId)}:c${baselineProcessed + fetchedThisRun}`;
+      await api.createCrawlSeedJob!(projectId, continuationSubject, { siteId, baseUrl, crawlRunId, sitemapUrl: payload.sitemapUrl, scopeType, resume: true });
+      const completed = await api.completeJob(job.id, "succeeded");
+      return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, fetchedUrls: fetchedThisRun, pageErrors, truncated: true, durationMs: Date.now() - cycleStartMs };
+    }
+
+    // Frontier drained (or cap reached) → finalize the audit from persisted signals.
+    const signals = await api.listCrawlPageSignals!(projectId, siteId, crawlRunId);
+    const statusByUrl = new Map<string, number | null>(signals.map((s) => [s.normalizedUrl, s.statusCode]));
+    const pages: AuditPageInput[] = signals.map((s) => ({
+      url: s.normalizedUrl,
+      finalUrl: s.finalUrl,
+      statusCode: s.statusCode,
+      parsed: { title: s.title, canonicalUrl: s.canonicalUrl, robotsMeta: "", links: [] },
+      // Only outgoing links we actually crawled carry a known status (broken-link check);
+      // uncrawled/out-of-scope links are omitted rather than falsely flagged.
+      outgoingLinks: s.outgoingLinks
+        .map((l) => ({ url: l.url, normalized: normalizeCrawlUrl(l.url, effectiveBase) }))
+        .filter((l) => statusByUrl.has(l.normalized))
+        .map((l) => ({ url: l.url, statusCode: statusByUrl.get(l.normalized) ?? null }))
+    }));
+    const detectedAt = now();
+    const issues = evaluateAuditIssues(pages).map((issue) => ({ ...issue, projectId, siteId, discoveredUrlId: discoveredIdFor(normalizeCrawlUrl(issue.url, effectiveBase)), detectedAt, resolvedAt: null }));
+    await api.recordAuditIssues(projectId, siteId, issues, signals.map((s) => discoveredIdFor(s.normalizedUrl)));
+    await api.computeHealthScore(projectId, siteId);
+    await api.completeCrawlRun(projectId, siteId, crawlRunId, "succeeded");
+    const completed = await api.completeJob(job.id, "succeeded");
+    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, discoveredUrls: signals.length, fetchedUrls: signals.length, issues: issues.length, pageErrors, truncated: capReached, durationMs: Date.now() - cycleStartMs };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown crawl worker error";
     if (siteId && crawlRunId) {

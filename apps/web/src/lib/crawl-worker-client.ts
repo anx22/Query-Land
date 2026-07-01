@@ -1,4 +1,4 @@
-import type { AuditIssue, DiscoveredUrl, FetchResult, FoundationJob, IndexabilityAssessment } from "@seo-tool/domain-model";
+import type { AuditIssue, CrawlFrontierEntry, CrawlPageSignal, DiscoveredUrl, FetchResult, FoundationJob, IndexabilityAssessment } from "@seo-tool/domain-model";
 import type { CrawlWorkerApiClient } from "@seo-tool/crawler";
 
 interface ApiResponse {
@@ -55,12 +55,52 @@ export class InProcessCrawlWorkerApiClient implements CrawlWorkerApiClient {
     return this.post(`/jobs/${jobId}/complete`, { status, lastError });
   }
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
-    const response = await this.call("POST", path, body);
-    const payload = response.body as { data?: T; error?: { message?: string } } | null;
+  // --- Resumable-crawl extensions (migrations 016/017) ---
+
+  enqueueCrawlFrontier(projectId: string, siteId: string, crawlRunId: string, entries: Array<{ normalizedUrl: string; depth: number; discoveredFrom: string | null }>): Promise<{ enqueued: number; pending: number }> {
+    return this.post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier`, { entries });
+  }
+
+  async claimCrawlFrontier(projectId: string, siteId: string, crawlRunId: string, limit: number): Promise<{ items: CrawlFrontierEntry[]; pending: number }> {
+    const envelope = await this.envelope<CrawlFrontierEntry[]>("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier/claim`, { limit });
+    return { items: envelope.data ?? [], pending: Number(envelope.meta?.pending ?? 0) };
+  }
+
+  completeCrawlFrontier(projectId: string, siteId: string, crawlRunId: string, normalizedUrls: string[]): Promise<{ done: number; pending: number }> {
+    return this.post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier/complete`, { normalizedUrls });
+  }
+
+  async countPendingCrawlFrontier(projectId: string, siteId: string, crawlRunId: string): Promise<number> {
+    const data = await this.get<{ pending: number }>(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier`);
+    return Number(data?.pending ?? 0);
+  }
+
+  recordCrawlPageSignals(projectId: string, siteId: string, crawlRunId: string, signals: Array<Omit<CrawlPageSignal, "crawlRunId">>): Promise<{ recorded: number }> {
+    return this.post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/page-signals`, { signals });
+  }
+
+  listCrawlPageSignals(projectId: string, siteId: string, crawlRunId: string): Promise<CrawlPageSignal[]> {
+    return this.get<CrawlPageSignal[]>(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/page-signals`);
+  }
+
+  createCrawlSeedJob(projectId: string, subject: string, payload: Record<string, unknown>): Promise<unknown> {
+    return this.post(`/jobs`, { projectId, type: "crawl_seed", subject, payload });
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    return (await this.envelope<T>("GET", path)).data as T;
+  }
+
+  private async envelope<T>(method: string, path: string, body?: unknown): Promise<{ data?: T; meta?: Record<string, unknown> }> {
+    const response = await this.call(method, path, body);
+    const payload = response.body as { data?: T; meta?: Record<string, unknown>; error?: { message?: string } } | null;
     if (response.status >= 400) {
-      throw new Error(payload?.error?.message ?? `POST ${path} failed with ${response.status}`);
+      throw new Error(payload?.error?.message ?? `${method} ${path} failed with ${response.status}`);
     }
-    return payload?.data as T;
+    return { data: payload?.data, meta: payload?.meta };
+  }
+
+  private async post<T>(path: string, body: unknown): Promise<T> {
+    return (await this.envelope<T>("POST", path, body)).data as T;
   }
 }
