@@ -1,3 +1,4 @@
+import { oauthEncryptionConfigured } from "@seo-tool/api";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
@@ -15,10 +16,16 @@ type ConnectorProvider = {
   description: string;
 };
 
-const connectorProviders: ConnectorProvider[] = [
-  { provider: "gsc", label: "Google Search Console", available: true, description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
-  { provider: "ga4", label: "Google Analytics 4", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." }
-];
+/**
+ * Google Search Console is only truly connectable when the server has the OAuth credentials + state
+ * encryption configured — the EXACT check /api/oauth/google/authorize enforces. Without them the
+ * "Mit Google verbinden" button was a dead end: clicking it just bounced back with
+ * "…serverseitig noch nicht konfiguriert." Gate the card on real config so an unconfigured server
+ * shows an honest "not set up yet" state instead of a live button that only errors.
+ */
+function gscOAuthConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_OAUTH_REDIRECT_URI && oauthEncryptionConfigured());
+}
 
 const sovereigntyItems = [
   { id: "self-hostable-core", label: "Selbst hostbar — kein Zwang zu externer Infrastruktur", status: "ready", statusClassName: "status succeeded" },
@@ -32,6 +39,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const data = await loadFoundationDashboardData();
   const selectedProject = data.selectedProject;
   const feedback = feedbackMessage(params);
+  // GSC is only "available" (live connect button) when the server can actually run OAuth. Otherwise
+  // it is presented as a not-yet-set-up source, exactly like GA4 — never a live button that errors.
+  const providers: ConnectorProvider[] = [
+    { provider: "gsc", label: "Google Search Console", available: gscOAuthConfigured(), description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
+    { provider: "ga4", label: "Google Analytics 4", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." },
+  ];
   // The status pill renders its `status` string verbatim, so it must already be German — the raw
   // enum ("connected"/"queued"/"empty") must never reach the UI. The label carries the name only;
   // the pill carries the (German) state.
@@ -76,7 +89,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <p className="kicker">Datenquelle verbinden</p>
           <p className="muted">Melden Sie sich mit Google an, um echte Klicks, Rankings und Positionen aus der Search Console einfließen zu lassen.</p>
           <div className="connector-grid">
-            {connectorProviders.map((connector) => {
+            {providers.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
               const isConnected = existing?.status === "connected";
               return (
@@ -87,13 +100,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <p>{connector.description}</p>
                   </div>
                   {!connector.available ? (
-                    // Honest gating: no real connect flow exists for this source yet. Never show a
-                    // button that fakes a connection (the dead "Verbindung vorhanden" pattern).
+                    // Honest gating: this source can't be connected right now (GA4 not built yet, or
+                    // GSC OAuth not configured on the server). Never show a live button that only
+                    // errors on click — say so plainly instead.
                     <div className="locked-action">
-                      <span className="badge">Bald verfügbar</span>
+                      <span className="badge">Noch nicht verfügbar</span>
                       <span className="locked-action__reason">
-                        Diese Datenquelle wird bald anschließbar — aktuell liefert Google Search Console
-                        die echten Such-Daten.
+                        {connector.provider === "gsc"
+                          ? "Die Google-Search-Console-Anbindung ist auf diesem Server noch nicht eingerichtet. Sie wird aktiv, sobald die Google-OAuth-Zugangsdaten hinterlegt sind."
+                          : "Diese Datenquelle wird bald anschließbar — Google Analytics 4 folgt in einer der nächsten Wellen."}
                       </span>
                     </div>
                   ) : connector.provider === "gsc" ? (
@@ -136,7 +151,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <p className="kicker">Datenabgleich planen</p>
           <p className="muted">Holt regelmäßig neue Daten von der verbundenen Quelle, damit Rankings und Kennzahlen aktuell bleiben.</p>
           <div className="connector-grid compact">
-            {connectorProviders.map((connector) => {
+            {providers.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
               const isConnected = existing?.status === "connected";
               // A sync only makes sense against a genuinely connected source. Gating on a mere
