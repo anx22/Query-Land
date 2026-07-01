@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { gzipSync } from "node:zlib";
 import test from "node:test";
 import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, hasRepeatedSegments, isInCrawlScope, isRobotsAllowed, loadRobotsPolicy, normalizeCrawlUrl, parsePage, parseRobotsTxt, robotsCrawlDelaySeconds } from "../src/index.js";
 
@@ -346,6 +347,22 @@ test("fetchUrl sends an Accept header preferring HTML/XML", async () => {
     }
   });
   assert.match(accept ?? "", /^text\/html/);
+});
+
+test("fetchUrl inflates gzipped sitemap payloads (.gz / application/gzip)", async () => {
+  const xml = "<urlset><url><loc>https://example.com/gz-page</loc></url></urlset>";
+  const gz = gzipSync(Buffer.from(xml, "utf-8"));
+  const byExt = await fetchUrl({
+    url: "https://example.com/sitemap.xml.gz",
+    fetchImpl: async () => new Response(gz, { status: 200, headers: { "content-type": "application/octet-stream" } })
+  });
+  assert.equal(byExt.responseBody, xml); // detected by .gz extension
+
+  const byType = await fetchUrl({
+    url: "https://example.com/sitemap",
+    fetchImpl: async () => new Response(gz, { status: 200, headers: { "content-type": "application/gzip" } })
+  });
+  assert.equal(byType.responseBody, xml); // detected by content-type
 });
 
 test("fetchUrl on garbage/invalid sitemap content still classifies without throwing", async () => {

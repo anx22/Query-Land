@@ -16,6 +16,7 @@
  *    exits non-zero if any scenario fails.
  */
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 import { createApp, createStore, type Store } from "@seo-tool/api";
 import { runCrawlWorkerCycle } from "./crawl-cycle.js";
 import type { CrawlScopeType } from "./url-normalization.js";
@@ -230,6 +231,23 @@ const SCENARIOS: Scenario[] = [
       expectEq("status", cycle.status, "succeeded"),
       check("robots-declared sitemap fetched", fetchLog.includes("https://example.com/sitemaps/pages.xml"), `fetchLog=${JSON.stringify(fetchLog)}`),
       check("URL from robots sitemap discovered", discovered.some((url) => url.normalizedUrl === "https://example.com/from-robots"), `urls=${JSON.stringify(discovered.map((u) => u.normalizedUrl))}`)
+    ]
+  },
+  {
+    name: "sitemap_gzip_discovery",
+    description: "Gzipped sitemaps (.xml.gz) declared in robots.txt are inflated and their URLs discovered.",
+    fetch: (url) => {
+      if (url.endsWith("/robots.txt")) return robotsTxt("User-agent: *\nAllow: /\nSitemap: https://example.com/sitemap.xml.gz\n");
+      if (url.endsWith("/sitemap.xml")) return httpStatus(404, "missing");
+      if (url.endsWith("/sitemap.xml.gz")) {
+        const gz = gzipSync(Buffer.from("<urlset><url><loc>https://example.com/gz-page</loc></url></urlset>", "utf-8"));
+        return new Response(gz, { status: 200, headers: { "content-type": "application/gzip" } });
+      }
+      return page(pathOf(url));
+    },
+    checks: ({ cycle, discovered }) => [
+      expectEq("status", cycle.status, "succeeded"),
+      check("URL from gzipped sitemap discovered", discovered.some((url) => url.normalizedUrl === "https://example.com/gz-page"), `urls=${JSON.stringify(discovered.map((u) => u.normalizedUrl))}`)
     ]
   },
   {
