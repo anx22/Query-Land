@@ -110,6 +110,14 @@ export interface CrawlWorkerCycleOptions {
   userAgent?: string;
   /** Cap (bytes) on each response body read into memory. Default DEFAULT_MAX_BODY_BYTES. */
   maxBodyBytes?: number;
+  /** Trap guard: max URL length enqueued. Default DEFAULT_MAX_URL_LENGTH. */
+  maxUrlLength?: number;
+  /** Trap guard: max distinct query variants enqueued per path. Default DEFAULT_MAX_DISTINCT_QUERY_PER_PATH. */
+  maxDistinctQueryPerPath?: number;
+  /** Politeness cap (ms) on the per-host crawl-delay. Default DEFAULT_MAX_CRAWL_DELAY_MS. */
+  maxCrawlDelayMs?: number;
+  /** Injectable sleep for the per-host politeness wait (tests assert without real timers). */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export interface CrawlWorkerCycleResult {

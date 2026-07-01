@@ -27,6 +27,15 @@ export const DEFAULT_MAX_URLS = 150;
  */
 export const DEFAULT_MAX_BODY_BYTES = 5_000_000;
 
+/** Trap guard: skip enqueuing absurdly long URLs (session-id/param explosions). */
+export const DEFAULT_MAX_URL_LENGTH = 2000;
+
+/** Trap guard: cap distinct query-string variants enqueued per path (faceted-nav explosion). */
+export const DEFAULT_MAX_DISTINCT_QUERY_PER_PATH = 20;
+
+/** Politeness cap: never wait longer than this between same-host fetches, even if robots asks for more. */
+export const DEFAULT_MAX_CRAWL_DELAY_MS = 10_000;
+
 /** Accept header sent on crawl fetches — we want HTML/XML, tolerate anything. */
 export const DEFAULT_ACCEPT_HEADER =
   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";

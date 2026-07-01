@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, loadRobotsPolicy, parsePage, parseRobotsTxt, robotsCrawlDelaySeconds } from "../src/index.js";
+import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, hasRepeatedSegments, isInCrawlScope, isRobotsAllowed, loadRobotsPolicy, normalizeCrawlUrl, parsePage, parseRobotsTxt, robotsCrawlDelaySeconds } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
   const urls = discoverUrlsFromSitemap({
@@ -357,6 +357,43 @@ test("fetchUrl on garbage/invalid sitemap content still classifies without throw
   assert.equal(result.responseBody, "<<<not xml>>>");
 });
 
+
+test("normalizeCrawlUrl strips tracking params and sorts the rest for stable dedupe", () => {
+  assert.equal(normalizeCrawlUrl("https://example.com/p?utm_source=x&b=2&a=1&gclid=y", "https://example.com"), "https://example.com/p?a=1&b=2");
+  assert.equal(normalizeCrawlUrl("https://example.com/p?utm_campaign=x", "https://example.com"), "https://example.com/p");
+  // meaningful params are preserved (only known trackers are dropped).
+  assert.equal(normalizeCrawlUrl("https://example.com/p?id=5&page=2", "https://example.com"), "https://example.com/p?id=5&page=2");
+});
+
+test("hasRepeatedSegments detects spider-trap paths", () => {
+  assert.equal(hasRepeatedSegments("/a/a/a"), true);
+  assert.equal(hasRepeatedSegments("/shop/shop"), false); // 2 consecutive is allowed (maxRepeats=2)
+  assert.equal(hasRepeatedSegments("/blog/blog-post"), false); // distinct segments
+  assert.equal(hasRepeatedSegments("/a/b/c/d"), false);
+});
+
+test("crawl worker waits the robots Crawl-delay between same-host fetches", async () => {
+  const store = await createStore("sqlite::memory:");
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: "https://example.com", payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+
+  const delays: number[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nCrawl-delay: 2\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    const links = path === "/" ? '<a href="/a">a</a>' : "";
+    return new Response(`<html><head><title>${path}</title></head><body>${links}</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+  };
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", sleep: async (ms: number) => { delays.push(ms); } });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.fetchedUrls, 2); // seed + /a
+  assert.ok(delays.includes(2000), `expected a 2000ms politeness wait before the same-host fetch, got ${JSON.stringify(delays)}`);
+  await store.close();
+});
 
 test("crawl scope is scheme- and www-tolerant with domain/subdomain/folder modes", () => {
   // domain (default): apex + www + any subdomain; scheme-tolerant.

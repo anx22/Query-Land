@@ -290,6 +290,36 @@ const SCENARIOS: Scenario[] = [
     ]
   },
   {
+    name: "tracking_params_deduped",
+    description: "Links differing only by tracking params (utm_*/gclid) collapse to one frontier URL.",
+    fetch: (url) => {
+      if (url.endsWith("/robots.txt")) return robotsTxt("User-agent: *\nAllow: /\n");
+      if (url.endsWith("/sitemap.xml")) return httpStatus(404, "missing");
+      if (pathOf(url) === "/page") return page("/page");
+      return rawPage('<html><head><title>Seed</title></head><body><a href="/page?utm_source=a">1</a><a href="/page?utm_source=b">2</a><a href="/page">3</a></body></html>');
+    },
+    checks: ({ cycle }) => [
+      expectEq("status", cycle.status, "succeeded"),
+      expectEq("fetchedUrls (seed + one /page)", cycle.fetchedUrls, 2),
+      expectEq("discoveredUrls", cycle.discoveredUrls, 2)
+    ]
+  },
+  {
+    name: "trap_repeated_segments",
+    description: "A repeated-segment spider-trap path is kept out of the frontier; a normal link is followed.",
+    fetch: (url) => {
+      if (url.endsWith("/robots.txt")) return robotsTxt("User-agent: *\nAllow: /\n");
+      if (url.endsWith("/sitemap.xml")) return httpStatus(404, "missing");
+      if (pathOf(url) === "/ok") return page("/ok");
+      return rawPage('<html><head><title>Seed</title></head><body><a href="/loop/loop/loop">trap</a><a href="/ok">ok</a></body></html>');
+    },
+    checks: ({ cycle, discovered }) => [
+      expectEq("status", cycle.status, "succeeded"),
+      check("trap path not in frontier", !discovered.some((url) => url.normalizedUrl.includes("/loop/loop/loop")), `urls=${JSON.stringify(discovered.map((u) => u.normalizedUrl))}`),
+      expectEq("fetchedUrls (seed + /ok)", cycle.fetchedUrls, 2)
+    ]
+  },
+  {
     name: "binary_resource_not_parsed",
     description: "An in-scope non-HTML resource is fetched but its body is never parsed for links.",
     fetch: (url) => {
