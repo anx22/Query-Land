@@ -4,10 +4,19 @@
  * lives here. Colors are functional, never brand-orange (mirrors audit.css).
  */
 
+/* Master-detail: the candidate list (master) is the narrower selector; the content-score
+   detail gets the wider column. Not equal peers — the right column is driven by the left. */
 .cw-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr);
   gap: 1rem;
+  align-items: start;
+}
+
+/* Calm placeholder in the detail column before a candidate is selected. */
+.cw-detail-hint {
+  margin: 0;
+  padding: 1.5rem 0;
 }
 
 @media (max-width: 900px) {

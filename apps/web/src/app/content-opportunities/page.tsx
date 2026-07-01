@@ -9,6 +9,7 @@ import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { OpportunityBoardClient } from "../../features/content-opportunities";
 import { ModulesPending } from "../../components/modules-pending";
+import { NextStep } from "../../components/next-step";
 import { loadOpportunityBoard } from "../../lib/board-api";
 import { actionLock, type ReadinessState } from "../../lib/readiness";
 import {
@@ -130,6 +131,12 @@ export default async function Page({
           <OpportunityBoardClient
             opportunities={opportunities}
             onBulkTransition={bulkTransitionOpportunitiesAction}
+          />
+
+          <NextStep
+            hint="Chancen priorisiert — setzen Sie sie im Content Workspace in konkrete Briefs um."
+            href="/content-workspace"
+            ctaLabel="Zum Content Workspace →"
           />
         </>
       )}

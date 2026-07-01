@@ -15,7 +15,7 @@ import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
-import { HelpPanel } from "../../components/help-panel";
+import { HelpDisclosure } from "../../components/help-disclosure";
 import { GlossarLink } from "../../components/glossar-link";
 import { IssueGroups } from "../../features/technical-audit/issue-groups";
 import { IssueFilterBar } from "../../features/technical-audit/issue-filter-bar";
@@ -406,8 +406,8 @@ async function TechnicalAuditBody({
         runningRun={runningRun}
       />
 
-      {/* Help zone — layout-separated from the productive panels below */}
-      <HelpPanel title="So lesen Sie die Technische Prüfung">
+      {/* Help zone — collapsed by default (one-time reading, not permanent). */}
+      <HelpDisclosure summary="So lesen Sie die Technische Prüfung">
         <p>
           Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt,
           wo URLs auf dem Weg in den Google-Index verloren gehen. Der{" "}
@@ -415,7 +415,7 @@ async function TechnicalAuditBody({
           Issues zu einer Zahl. Die Treemap verrät, welche Website-Bereiche die meisten
           Probleme tragen — dort lohnt sich die Arbeit zuerst.
         </p>
-      </HelpPanel>
+      </HelpDisclosure>
 
       {!hasAudit && (
         <ModulesPending

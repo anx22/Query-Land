@@ -825,6 +825,26 @@ select:disabled {
   padding: 1rem;
 }
 
+/* A short status panel in a content-grid must not stretch to match the taller action column
+   beside it — that reserved a half-column of empty space just to say "leer". */
+.status-panel {
+  align-self: start;
+}
+
+/* NextStep — waterfall hand-off card: a calm row, hint left + secondary CTA right. */
+.next-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.next-step__hint {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+}
+
 .connector-card h2 {
   margin: 0.75rem 0 0.35rem;
 }

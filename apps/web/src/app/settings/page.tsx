@@ -120,9 +120,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             })}
           </div>
         </div>
-        <div className="card">
+        <div className="card status-panel">
           <p className="kicker">Verbundene Datenquellen</p>
-          <StatusList items={connectorItems} />
+          {data.integrations.length > 0 ? (
+            <StatusList items={connectorItems} />
+          ) : (
+            <p className="muted">Noch keine Datenquelle verbunden.</p>
+          )}
         </div>
       </section>
 
@@ -164,9 +168,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             })}
           </div>
         </div>
-        <div className="card">
+        <div className="card status-panel">
           <p className="kicker">Status der Abgleiche</p>
-          <StatusList items={jobItems} />
+          {connectorJobs.length > 0 ? (
+            <StatusList items={jobItems} />
+          ) : (
+            <p className="muted">Noch kein Datenabgleich geplant.</p>
+          )}
         </div>
       </section>
 

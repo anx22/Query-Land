@@ -15,6 +15,7 @@ import { PREREQUISITE_META } from "../../lib/readiness";
 import { PositionDistribution } from "../../components/charts/position-distribution";
 import { TrendChart } from "../../components/charts/trend-chart";
 import { KeywordTableClient } from "../../features/keyword-rank";
+import { NextStep } from "../../components/next-step";
 import { loadKeywordsRankData } from "../../lib/keywords-api";
 import { addKeywordsAction, computeVisibilityAction, createKeywordGroupAction } from "./actions";
 
@@ -231,6 +232,14 @@ async function KeywordsRankBody({
           </form>
         </div>
       </section>
+
+      {hasKeywords ? (
+        <NextStep
+          hint="Ihre Keywords stehen — die stärksten Hebel werden zu priorisierten Optimierungschancen."
+          href="/content-opportunities"
+          ctaLabel="Zu den Chancen →"
+        />
+      ) : null}
     </>
   );
 }

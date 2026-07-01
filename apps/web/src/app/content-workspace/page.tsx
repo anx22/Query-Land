@@ -8,7 +8,9 @@ import { ConnectionBadge } from "../../components/connection-badge";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { WhyItMatters } from "../../components/why-it-matters";
-import { HelpPanel } from "../../components/help-panel";
+import { HelpDisclosure } from "../../components/help-disclosure";
+import { ModulesPending } from "../../components/modules-pending";
+import { NextStep } from "../../components/next-step";
 import { BriefEditor } from "../../features/content-workspace/brief-editor";
 import {
   availableTransitions,
@@ -101,6 +103,15 @@ async function ContentWorkspaceBody({
   const score = data.contentScore;
   const opportunityId = firstParam(params.opportunityId) ?? "";
 
+  // Two-mode + master-detail. Until an analysis (or GSC) has produced refresh candidates — and no
+  // brief has been created manually — the score/link/candidate machinery is a wall of empty
+  // placeholder panels. Hide it behind one calm ModulesPending panel; the "Neuen Brief erstellen"
+  // form below stays, since manual briefs work without any data.
+  const hasWorkspaceData = data.refreshCandidates.length > 0 || data.briefs.length > 0;
+  // The score + internal-link panels are the DETAIL of the candidate list: only meaningful once a
+  // candidate (URL) is selected. Progressive disclosure — no empty "Wähle einen Kandidaten" panels.
+  const hasSelection = Boolean(data.selectedUrl);
+
   return (
     <>
       {banner ? (
@@ -130,7 +141,7 @@ async function ContentWorkspaceBody({
         ) : null}
       </section>
 
-      <HelpPanel title="So nutzt du den Content Workspace">
+      <HelpDisclosure summary="So nutzt du den Content Workspace">
         <p>
           Wähle links einen Refresh-Kandidaten — das treibt den Content-Score-Gauge und die internen
           Link-Vorschläge rechts. Erstelle daraus einen Brief, pflege Gliederung und Term-Checkliste
@@ -138,8 +149,22 @@ async function ContentWorkspaceBody({
           Score) erscheinen, sobald die Google Search Console verbunden ist — bis dahin bleibt diese
           Liste leer.
         </p>
-      </HelpPanel>
+      </HelpDisclosure>
 
+      {/* First-run: no candidates and no briefs → one calm panel instead of empty machinery. The
+          create-brief form below stays available for manual briefs. */}
+      {data.connected && data.project && data.site && !hasWorkspaceData ? (
+        <ModulesPending
+          icon="description"
+          title="Noch keine Content-Daten"
+          text="Refresh-Kandidaten, Content-Score und interne Link-Vorschläge erscheinen hier nach Ihrer ersten Analyse — bzw. sobald die Google Search Console verbunden ist. Einen Brief können Sie jederzeit manuell unten anlegen."
+          ctaHref="/technical-audit#crawl-start"
+          ctaLabel="Zur Analyse →"
+          ctaVariant="secondary"
+        />
+      ) : null}
+
+      {hasWorkspaceData && data.refreshCandidates.length > 0 ? (
       <div className="cw-grid">
         {/* Refresh candidates */}
         <section className="card">
@@ -193,53 +218,54 @@ async function ContentWorkspaceBody({
           )}
         </section>
 
-        {/* Content score gauge */}
+        {/* Content score — the DETAIL: only meaningful once a candidate (URL) is selected. */}
         <section className="card">
           <p className="kicker">Content-Score</p>
-          <p className="muted">
-            Für {data.selectedUrl ? <strong>{data.selectedUrl}</strong> : "die gewählte URL"} — blendet
-            Crawl-Health, offene Issues und Metrik-Trend. <ConfidenceBadge level="E" />
-          </p>
-          <ScoreGauge value={score?.score ?? null} label="Content" />
-          <div className="cw-score-row">
-            <span className="muted">{scoreBandLabel(score?.score ?? null)}</span>
-          </div>
-          {score && score.reasons.length > 0 ? (
-            <ul className="cw-reasons">
-              {score.reasons.map((reason, index) => (
-                <li key={index}>{reason}</li>
-              ))}
-            </ul>
+          {hasSelection ? (
+            <>
+              <p className="muted">
+                Für <strong>{data.selectedUrl}</strong> — blendet Crawl-Health, offene Issues und
+                Metrik-Trend. <ConfidenceBadge level="E" />
+              </p>
+              <ScoreGauge value={score?.score ?? null} label="Content" />
+              <div className="cw-score-row">
+                <span className="muted">{scoreBandLabel(score?.score ?? null)}</span>
+              </div>
+              {score && score.reasons.length > 0 ? (
+                <ul className="cw-reasons">
+                  {score.reasons.map((reason, index) => (
+                    <li key={index}>{reason}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="muted">Kein Score für diese URL ableitbar.</p>
+              )}
+              <div className="cw-action-row">
+                <a className="button compact" href="#brief-erstellen">
+                  Brief für diese URL erstellen ↓
+                </a>
+              </div>
+              <WhyItMatters>
+                Ein niedriger Score plus fallender Trend ist der stärkste Hinweis, dass sich ein Refresh
+                lohnt.
+              </WhyItMatters>
+            </>
           ) : (
-            <p className="muted">
-              {data.selectedUrl
-                ? "Kein Score für diese URL ableitbar."
-                : "Wähle einen Refresh-Kandidaten, um den Score zu sehen."}
+            <p className="muted cw-detail-hint">
+              Wählen Sie links einen Refresh-Kandidaten, um Content-Score und interne Link-Vorschläge zu
+              sehen.
             </p>
           )}
-          {data.selectedUrl ? (
-            <div className="cw-action-row">
-              <a
-                className="button compact"
-                href={`#brief-erstellen`}
-              >
-                Brief für diese URL erstellen ↓
-              </a>
-            </div>
-          ) : null}
-          <WhyItMatters>
-            Ein niedriger Score plus fallender Trend ist der stärkste Hinweis, dass sich ein Refresh
-            lohnt.
-          </WhyItMatters>
         </section>
       </div>
+      ) : null}
 
-      {/* Internal-link suggestions */}
+      {/* Internal-link suggestions — DETAIL: only shown once a candidate is selected. */}
+      {hasWorkspaceData && data.refreshCandidates.length > 0 && hasSelection ? (
       <section className="card">
         <p className="kicker">Interne Link-Vorschläge</p>
         <p className="muted">
-          Aus dem echten Crawl-Link-Graph für{" "}
-          {data.selectedUrl ? <strong>{data.selectedUrl}</strong> : "die gewählte URL"}. Mit „→ Brief“
+          Aus dem echten Crawl-Link-Graph für <strong>{data.selectedUrl}</strong>. Mit „→ Brief“
           übernimmst du einen Vorschlag in die internen Links des geöffneten Briefs.{" "}
           <ConfidenceBadge level="A" />
         </p>
@@ -271,15 +297,13 @@ async function ContentWorkspaceBody({
             ))}
           </div>
         ) : (
-          <p className="muted">
-            {data.selectedUrl
-              ? "Keine internen Link-Vorschläge für diese URL."
-              : "Wähle einen Refresh-Kandidaten, um Link-Vorschläge zu sehen."}
-          </p>
+          <p className="muted">Keine internen Link-Vorschläge für diese URL.</p>
         )}
       </section>
+      ) : null}
 
-      {/* Brief list + filter */}
+      {/* Brief list + filter — part of the workspace machinery (shown once there is data). */}
+      {hasWorkspaceData ? (
       <section className="card">
         <p className="kicker">Briefs</p>
         <p className="muted">
@@ -334,6 +358,7 @@ async function ContentWorkspaceBody({
           <p className="muted">Keine Briefs im aktiven Filter.</p>
         )}
       </section>
+      ) : null}
 
       {/* Brief editor (when one is open) */}
       {selectedBrief ? (
@@ -430,6 +455,14 @@ async function ContentWorkspaceBody({
           <p className="muted">Website + erreichbare API erforderlich.</p>
         )}
       </section>
+
+      {data.briefs.length > 0 ? (
+        <NextStep
+          hint="Briefs gepflegt — fassen Sie den Fortschritt in einem Bericht zusammen."
+          href="/reports"
+          ctaLabel="Zu den Reports →"
+        />
+      ) : null}
     </>
   );
 }
