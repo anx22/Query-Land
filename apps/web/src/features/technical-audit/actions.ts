@@ -78,7 +78,12 @@ async function updateIssueAction(formData: FormData, action: "resolve" | "dismis
   }
 
   revalidateTechnicalAuditViews();
-  redirect(`/technical-audit?issue=${action}&issueStatus=${action === "reopen" ? "resolved" : "open"}`);
+  // Switch the issue filter to a view that INCLUDES the issue's new state, so it doesn't silently
+  // vanish from the list. (The loader reads `status`, not `issueStatus` — the old param was dead and
+  // its intent was also inverted.) reopen → "open", resolve → "resolved", dismiss → "all" (there is
+  // no dedicated "dismissed" filter).
+  const nextFilter = action === "reopen" ? "open" : action === "resolve" ? "resolved" : "all";
+  redirect(`/technical-audit?issue=${action}&status=${nextFilter}`);
 }
 
 /** Server action: load an issue's lifecycle history for the detail drawer. */

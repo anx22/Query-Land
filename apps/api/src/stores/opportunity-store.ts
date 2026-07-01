@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { analyzeCannibalization, analyzeCtrGap, analyzeStrikingDistance, hasRequiredEvidence, scoreOpportunity, type Evidence, type Opportunity, type OpportunityStatus, type SearchPerformanceMetricRow, type SourceAnchor } from "@seo-tool/domain-model";
+import { analyzeCannibalization, analyzeCtrGap, analyzeStrikingDistance, hasRequiredEvidence, OPPORTUNITY_STATUS_TRANSITIONS, scoreOpportunity, type Evidence, type Opportunity, type OpportunityStatus, type SearchPerformanceMetricRow, type SourceAnchor } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
 import type { AsyncDatabase } from "../db/index.js";
@@ -61,17 +61,9 @@ export interface OpportunityStore {
   generateAllOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult>;
 }
 
-// Statusmodell §6.5: open -> planned -> in_progress -> implemented -> validated | reopened | dismissed | expired.
-const ALLOWED_TRANSITIONS: Record<OpportunityStatus, OpportunityStatus[]> = {
-  open: ["planned", "in_progress", "dismissed", "expired"],
-  planned: ["in_progress", "open", "dismissed", "expired"],
-  in_progress: ["implemented", "planned", "dismissed", "expired"],
-  implemented: ["validated", "reopened", "dismissed", "expired"],
-  validated: ["reopened", "expired"],
-  reopened: ["in_progress", "planned", "implemented", "dismissed", "expired"],
-  dismissed: ["open"],
-  expired: ["open"]
-};
+// Statusmodell §6.5 — single source of truth lives in @seo-tool/domain-model so the web UI offers
+// exactly the transitions the store enforces.
+const ALLOWED_TRANSITIONS = OPPORTUNITY_STATUS_TRANSITIONS;
 
 const OPPORTUNITY_TYPES: readonly OpportunityType[] = ["technical_fix", "low_hanging_keyword", "cannibalization", "money_page", "internal_link_gap", "aeo"];
 const MAX_LIMIT = 200;

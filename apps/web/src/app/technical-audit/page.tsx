@@ -651,11 +651,10 @@ async function TechnicalAuditBody({
 function feedbackMessage(
   params: Record<string, string | string[] | undefined>
 ): { kind: "success" | "danger"; message: string } | null {
-  const error = firstParam(params.error);
-  if (error) return { kind: "danger", message: error };
-  if (firstParam(params.started)) {
-    return { kind: "success", message: "Crawl gestartet — die Ergebnisse erscheinen unten." };
-  }
+  // `error`, `started` and `crawlWarning` are owned by the top-of-page actionBanner
+  // (resolveActionBanner) — handling them here too rendered TWO notices for the same event (and on a
+  // failed inline crawl even a green "gestartet" next to the orange warning). This hero notice only
+  // covers the events the banner does not: issue-lifecycle changes and a manual health recompute.
   if (firstParam(params.health)) {
     return { kind: "success", message: "Health Score neu berechnet." };
   }
