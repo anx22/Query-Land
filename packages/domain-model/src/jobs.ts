@@ -20,6 +20,10 @@ export interface CrawlSeedJobPayload {
   baseUrl: string;
   crawlRunId?: string;
   sitemapUrl?: string;
+  /** Crawl scope strategy from the site (domain|subdomain|folder). Default "domain". */
+  scopeType?: "domain" | "subdomain" | "folder";
+  /** True for a continuation job: resume from the persisted crawl_frontier, do not re-bootstrap. */
+  resume?: boolean;
 }
 
 export interface ScheduledCrawlSeedJobPayload extends CrawlSeedJobPayload {
@@ -67,6 +71,12 @@ export function validateCrawlSeedJobPayload(input: unknown): CrawlSeedJobPayload
   }
   if (value.sitemapUrl !== undefined) {
     payload.sitemapUrl = normalizeRequiredUrl(value.sitemapUrl, "sitemapUrl");
+  }
+  if (value.scopeType === "domain" || value.scopeType === "subdomain" || value.scopeType === "folder") {
+    payload.scopeType = value.scopeType;
+  }
+  if (value.resume === true) {
+    payload.resume = true;
   }
   return payload;
 }

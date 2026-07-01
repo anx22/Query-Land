@@ -2,11 +2,15 @@ import "../../features/content-opportunities/board.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
+import { HeroBand } from "../../components/hero-band";
 import { Icon } from "../../components/icon";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
-import { HelpDisclosure } from "../../components/help-disclosure";
 import { OpportunityBoardClient } from "../../features/content-opportunities";
+import { ModulesPending } from "../../components/modules-pending";
+import { NextStep } from "../../components/next-step";
+import { SubmitButton } from "../../components/submit-button";
 import { loadOpportunityBoard } from "../../lib/board-api";
 import { actionLock, type ReadinessState } from "../../lib/readiness";
 import {
@@ -48,87 +52,95 @@ export default async function Page({
     hasCrawl: data.hasCrawl,
   };
   const heroLock = actionLock(readiness, ["project", "site", "crawl"]);
-  const lockReason = !data.connected ? "Daten momentan nicht erreichbar." : heroLock.reason;
   const heroDisabled = !data.connected || heroLock.locked;
 
   return (
     <AppShell activePath="/content-opportunities">
-      {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-      {!data.connected ? <OfflineNotice /> : null}
-
-      <header className="page-header">
-        <div className="page-header__titles">
-          <p className="kicker">Content &amp; Chancen</p>
-          <h1>Optimierungschancen</h1>
-          <p className="page-header__purpose">
-            Konkrete Verbesserungen für Ihre Website, nach Wirkung sortiert — schnelle Erfolge vor
-            großen Projekten.
-          </p>
-        </div>
-        <div className="page-header__aside">
-          <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "Daten verbunden" : "Daten offline"}
-          </span>
-          <div className="locked-action">
-            <form action={generateOpportunitiesAction}>
-              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-              <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-              <button className="button" type="submit" disabled={heroDisabled}>
-                Alle Optimierungschancen erzeugen
-              </button>
-            </form>
-            {heroDisabled && lockReason ? (
-              <span className="locked-action__reason">
-                <Icon name="lock" />
-                {lockReason}
-              </span>
-            ) : null}
-          </div>
-          <div className="locked-action">
-            <form action={syncSearchPerformanceAction}>
-              <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
-              <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
-              <button className="button secondary" type="submit" disabled={heroDisabled || !data.hasIntegration}>
-                Search Performance synchronisieren
-              </button>
-            </form>
-            {/* Search-Performance sync pulls clicks/impressions from GSC — without a connected source it
-                would do nothing, so gate it honestly instead of offering a silent no-op. */}
-            {!heroDisabled && !data.hasIntegration ? (
-              <span className="locked-action__reason">
-                <Icon name="lock" />
-                Zuerst Google Search Console verbinden — dann liefert die Synchronisierung echte Klick- und Ranking-Daten.
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </header>
-
-      <HelpDisclosure summary="So lesen Sie die Optimierungschancen">
+      <section className="card hero-card">
+        <HeroBand src="/brand/hdr-content-opportunities.jpg" />
+        <p className="kicker">Content &amp; Chancen</p>
+        <h1>Optimierungschancen</h1>
         <p>
-          Jede Chance folgt dem Muster: Beobachtung → Evidenz → Maßnahme → messbares Ergebnis.
+          Konkrete Verbesserungen für Ihre Website, nach Wirkung sortiert. Jede Chance folgt dem
+          Muster: Beobachtung → Evidenz → Maßnahme → messbares Ergebnis.
         </p>
         <WhyItMatters>
           Die Wirkung-/Aufwand-Matrix zeigt die günstigsten Hebel zuerst — schnelle Erfolge vor großen Projekten.
         </WhyItMatters>
-      </HelpDisclosure>
+        <div className="badge-row">
+          <ConnectionBadge connected={data.connected} />
+        </div>
+        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+        {!data.connected ? <OfflineNotice /> : null}
+        {/* Only show the generate/sync actions once an analysis exists. Before that the readiness
+            banner + the ModulesPending panel below carry the single "go analyse" next step — no row
+            of disabled buttons. */}
+        {!heroDisabled && (
+          <div className="action-row">
+            <div className="locked-action">
+              <form action={generateOpportunitiesAction}>
+                <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+                <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+                <SubmitButton className="button" pendingLabel="werden erzeugt …">
+                  Alle Optimierungschancen erzeugen
+                </SubmitButton>
+              </form>
+              <div className="locked-action">
+                <form action={syncSearchPerformanceAction}>
+                  <input type="hidden" name="projectId" value={data.selectedProject?.id ?? ""} />
+                  <input type="hidden" name="siteId" value={data.selectedSite?.id ?? ""} />
+                  <SubmitButton className="button secondary" pendingLabel="wird synchronisiert …" disabled={!data.hasIntegration}>
+                    Search Performance synchronisieren
+                  </SubmitButton>
+                </form>
+                {/* Search-Performance sync pulls clicks/impressions from GSC — without a connected source it
+                    would do nothing, so gate it honestly instead of offering a silent no-op. */}
+                {!data.hasIntegration ? (
+                  <span className="locked-action__reason">
+                    <Icon name="lock" />
+                    Zuerst Google Search Console verbinden — dann liefert die Synchronisierung echte Klick- und Ranking-Daten.
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
-      {/* At-a-glance verdict: the four numbers that frame the opportunity backlog */}
-      <div className="verdict-strip verdict-strip--4">
-        <MetricCard label="Opportunities" value={String(data.meta.total)} note={`${opportunities.length} geladen`} />
-        <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
-        <MetricCard label="Quick Wins" value={String(quickWins)} note="hohe Wirkung, niedriger Aufwand" />
-        <MetricCard
-          label="Validiert"
-          value={String(validatedCount)}
-          note={topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt"}
+      {opportunities.length === 0 ? (
+        <ModulesPending
+          icon="lightbulb"
+          title="Noch keine Optimierungschancen"
+          text="Priorisierte Chancen mit Wirkung-/Aufwand-Matrix und Maßnahmen entstehen aus Ihrer Analyse. Starten Sie zuerst eine Analyse Ihrer Website."
+          ctaHref="/technical-audit#crawl-start"
+          ctaLabel="Analyse starten →"
+          ctaVariant="secondary"
         />
-      </div>
+      ) : (
+        <>
+          <section className="metric-grid">
+            <MetricCard label="Opportunities" value={String(data.meta.total)} note={`${opportunities.length} geladen`} />
+            <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
+            <MetricCard label="Quick Wins" value={String(quickWins)} note="hohe Wirkung, niedriger Aufwand" />
+            <MetricCard
+              label="Validiert"
+              value={String(validatedCount)}
+              note={topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt"}
+            />
+          </section>
 
-      <OpportunityBoardClient
-        opportunities={opportunities}
-        onBulkTransition={bulkTransitionOpportunitiesAction}
-      />
+          <OpportunityBoardClient
+            opportunities={opportunities}
+            onBulkTransition={bulkTransitionOpportunitiesAction}
+          />
+
+          <NextStep
+            hint="Chancen priorisiert — setzen Sie sie im Content Workspace in konkrete Briefs um."
+            href="/content-workspace"
+            ctaLabel="Zum Content Workspace →"
+          />
+        </>
+      )}
     </AppShell>
   );
 }

@@ -17,6 +17,10 @@ export interface DrainCrawlJobsOptions {
   now?: () => number;
   fetchTimeoutMs?: number;
   fetchMaxAttempts?: number;
+  /** When set, each cycle runs the resumable frontier path with this per-cycle budget
+   *  (enqueues a continuation job if a large site does not finish in one invocation).
+   *  Unset → the classic single-invocation in-memory crawl. */
+  cycleTimeBudgetMs?: number;
 }
 
 export type DrainStopReason = "empty" | "maxJobs" | "timeBudget";
@@ -60,7 +64,9 @@ export async function drainCrawlJobs(options: DrainCrawlJobsOptions): Promise<Dr
       apiClient: client,
       fetchTimeoutMs: options.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS,
       retry: { maxAttempts: options.fetchMaxAttempts ?? DEFAULT_FETCH_MAX_ATTEMPTS, delayMs: 100 },
-      maxRedirects: 5
+      maxRedirects: 5,
+      // Opt-in resumable path: only when a per-cycle budget is provided.
+      timeBudgetMs: options.cycleTimeBudgetMs
     });
     if (!result.claimed) {
       stoppedReason = "empty";

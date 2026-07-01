@@ -1,5 +1,6 @@
+import { gunzipSync } from "node:zlib";
 import type { FetchResult } from "@seo-tool/domain-model";
-import { DEFAULT_CRAWLER_USER_AGENT, DEFAULT_RETRY_BASE_DELAY_MS, DEFAULT_RETRY_MAX_DELAY_MS, backoffDelayMs } from "./config.js";
+import { DEFAULT_ACCEPT_HEADER, DEFAULT_CRAWLER_USER_AGENT, DEFAULT_MAX_BODY_BYTES, DEFAULT_RETRY_BASE_DELAY_MS, DEFAULT_RETRY_MAX_DELAY_MS, backoffDelayMs } from "./config.js";
 import type { FetchWorkerInput } from "./types.js";
 import { normalizeCrawlUrl } from "./url-normalization.js";
 
@@ -41,7 +42,7 @@ async function fetchWithRedirectLimit(input: FetchWorkerInput, fetchImpl: typeof
       const response = await fetchImpl(currentUrl, {
         redirect: "manual",
         signal: controller?.signal,
-        headers: { "user-agent": input.userAgent ?? DEFAULT_CRAWLER_USER_AGENT }
+        headers: { "user-agent": input.userAgent ?? DEFAULT_CRAWLER_USER_AGENT, accept: DEFAULT_ACCEPT_HEADER }
       });
       if (timeout) clearTimeout(timeout);
       const headers = normalizeHeaders(response.headers);
@@ -72,7 +73,22 @@ async function fetchWithRedirectLimit(input: FetchWorkerInput, fetchImpl: typeof
         continue;
       }
 
-      const responseBody = await response.text().catch(() => "");
+      // Only read/parse textual bodies (HTML/XML/plain/unknown). Binary resources
+      // (images, PDFs, fonts, octet-stream) are recorded by status+headers but
+      // their bodies are discarded — never fed to the HTML parser. Textual bodies
+      // are read up to maxBodyBytes and decoded with the declared/​sniffed charset.
+      const contentType = headers["content-type"] ?? "";
+      const maxBodyBytes = Math.max(0, input.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES);
+      let responseBody = "";
+      if (isGzipResource(currentUrl, contentType)) {
+        // Gzipped payloads (e.g. sitemap .xml.gz served as application/gzip) are
+        // read as bytes and inflated — content-type gating would otherwise drop them.
+        responseBody = await readGzipBody(response, maxBodyBytes);
+      } else if (shouldReadBody(contentType)) {
+        responseBody = await readBodyCapped(response, maxBodyBytes, contentType);
+      } else {
+        await discardBody(response);
+      }
       return {
         url: input.url,
         finalUrl: response.url || currentUrl,
@@ -125,4 +141,110 @@ function networkErrorMessage(error: unknown, attempts: number): string {
 
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Should we read and parse this response body? Textual types (HTML/XML/plain)
+ * yes; an absent content-type yes (servers routinely omit it); clearly-binary
+ * types (image/video/audio/pdf/font/octet-stream/zip) no.
+ */
+function shouldReadBody(contentType: string): boolean {
+  const type = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (type === "") return true; // unknown — assume textual, read it
+  if (type.startsWith("text/")) return true;
+  return type.includes("html") || type.includes("xml") || type.includes("json") || type.includes("javascript");
+}
+
+/**
+ * Read a response body up to `maxBytes` (streaming, so an oversized payload is
+ * never fully buffered), then decode using the charset declared in the
+ * content-type, sniffed from a <meta charset>, or UTF-8 as a last resort.
+ * Falls back to response.text() when the body is not an inspectable stream
+ * (some fetch mocks), which preserves existing behaviour.
+ */
+async function readBodyCapped(response: Response, maxBytes: number, contentType: string): Promise<string> {
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    return await response.text().catch(() => "");
+  }
+  return decodeBody(await readBytesCapped(reader, maxBytes), contentType);
+}
+
+/** Read a response body stream into a Buffer, capped at `maxBytes` (cancels the rest). */
+async function readBytesCapped(reader: ReadableStreamDefaultReader<Uint8Array>, maxBytes: number): Promise<Buffer> {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      if (total + value.byteLength > maxBytes) {
+        const remaining = maxBytes - total;
+        if (remaining > 0) chunks.push(value.subarray(0, remaining));
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
+      chunks.push(value);
+      total += value.byteLength;
+    }
+  } catch {
+    // Treat a mid-stream read error as "what we have so far".
+  }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+}
+
+/** A gzipped payload (by .gz URL or gzip content-type) that we must inflate, not text-decode. */
+function isGzipResource(url: string, contentType: string): boolean {
+  const type = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return /\.gz($|\?)/i.test(url) || type === "application/gzip" || type === "application/x-gzip" || type === "gzip";
+}
+
+/** Read bytes (capped) and gunzip when the gzip magic is present; else decode as UTF-8. */
+async function readGzipBody(response: Response, maxBytes: number): Promise<string> {
+  const reader = response.body?.getReader?.();
+  const buffer = reader
+    ? await readBytesCapped(reader, maxBytes)
+    : Buffer.from(await response.arrayBuffer().catch(() => new ArrayBuffer(0))).subarray(0, maxBytes);
+  if (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
+    try {
+      return gunzipSync(buffer).toString("utf-8");
+    } catch {
+      return buffer.toString("utf-8");
+    }
+  }
+  return buffer.toString("utf-8");
+}
+
+/** Drain/cancel a body we will not parse, so the connection is released promptly. */
+async function discardBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel?.();
+  } catch {
+    // best effort
+  }
+}
+
+function decodeBody(buffer: Buffer, contentType: string): string {
+  const charset = charsetFromContentType(contentType) ?? sniffMetaCharset(buffer) ?? "utf-8";
+  try {
+    return new TextDecoder(charset).decode(buffer);
+  } catch {
+    return new TextDecoder("utf-8").decode(buffer);
+  }
+}
+
+function charsetFromContentType(contentType: string): string | null {
+  const match = /charset=["']?([^"';,\s]+)/i.exec(contentType);
+  return match?.[1]?.trim().toLowerCase() || null;
+}
+
+/** Sniff `<meta charset>` / `<meta http-equiv content="...charset=...">` from the head. */
+function sniffMetaCharset(buffer: Buffer): string | null {
+  // Inspect a latin1 view of the first 2 KB — enough to cover the <head> meta tags.
+  const head = buffer.subarray(0, 2048).toString("latin1");
+  const direct = /<meta[^>]+charset=["']?([^"'>\s/]+)/i.exec(head);
+  if (direct?.[1]) return direct[1].trim().toLowerCase();
+  const httpEquiv = /<meta[^>]+content=["'][^"']*charset=([^"'>\s;]+)/i.exec(head);
+  return httpEquiv?.[1]?.trim().toLowerCase() ?? null;
 }

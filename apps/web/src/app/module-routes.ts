@@ -30,7 +30,7 @@ export interface ModuleRoute {
 export const moduleRoutes = [
   { label: "Websites", path: "/projects", icon: "folder", description: "Ihre Websites verwalten — Adresse, Analyse-Umfang und -Rhythmus. Eine Website = ein Projekt.", status: "active", plannedWave: 1, section: "Start", tier: "basic", dataStatus: "live" },
   { label: "Übersicht", path: "/", icon: "dashboard", description: "Sichtbarkeit, Health Score und offene Optimierungschancen auf einen Blick.", status: "active", plannedWave: 1, section: "Start", tier: "basic", dataStatus: "live" },
-  { label: "Technical Audit", path: "/technical-audit", icon: "troubleshoot", description: "Technische SEO-Analyse — Crawl-Runs, Health Score, Indexierbarkeit und offene Issues.", status: "active", plannedWave: 2, section: "Analyse", tier: "basic", dataStatus: "live" },
+  { label: "Technische Prüfung", path: "/technical-audit", icon: "troubleshoot", description: "Technische SEO-Analyse — Crawl-Runs, Health Score, Indexierbarkeit und offene Issues.", status: "active", plannedWave: 2, section: "Analyse", tier: "basic", dataStatus: "live" },
   { label: "URL-Dossier", path: "/url-dossier", icon: "description", description: "Eine URL als vollständiges SEO-Objekt: Crawl-Status, Indexierbarkeit, Rankings und Backlinks.", status: "active", plannedWave: 2, section: "Detailanalyse", tier: "advanced", dataStatus: "live" },
   { label: "Keywords & Rankings", path: "/keywords-rank", icon: "key", description: "Kuratiertes Keyword-Universum mit Rankings, Sichtbarkeit und SERP-Analyse.", status: "active", plannedWave: 3, section: "Detailanalyse", tier: "basic", dataStatus: "live" },
   { label: "Content & Chancen", path: "/content-opportunities", icon: "lightbulb", description: "Priorisierte Optimierungschancen mit Evidenz, Maßnahmen und Validierung.", status: "active", plannedWave: 4, section: "Wachstum", tier: "basic", dataStatus: "live" },
@@ -38,7 +38,8 @@ export const moduleRoutes = [
   { label: "Backlinks", path: "/backlinks", icon: "link", description: "Verweisende Domains, Link-Aufbau und Authority-Entwicklung im Zeitverlauf.", status: "active", plannedWave: 5, section: "Wachstum", tier: "advanced", dataStatus: "live" },
   { label: "Reports", path: "/reports", icon: "description", description: "Regelmäßige Berichte, automatische Lieferungen und Schwellwert-Alarme.", status: "active", plannedWave: 6, section: "Wachstum", tier: "advanced", dataStatus: "live" },
   { label: "KI-Sichtbarkeit", path: "/ai-visibility", icon: "auto_awesome", description: "Ob die eigene Domain in KI-Antworten zitiert wird — Prompts, Citations und AEO-Bewertung.", status: "active", plannedWave: 7, section: "Erweitert", tier: "advanced", dataStatus: "live" },
-  { label: "Einstellungen", path: "/settings", icon: "settings", description: "Connectors, Datenquellen und Projekt-Konfiguration.", status: "active", plannedWave: 1, section: "System", tier: "basic", dataStatus: "live" }
+  { label: "Einstellungen", path: "/settings", icon: "settings", description: "Connectors, Datenquellen und Projekt-Konfiguration.", status: "active", plannedWave: 1, section: "System", tier: "basic", dataStatus: "live" },
+  { label: "Glossar", path: "/glossar", icon: "info", description: "Alle Fachbegriffe einfach erklärt — von Backlink bis Visibility-Index, mit der A–E-Konfidenzskala.", status: "active", plannedWave: 1, section: "System", tier: "basic", dataStatus: "live" }
 ] as const satisfies readonly ModuleRoute[];
 
 export type ModulePath = (typeof moduleRoutes)[number]["path"];

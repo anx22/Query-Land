@@ -1,5 +1,8 @@
+import { oauthEncryptionConfigured } from "@seo-tool/api";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
+import { SubmitButton } from "../../components/submit-button";
 import { StatusList } from "../../components/status-list";
 import { loadFoundationDashboardData } from "../../lib/foundation-api";
 import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckAction, scheduleConnectorSyncAction } from "./actions";
@@ -13,10 +16,16 @@ type ConnectorProvider = {
   description: string;
 };
 
-const connectorProviders: ConnectorProvider[] = [
-  { provider: "gsc", label: "Google Search Console", available: true, description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
-  { provider: "ga4", label: "Google Analytics 4", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." }
-];
+/**
+ * Google Search Console is only truly connectable when the server has the OAuth credentials + state
+ * encryption configured — the EXACT check /api/oauth/google/authorize enforces. Without them the
+ * "Mit Google verbinden" button was a dead end: clicking it just bounced back with
+ * "…serverseitig noch nicht konfiguriert." Gate the card on real config so an unconfigured server
+ * shows an honest "not set up yet" state instead of a live button that only errors.
+ */
+function gscOAuthConfigured(): boolean {
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_OAUTH_REDIRECT_URI && oauthEncryptionConfigured());
+}
 
 const sovereigntyItems = [
   { id: "self-hostable-core", label: "Selbst hostbar — kein Zwang zu externer Infrastruktur", status: "ready", statusClassName: "status succeeded" },
@@ -30,23 +39,32 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const data = await loadFoundationDashboardData();
   const selectedProject = data.selectedProject;
   const feedback = feedbackMessage(params);
+  // GSC is only "available" (live connect button) when the server can actually run OAuth. Otherwise
+  // it is presented as a not-yet-set-up source, exactly like GA4 — never a live button that errors.
+  const providers: ConnectorProvider[] = [
+    { provider: "gsc", label: "Google Search Console", available: gscOAuthConfigured(), description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
+    { provider: "ga4", label: "Google Analytics 4", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." },
+  ];
+  // The status pill renders its `status` string verbatim, so it must already be German — the raw
+  // enum ("connected"/"queued"/"empty") must never reach the UI. The label carries the name only;
+  // the pill carries the (German) state.
   const connectorItems = data.integrations.length > 0
     ? data.integrations.map((integration) => ({
       id: integration.id,
-      label: `${providerLabel(integration.provider)} · ${connectorStatusLabel(integration.status)}`,
-      status: integration.status,
+      label: providerLabel(integration.provider),
+      status: connectorStatusLabel(integration.status),
       statusClassName: `status ${integration.status}`
     }))
-    : [{ id: "connector-empty", label: "Noch keine Datenquelle verbunden", status: "empty", statusClassName: "status empty" }];
+    : [{ id: "connector-empty", label: "Noch keine Datenquelle verbunden", status: "leer", statusClassName: "status empty" }];
   const connectorJobs = data.jobs.filter((job) => job.type === "connector_sync");
   const jobItems = connectorJobs.length > 0
     ? connectorJobs.map((job) => ({
       id: job.id,
       label: `${providerLabel(job.subject)} — Datenabgleich`,
-      status: job.status,
+      status: jobStatusLabel(job.status),
       statusClassName: `status ${job.status}`
     }))
-    : [{ id: "job-empty", label: "Noch kein Datenabgleich geplant", status: "empty", statusClassName: "status empty" }];
+    : [{ id: "job-empty", label: "Noch kein Datenabgleich geplant", status: "leer", statusClassName: "status empty" }];
 
   return (
     <AppShell activePath="/settings">
@@ -60,7 +78,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         <div className="badge-row">
           <span className="badge primary">{data.integrations.filter((i) => i.status === "connected").length} verbundene Datenquellen</span>
           <span className="badge">{connectorJobs.length} geplante Abgleiche</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
+          <ConnectionBadge connected={data.connected} />
         </div>
         {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
         {!data.connected ? <OfflineNotice /> : null}
@@ -71,7 +89,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <p className="kicker">Datenquelle verbinden</p>
           <p className="muted">Melden Sie sich mit Google an, um echte Klicks, Rankings und Positionen aus der Search Console einfließen zu lassen.</p>
           <div className="connector-grid">
-            {connectorProviders.map((connector) => {
+            {providers.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
               const isConnected = existing?.status === "connected";
               return (
@@ -82,13 +100,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <p>{connector.description}</p>
                   </div>
                   {!connector.available ? (
-                    // Honest gating: no real connect flow exists for this source yet. Never show a
-                    // button that fakes a connection (the dead "Verbindung vorhanden" pattern).
+                    // Honest gating: this source can't be connected right now (GA4 not built yet, or
+                    // GSC OAuth not configured on the server). Never show a live button that only
+                    // errors on click — say so plainly instead.
                     <div className="locked-action">
-                      <span className="badge">Bald verfügbar</span>
+                      <span className="badge">Noch nicht verfügbar</span>
                       <span className="locked-action__reason">
-                        Diese Datenquelle wird bald anschließbar — aktuell liefert Google Search Console
-                        die echten Such-Daten.
+                        {connector.provider === "gsc"
+                          ? "Die Google-Search-Console-Anbindung ist auf diesem Server noch nicht eingerichtet. Sie wird aktiv, sobald die Google-OAuth-Zugangsdaten hinterlegt sind."
+                          : "Diese Datenquelle wird bald anschließbar — Google Analytics 4 folgt in einer der nächsten Wellen."}
                       </span>
                     </div>
                   ) : connector.provider === "gsc" ? (
@@ -116,9 +136,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             })}
           </div>
         </div>
-        <div className="card">
+        <div className="card status-panel">
           <p className="kicker">Verbundene Datenquellen</p>
-          <StatusList items={connectorItems} />
+          {data.integrations.length > 0 ? (
+            <StatusList items={connectorItems} />
+          ) : (
+            <p className="muted">Noch keine Datenquelle verbunden.</p>
+          )}
         </div>
       </section>
 
@@ -127,7 +151,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           <p className="kicker">Datenabgleich planen</p>
           <p className="muted">Holt regelmäßig neue Daten von der verbundenen Quelle, damit Rankings und Kennzahlen aktuell bleiben.</p>
           <div className="connector-grid compact">
-            {connectorProviders.map((connector) => {
+            {providers.map((connector) => {
               const existing = data.integrations.find((integration) => integration.provider === connector.provider && integration.projectId === selectedProject?.id);
               const isConnected = existing?.status === "connected";
               // A sync only makes sense against a genuinely connected source. Gating on a mere
@@ -140,9 +164,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                   <strong>{connector.label}</strong>
                   <span>Plant einen täglichen Datenabgleich für {connector.label}.</span>
                   <div className="locked-action">
-                    <button className="button secondary" type="submit" disabled={!canSchedule}>
+                    <SubmitButton className="button secondary" pendingLabel="wird geplant …" disabled={!canSchedule}>
                       Abgleich planen
-                    </button>
+                    </SubmitButton>
                     {!canSchedule ? (
                       <span className="locked-action__reason">
                         {!connector.available
@@ -160,9 +184,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             })}
           </div>
         </div>
-        <div className="card">
+        <div className="card status-panel">
           <p className="kicker">Status der Abgleiche</p>
-          <StatusList items={jobItems} />
+          {connectorJobs.length > 0 ? (
+            <StatusList items={jobItems} />
+          ) : (
+            <p className="muted">Noch kein Datenabgleich geplant.</p>
+          )}
         </div>
       </section>
 
@@ -253,6 +281,15 @@ function connectorStatusLabel(status: string): string {
   if (status === "connected") return "verbunden";
   if (status === "degraded") return "eingeschränkt";
   if (status === "error") return "Fehler — bitte neu verbinden";
+  return status;
+}
+
+function jobStatusLabel(status: string): string {
+  if (status === "queued") return "geplant";
+  if (status === "running") return "läuft";
+  if (status === "succeeded") return "erledigt";
+  if (status === "failed") return "fehlgeschlagen";
+  if (status === "canceled" || status === "cancelled") return "abgebrochen";
   return status;
 }
 

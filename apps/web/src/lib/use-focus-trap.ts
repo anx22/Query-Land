@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 /**
  * Focus-trap for modal drawers/dialogs.
@@ -15,6 +15,11 @@ export function useFocusTrap(
   active: boolean,
   onClose: () => void,
 ): void {
+  // Keep the latest onClose in a ref so callers can pass an inline arrow without making the
+  // effect re-run (and re-trap focus / re-bind the listener) on every parent render.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!active) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -30,7 +35,7 @@ export function useFocusTrap(
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key === "Tab") {
@@ -52,5 +57,5 @@ export function useFocusTrap(
       window.removeEventListener("keydown", handler);
       previouslyFocused?.focus?.();
     };
-  }, [ref, active, onClose]);
+  }, [ref, active]);
 }

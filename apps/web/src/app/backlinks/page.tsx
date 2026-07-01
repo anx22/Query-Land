@@ -2,15 +2,14 @@ import "../../features/backlinks/backlinks.css";
 
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
-import { MetricCard } from "../../components/metric-card";
-import { HelpDisclosure } from "../../components/help-disclosure";
+import { ConnectionBadge } from "../../components/connection-badge";
+import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
 import { GlossarLink } from "../../components/glossar-link";
-import { Icon } from "../../components/icon";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { BacklinkFlowChart } from "../../components/charts/backlink-flow";
 import { loadBacklinksScreenData } from "../../lib/backlinks-api";
@@ -52,41 +51,12 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
     <AppShell activePath="/backlinks">
       <div className="backlinks-root">
         {/* ----------------------------------------------------------------- */}
-        {/* Header + import action                                            */}
+        {/* Intro + import action                                             */}
         {/* ----------------------------------------------------------------- */}
-        <header className="page-header">
-          <div className="page-header__titles">
-            <p className="kicker">Verlinkung von anderen Websites</p>
-            <h1>Backlink-Profil</h1>
-            <p className="page-header__purpose">
-              Wie entwickelt sich Ihr Linkprofil — Backlinks, verweisende Domains und die Follow-Ratio
-              über die Zeit?
-            </p>
-          </div>
-          <div className="page-header__aside">
-            <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
-            <ConfidenceBadge level="B" />
-            <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
-            <div className="locked-action">
-              <button className="button" type="button" disabled>Backlinks importieren</button>
-              <span className="locked-action__reason">
-                <Icon name="lock" />
-                Backlinks-Quelle noch nicht verfügbar — Google liefert keine Backlinks per API.
-              </span>
-            </div>
-          </div>
-        </header>
-
-        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-        {!data.connected ? <OfflineNotice /> : null}
-        {data.connected && !hasData ? (
-          <p className="notice">
-            Noch keine Backlink-Daten. Eine echte Backlink-Quelle ist noch nicht angebunden —
-            Google Search Console stellt Backlinks nicht über die Schnittstelle bereit.
-          </p>
-        ) : null}
-
-        <HelpDisclosure summary="So lesen Sie das Backlink-Profil">
+        <section className="card hero-card">
+          <HeroBand src="/brand/hdr-backlinks.jpg" />
+          <p className="kicker">Verlinkung von anderen Websites</p>
+          <h1>Backlink-Profil</h1>
           <p>
             Backlinks sind Links von anderen Websites auf Ihre — ein wichtiges Vertrauenssignal für
             Google. So entwickelt sich Ihr Linkprofil: <TermTooltip term="Backlink">Backlinks</TermTooltip> und{" "}
@@ -94,30 +64,34 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <TermTooltip term="Follow / Nofollow">Follow / Nofollow</TermTooltip>-Mix, Zu- und Abgänge sowie die{" "}
             <TermTooltip term="Follow-Ratio">Follow-Ratio</TermTooltip>.
           </p>
-        </HelpDisclosure>
+          <div className="badge-row">
+            {data.snapshots.length > 0 ? (
+              <span className="badge">{data.snapshots.length} Momentaufnahme{data.snapshots.length !== 1 ? "n" : ""}</span>
+            ) : null}
+            {/* Only claim a confidence class once there is something measured. With no data, say
+                "Bald verfügbar" — the same honest coming-soon treatment as GA4 in den Einstellungen. */}
+            {hasData ? <ConfidenceBadge level="B" /> : <span className="badge warning">Bald verfügbar</span>}
+            <ConnectionBadge connected={data.connected} />
+          </div>
+          {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+          {!data.connected ? <OfflineNotice /> : null}
+          {/* No dead "Backlinks importieren" button: there is no backlink source yet (Google offers
+              none via API), so a permanently-disabled action would be a dead-end. Instead set the
+              expectation honestly and make clear nothing is blocked on the user. */}
+          {data.connected && !hasData ? (
+            <p className="notice">
+              <strong>Backlink-Anbindung folgt.</strong> Google stellt Backlinks nicht über seine
+              Schnittstelle bereit — dafür binden wir eine eigene Backlink-Quelle an. Sobald sie
+              verfügbar ist, erscheinen hier Ihr Linkprofil, die verweisenden Domains und ihre
+              Entwicklung über die Zeit. Von Ihrer Seite ist dafür kein Schritt nötig.
+            </p>
+          ) : null}
+        </section>
 
-        {/* At-a-glance verdict: the three numbers that frame the profile */}
-        <div className="verdict-strip verdict-strip--3">
-          <MetricCard
-            label="Backlinks"
-            value={formatCount(totalBacklinks)}
-            note="eingehende Links gesamt"
-            info="Alle eingehenden Links, die Google Search Console meldet (verlässliche Quelle)."
-          />
-          <MetricCard
-            label="Verweisende Domains"
-            value={formatCount(deltas.latest?.referringDomains)}
-            note="unterschiedliche Domains, die verlinken"
-            info="Viele unterschiedliche verweisende Domains wiegen schwerer als viele Links von wenigen Domains."
-          />
-          <MetricCard
-            label="Follow-Ratio"
-            value={formatRatioPct(followRatio)}
-            note="Anteil linkkraft-weitergebender Links"
-            info="Anteil der Follow-Links am Gesamtprofil — der Teil, der tatsächlich Authority überträgt."
-          />
-        </div>
-
+        {/* Two-mode: the trend/gauge/flow/distribution/table machinery only renders once there
+            is real backlink data; until then the hero above already explains the no-source state. */}
+        {hasData && (
+        <>
         {/* ----------------------------------------------------------------- */}
         {/* Hero: TrendChart (toggle Backlinks/Domains) + Follow-Ratio gauge  */}
         {/* ----------------------------------------------------------------- */}
@@ -213,27 +187,28 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
         </section>
 
         {/* ----------------------------------------------------------------- */}
-        {/* Referring-domains table (primary) + Anchor distribution (rail)    */}
+        {/* Anchor distribution                                               */}
         {/* ----------------------------------------------------------------- */}
-        <div className="split-lead">
-          <section className="card" aria-label="Verweisende Domains">
-            <p className="kicker">
-              <TermTooltip term="Verweisende Domain">Verweisende Domains</TermTooltip>
-            </p>
-            <h2>Domains, die auf Sie verlinken</h2>
-            <WhyItMatters text="Viele unterschiedliche verweisende Domains wiegen schwerer als viele Links von wenigen Domains." />
-            <ReferringDomainsTable domains={data.referringDomains} />
-          </section>
+        <section className="card" aria-label="Anchor-Verteilung">
+          <p className="kicker">Anchor-Verteilung</p>
+          <h2>Häufigste Ankertexte</h2>
+          <WhyItMatters text="Ein natürlicher Anchor-Mix (Brand, URL, generisch) schützt vor Over-Optimization-Risiken." />
+          <AnchorDistribution authority={data.authority} />
+        </section>
 
-          <div className="side-rail">
-            <section className="card" aria-label="Anchor-Verteilung">
-              <p className="kicker">Anchor-Verteilung</p>
-              <h2>Häufigste Ankertexte</h2>
-              <WhyItMatters text="Ein natürlicher Anchor-Mix (Brand, URL, generisch) schützt vor Over-Optimization-Risiken." />
-              <AnchorDistribution authority={data.authority} />
-            </section>
-          </div>
-        </div>
+        {/* ----------------------------------------------------------------- */}
+        {/* Referring-domains table                                           */}
+        {/* ----------------------------------------------------------------- */}
+        <section className="card" aria-label="Verweisende Domains">
+          <p className="kicker">
+            <TermTooltip term="Verweisende Domain">Verweisende Domains</TermTooltip>
+          </p>
+          <h2>Domains, die auf Sie verlinken</h2>
+          <WhyItMatters text="Viele unterschiedliche verweisende Domains wiegen schwerer als viele Links von wenigen Domains." />
+          <ReferringDomainsTable domains={data.referringDomains} />
+        </section>
+        </>
+        )}
       </div>
     </AppShell>
   );

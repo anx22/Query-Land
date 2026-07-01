@@ -1,17 +1,22 @@
 import "../../features/keyword-rank/keywords.css";
 
+import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
+import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
+import { HeroBand } from "../../components/hero-band";
 import { MetricCard } from "../../components/metric-card";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { TermTooltip } from "../../components/term-tooltip";
 import { GlossarLink } from "../../components/glossar-link";
-import { HelpDisclosure } from "../../components/help-disclosure";
 import { Icon } from "../../components/icon";
 import { PREREQUISITE_META } from "../../lib/readiness";
 import { PositionDistribution } from "../../components/charts/position-distribution";
 import { TrendChart } from "../../components/charts/trend-chart";
 import { KeywordTableClient } from "../../features/keyword-rank";
+import { NextStep } from "../../components/next-step";
+import { SubmitButton } from "../../components/submit-button";
 import { loadKeywordsRankData } from "../../lib/keywords-api";
 import { addKeywordsAction, computeVisibilityAction, createKeywordGroupAction } from "./actions";
 
@@ -23,10 +28,28 @@ export default async function Page({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  return (
+    <AppShell activePath="/keywords-rank">
+      <Suspense fallback={<PageSkeleton label="Keywords & Rankings werden geladen …" />}>
+        <KeywordsRankBody params={params} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+// Data-dependent body — streamed behind Suspense so the shell paints immediately.
+async function KeywordsRankBody({
+  params,
+}: {
+  params: Record<string, string | string[] | undefined> | undefined;
+}) {
   const data = await loadKeywordsRankData();
   const feedback = feedbackMessage(params);
 
   const brandCount = data.rows.filter((r) => r.brand).length;
+  // Two-mode: until the project actually has keywords, the KPI grid / charts / table are all empty
+  // shells. Hide them and lead with the "Keywords hinzufügen" form — the single real next step.
+  const hasKeywords = data.totalKeywords > 0;
   // A Visibility-Index computed over zero ranked keywords is a meaningless 0 — treat it as "no data".
   const hasVisibility = data.latestVisibility != null && data.latestVisibility.trackedKeywords > 0;
   const visScore = hasVisibility ? data.latestVisibility!.score : undefined;
@@ -36,52 +59,48 @@ export default async function Page({
       : null;
 
   return (
-    <AppShell activePath="/keywords-rank">
-      <header className="page-header">
-        <div className="page-header__titles">
-          <p className="kicker">Suchbegriffe &amp; Platzierungen</p>
-          <h1>Keywords &amp; Rankings</h1>
-          <p className="page-header__purpose">
-            Für welche Suchbegriffe Ihre Website bei Google erscheint — und auf welcher Position, mit
-            Positions-Trend und Veränderung seit der letzten Messung.
-          </p>
-        </div>
-        <div className="page-header__aside">
-          <span className="badge">{data.groups.length} Cluster</span>
-          <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "Daten verbunden" : "Daten offline"}
-          </span>
-          <div className="locked-action">
-            <form action={computeVisibilityAction}>
-              <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
-              <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
-                Visibility neu berechnen
-              </button>
-            </form>
-            {!data.connected || !data.project ? (
-              <span className="locked-action__reason">
-                <Icon name="lock" />
-                {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </header>
-
-      {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-      {!data.connected ? <OfflineNotice /> : null}
-
-      <HelpDisclosure summary="So lesen Sie Keywords & Rankings">
+    <>
+      <section className="card hero-card">
+        <HeroBand src="/brand/hdr-keywords-rank.jpg" />
+        <p className="kicker">Suchbegriffe &amp; Platzierungen</p>
+        <h1>Keywords &amp; Rankings</h1>
         <p>
-          <TermTooltip term="Striking Distance">Striking-Distance</TermTooltip>-Keywords (Position 11–20)
-          sind die günstigsten Hebel — ein paar Plätze entscheiden über Sichtbarkeit. Der{" "}
-          <GlossarLink term="Visibility-Index">Visibility-Index</GlossarLink> bündelt die
-          positionsgewichtete Sichtbarkeit über das eigene Keyword-Set zu einer Zahl.
+          Für welche Suchbegriffe Ihre Website bei Google erscheint — und auf welcher Position. Jede
+          Zeile zeigt den Positions-Trend und die Veränderung seit der letzten Messung.
         </p>
-      </HelpDisclosure>
+        <WhyItMatters>
+          <TermTooltip term="Striking Distance">Striking-Distance</TermTooltip>-Keywords (Position 11–20)
+          sind die günstigsten Hebel — ein paar Plätze entscheiden über Sichtbarkeit.
+        </WhyItMatters>
+        <div className="badge-row">
+          <span className="badge">{data.groups.length} Cluster</span>
+          <ConnectionBadge connected={data.connected} />
+        </div>
+        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+        {!data.connected ? <OfflineNotice /> : null}
+        {hasKeywords && (
+          <div className="action-row">
+            <div className="locked-action">
+              <form action={computeVisibilityAction}>
+                <input type="hidden" name="projectId" value={data.project?.id ?? ""} />
+                <SubmitButton className="button secondary" pendingLabel="wird berechnet …" disabled={!data.connected || !data.project}>
+                  Visibility neu berechnen
+                </SubmitButton>
+              </form>
+              {!data.connected || !data.project ? (
+                <span className="locked-action__reason">
+                  <Icon name="lock" />
+                  {!data.connected ? "Daten momentan nicht erreichbar." : PREREQUISITE_META.project.reason}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        )}
+      </section>
 
-      {/* At-a-glance verdict: the numbers that frame visibility & reach */}
-      <div className="verdict-strip verdict-strip--4">
+      {hasKeywords && (
+      <>
+      <section className="metric-grid">
         <MetricCard
           label="Visibility-Index"
           value={visScore != null ? String(visScore) : "—"}
@@ -117,7 +136,7 @@ export default async function Page({
           info="Keywords mit der eigenen Marke (Brand). Sie ranken meist leicht und sagen wenig über Wachstumspotenzial."
           note="von den geladenen Keywords"
         />
-      </div>
+      </section>
 
       {/* Charts: PositionDistribution + Visibility TrendChart */}
       <section className="kw-charts">
@@ -141,16 +160,12 @@ export default async function Page({
 
       {/* Interactive keyword table + FilterBar + Inspector */}
       <KeywordTableClient rows={data.rows} inspectors={data.inspectors} />
+      </>
+      )}
 
-      {/* Curation forms (reframed in voice) — collapsed by default */}
-      <details className="advanced-section">
-        <summary>
-          <span className="advanced-section__title">Keywords &amp; Cluster verwalten</span>
-          <span className="advanced-section__hint">
-            Neue Begriffe hinzufügen und thematische Cluster anlegen.
-          </span>
-        </summary>
-        <div className="cards-2">
+      {/* Curation forms (reframed in voice) — always visible; in the empty state these ARE the
+          primary next step, so they lead directly below the hero. */}
+      <section className="content-grid">
         <div className="card">
           <p className="kicker">Keywords hinzufügen</p>
           <WhyItMatters showIcon={false}>
@@ -183,9 +198,9 @@ export default async function Page({
               <input name="brandTerms" placeholder="query-land, acme" />
             </label>
             <div className="locked-action">
-              <button className="button" type="submit" disabled={!data.connected || !data.project}>
+              <SubmitButton className="button" pendingLabel="wird gespeichert …" disabled={!data.connected || !data.project}>
                 Klassifizieren &amp; speichern
-              </button>
+              </SubmitButton>
               {!data.connected || !data.project ? (
                 <span className="locked-action__reason">
                   <Icon name="lock" />
@@ -205,9 +220,9 @@ export default async function Page({
             <label>Name<input name="name" placeholder="Pricing" required /></label>
             <label>Thema (optional)<input name="topic" placeholder="Money pages" /></label>
             <div className="locked-action">
-              <button className="button secondary" type="submit" disabled={!data.connected || !data.project}>
+              <SubmitButton className="button secondary" pendingLabel="wird angelegt …" disabled={!data.connected || !data.project}>
                 Cluster anlegen
-              </button>
+              </SubmitButton>
               {!data.connected || !data.project ? (
                 <span className="locked-action__reason">
                   <Icon name="lock" />
@@ -217,9 +232,16 @@ export default async function Page({
             </div>
           </form>
         </div>
-        </div>
-      </details>
-    </AppShell>
+      </section>
+
+      {hasKeywords ? (
+        <NextStep
+          hint="Ihre Keywords stehen — die stärksten Hebel werden zu priorisierten Optimierungschancen."
+          href="/content-opportunities"
+          ctaLabel="Zu den Chancen →"
+        />
+      ) : null}
+    </>
   );
 }
 

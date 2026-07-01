@@ -17,9 +17,17 @@ export interface RankSnapshotResult {
   rankSnapshot: RankSnapshot;
 }
 
+export interface LatestKeywordPosition {
+  keywordId: string;
+  position: number | null;
+  capturedAt: string;
+}
+
 export interface RankStore {
   recordRankSnapshot(projectId: string, keywordId: string, options?: RecordRankOptions): Promise<RankSnapshotResult>;
   listRankSnapshots(projectId: string, keywordId: string): Promise<RankSnapshot[]>;
+  /** Latest rank snapshot per keyword for a project (one query, no per-keyword fan-out). */
+  latestKeywordPositions(projectId: string, market?: string): Promise<LatestKeywordPosition[]>;
   listSerpSnapshots(projectId: string, keywordId: string): Promise<SerpSnapshot[]>;
   serpDiff(projectId: string, keywordId: string): Promise<SerpDiff>;
   computeVisibility(projectId: string, market?: string): Promise<VisibilityScore>;
@@ -78,6 +86,28 @@ class SQLiteRankStore implements RankStore {
   async listRankSnapshots(projectId: string, keywordId: string): Promise<RankSnapshot[]> {
     await this.assertKeyword(projectId, keywordId);
     return (await this.db.prepare(`SELECT * FROM rank_snapshots WHERE project_id = ? AND keyword_id = ? ORDER BY captured_at ASC, id ASC`).all(projectId, keywordId)).map((row) => this.mapRank(row));
+  }
+
+  async latestKeywordPositions(projectId: string, market?: string): Promise<LatestKeywordPosition[]> {
+    // DISTINCT ON (keyword_id) + ORDER BY captured_at DESC yields exactly the latest snapshot per
+    // keyword in a single query, replacing the per-keyword rank-snapshots fan-out the dashboard did.
+    const clauses = ["project_id = ?"];
+    const args: unknown[] = [projectId];
+    if (market) {
+      clauses.push("market = ?");
+      args.push(market);
+    }
+    const rows = await this.db.prepare(
+      `SELECT DISTINCT ON (keyword_id) keyword_id, position, captured_at
+         FROM rank_snapshots
+        WHERE ${clauses.join(" AND ")}
+        ORDER BY keyword_id, captured_at DESC, id DESC`
+    ).all(...args) as Array<{ keyword_id: string; position: number | null; captured_at: string }>;
+    return rows.map((row) => ({
+      keywordId: String(row.keyword_id),
+      position: row.position === null ? null : Number(row.position),
+      capturedAt: String(row.captured_at)
+    }));
   }
 
   async listSerpSnapshots(projectId: string, keywordId: string): Promise<SerpSnapshot[]> {

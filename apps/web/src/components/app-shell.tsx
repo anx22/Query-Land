@@ -39,18 +39,27 @@ export async function AppShell({
       />
       <main className="main">
         <header className="topbar">
-          <ContextBar
-            projectName={foundation.selectedProject?.name ?? null}
-            siteBaseUrl={foundation.selectedSite?.baseUrl ?? null}
-          />
+          {/* The "you are here" crumb is meaningless on the login screen — and showing
+              "Keine Website — zuerst hinzufügen" there contradicts the actual next step (sign in). */}
+          {activePath === "/login" ? (
+            <span />
+          ) : (
+            <ContextBar
+              projectName={foundation.selectedProject?.name ?? null}
+              siteBaseUrl={foundation.selectedSite?.baseUrl ?? null}
+            />
+          )}
           <div className="topbar__controls">
             {currentUser ? (
               <form action={logoutAction} className="cluster">
                 <span className="badge success" title={currentUser.email}>{currentUser.name}</span>
                 <button className="button secondary compact" type="submit">Abmelden</button>
               </form>
-            ) : (
-              <a className="badge" href="/login">Anmelden</a>
+            ) : activePath === "/login" ? null : (
+              // Soft-login beta: the app is usable without an account, so a persistent "Anmelden"
+              // button on every screen reads as a logged-out error mid-use. Offer login quietly as a
+              // text link (reachable, not shouting); logged-in users get "Abmelden" above.
+              <a className="topbar__signin" href="/login">Anmelden</a>
             )}
           </div>
         </header>

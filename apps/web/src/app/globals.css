@@ -6,6 +6,9 @@
   --muted: #766b62;
   --line: #e8dfd6;
   --primary: #ff5c00;
+  /* Darker burnt-orange used ONLY for solid button fills so white button text reaches
+     WCAG AA (~4.6:1). The bright --primary stays the editorial accent for labels/icons. */
+  --primary-strong: #c2410c;
   --primary-soft: #fff0e6;
   --success: #16794d;
   --warning: #a05a00;
@@ -17,7 +20,7 @@
   --conf-b: #0e7c86; --conf-b-soft: #e2f4f5;   /* B Beobachtet    (Google/eigene API)  */
   --conf-c: #b7791f; --conf-c-soft: #fbf0db;   /* C Gemessen SERP (beobachtete Suche)  */
   --conf-d: #5b6478; --conf-d-soft: #edeff3;   /* D Geschätzt     (Drittanbieter)      */
-  --conf-e: #9aa0a6; --conf-e-soft: #f1f1f2;   /* E KI-Hinweis    (kein Beleg)         */
+  --conf-e: #71777e; --conf-e-soft: #f1f1f2;   /* E KI-Hinweis    (kein Beleg)         */
 
   /* UX-9 — categorical colors for opportunity types (avoids green/red/orange)    */
   --cat-technical: #0e7c86;
@@ -29,7 +32,7 @@
 
   /* Inactive / disabled / locked — single source for every gated surface.        */
   /* Used by .is-locked, [disabled], .button[aria-disabled], .nav-item.is-locked. */
-  --inactive-ink:     #a89e95;   /* muted text on inactive elements              */
+  --inactive-ink:     #837a71;   /* muted-but-legible text on inactive elements  */
   --inactive-surface: #f0ece7;   /* flat fill for inactive chips/icons           */
   --inactive-line:    #e8dfd6;   /* border for inactive controls                 */
   --inactive-opacity: 0.55;      /* applied to fully-disabled action buttons     */
@@ -89,6 +92,32 @@ button,
 input,
 select {
   font: inherit;
+}
+
+/* Baseline for text-like form controls, so a field that isn't wrapped in .form-card/.form-row never
+   renders as raw browser HTML (no border-radius, no padding). This is the design-system default;
+   component classes (.cw-input, filter bars, .project-switcher__select, compact controls) still
+   override where they need a different shape. Excludes toggles/file/color and button-type inputs. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="image"]),
+textarea,
+select {
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  padding: 0.6rem 0.8rem;
+}
+
+/* Bare <label> that directly wraps a control (label text + input on one line) reads as raw HTML —
+   the input crowds the caption. Stack them like the .form-card labels do. Scoped to labels that are
+   NOT inside an already-styled form group so we don't double-apply. */
+form:not(.form-card) > label:not(.cw-field),
+.stack > label:not(.cw-field) {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
 }
 
 .shell {
@@ -489,6 +518,24 @@ code, kbd, samp,
   color: var(--warning);
 }
 
+/* Honest caveat next to the Health Score when the crawl data is thin/partial. */
+.audit-data-quality {
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  background: #fff3d8;
+  color: var(--warning);
+  border: 1px solid rgba(160, 90, 0, 0.25);
+}
+
+.audit-data-quality--partial {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: rgba(55, 48, 163, 0.2);
+}
+
 .status.failed,
 .status.blocked,
 .status.not_connected {
@@ -517,7 +564,7 @@ code, kbd, samp,
   gap: 0.4rem;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--primary);
+  background: var(--primary-strong);
   color: white;
   cursor: pointer;
   min-height: 2.6rem;
@@ -549,6 +596,23 @@ code, kbd, samp,
   border-color: var(--line);
   background: var(--surface);
   color: var(--ink);
+}
+
+/* Keyboard accessibility — one visible focus ring for every interactive control.
+   Previously only .term / .infotip had focus styles; buttons, inputs, selects and
+   link-buttons fell back to the UA default, easy to miss on the warm-paper surface. */
+.button:focus-visible,
+a.button:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--primary-strong);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .button.danger {
@@ -691,7 +755,37 @@ button:disabled {
 }
 
 .form-card input,
-.form-card select {
+.form-card select,
+.form-card textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  padding: 0.8rem 0.9rem;
+}
+
+/* A horizontal group of fields inside a form (e.g. Prompt + Markt). Each child label
+   stacks its own caption over its control; the row wraps to one column when narrow.
+   Without this rule the bare labels rendered inline and looked cramped/broken. */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.form-row > label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.form-row input,
+.form-row select,
+.form-row textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 0.9rem;
@@ -757,8 +851,76 @@ select:disabled {
   display: grid;
   gap: 1rem;
   border: 1px solid var(--line);
-  border-radius: 1.25rem;
+  border-radius: 0.75rem;
   padding: 1rem;
+}
+
+/* A short status panel in a content-grid must not stretch to match the taller action column
+   beside it — that reserved a half-column of empty space just to say "leer". */
+.status-panel {
+  align-self: start;
+}
+
+/* Soft-login sign-in: a quiet, optional text link in the top bar — not a button that reads as a
+   logged-out error while the app is in use. */
+.topbar__signin {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.topbar__signin:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* NextStep — waterfall hand-off card: a calm row, hint left + secondary CTA right. */
+.next-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.next-step__body {
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+
+.next-step__hint {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+}
+
+/* SubmitButton in-flight state — spinner + label so a click never feels like nothing happened. */
+.submit-button__pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 1.4s; }
+}
+
+/* A form action in flight dims the whole form slightly — a second, quiet "working" cue. */
+form:has(button[data-pending]) {
+  opacity: 0.85;
 }
 
 .connector-card h2 {
@@ -1028,10 +1190,14 @@ select:disabled {
 
 .why-it-matters__icon {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
   color: var(--primary);
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.5;
 }
+/* The empty-state chart glyphs now render a line-icon, not an emoji. */
+.overview-trend-empty__glyph { display: inline-flex; color: var(--muted); }
 
 /* B-3 Mono-Daten-Pass: every Recharts axis tick label is a measured number, so */
 /* it renders in JetBrains Mono / tabular — consistent with .metric-value.       */
@@ -1985,9 +2151,52 @@ select:disabled {
 .overview-subhead { margin-top: var(--space-5); }
 .overview-cta { margin-top: var(--space-4); }
 
+/* First-run "modules pending" panel — shown instead of a screen's empty machinery. */
+.modules-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-5);
+}
+.modules-pending__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 1.35rem;
+}
+.modules-pending__title { margin: 0; }
+.modules-pending__text { margin: 0; color: var(--muted); max-width: 48ch; }
+
 .overview-empty-state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); margin-top: var(--space-3); }
 .overview-empty-state__text { margin: 0; color: var(--muted); }
 .overview-empty-hint { margin-top: var(--space-2); color: var(--muted); font-size: 0.9rem; }
+
+/* Chart empty-states (Visibility-Verlauf, Positions-Verteilung). Without this the bold title
+   and the hint render inline and glue together ("…vorhandenSobald…"). Centered, calm, stacked. */
+.overview-trend-empty,
+.overview-dist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-align: center;
+  min-height: 180px;
+  padding: var(--space-5) var(--space-4);
+  color: var(--muted);
+}
+.overview-trend-empty__glyph { font-size: 1.75rem; opacity: 0.7; }
+.overview-trend-empty__title,
+.overview-dist-empty__title { color: var(--ink); }
+.overview-trend-empty__hint,
+.overview-dist-empty__hint { font-size: 0.9rem; max-width: 42ch; }
 .overview-site-context { margin-top: var(--space-2); color: var(--muted); font-size: 0.85rem; }
 
 .overview-opportunity-list { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }

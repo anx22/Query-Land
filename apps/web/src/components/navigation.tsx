@@ -53,14 +53,12 @@ export function Navigation({ activePath, projects, activeProjectId, readiness }:
                           Erweitert
                         </span>
                       )}
-                      {locked && (
-                        <span className="nav-item__lock" aria-hidden="true">
-                          <Icon name="lock" />
-                        </span>
-                      )}
+                      {/* No padlock icon: a column of locks reads as a broken/disabled app on first
+                          run. Locked items stay visible but muted (.is-locked) with the reason on
+                          hover (title) + for screen readers, so the state is still communicated. */}
                       {locked && (
                         <span id={`${route.path}-lock`} className="visually-hidden">
-                          Gesperrt: {lockReason}
+                          Noch gesperrt: {lockReason}
                         </span>
                       )}
                     </Link>

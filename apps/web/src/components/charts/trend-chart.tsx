@@ -32,6 +32,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { chartTheme, ANIMATION_DEFAULT, animationDuration } from "./chart-theme";
+import { Icon } from "../icon";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,9 +92,8 @@ function TrendChartEmpty({ title }: { title: string }) {
       role="img"
       aria-label={`${title} — keine Daten vorhanden`}
     >
-      {/* Land-metaphor allowed in empty-states per spec Teil 1 §1 */}
       <span className="overview-trend-empty__glyph" aria-hidden="true">
-        🗺️
+        <Icon name="description" />
       </span>
       <strong className="overview-trend-empty__title">
         Noch keine Verlaufsdaten vorhanden

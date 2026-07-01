@@ -1,9 +1,13 @@
 import "../../features/technical-audit/audit.css";
 
+import { Suspense } from "react";
 import { AppShell } from "../../components/app-shell";
+import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
-import { MetricCard } from "../../components/metric-card";
+import { ConnectionBadge } from "../../components/connection-badge";
+import { HeroBand } from "../../components/hero-band";
 import { ScoreGauge } from "../../components/charts/score-gauge";
+import { ModulesPending } from "../../components/modules-pending";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
 import { SectionTreemap } from "../../components/charts/section-treemap";
 import { ConfidenceBadge } from "../../components/confidence-badge";
@@ -17,6 +21,7 @@ import { IssueGroups } from "../../features/technical-audit/issue-groups";
 import { IssueFilterBar } from "../../features/technical-audit/issue-filter-bar";
 import { UrlExplorerTable } from "../../features/technical-audit/url-explorer-table";
 import { CrawlStartPanel } from "../../features/technical-audit/crawl-start";
+import { deriveCrawlDataQuality } from "../../features/technical-audit/crawl-data-quality";
 import { actionLock } from "../../lib/readiness";
 import {
   computePageInfo,
@@ -285,6 +290,21 @@ export default async function Page({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = (await searchParams) ?? {};
+  return (
+    <AppShell activePath="/technical-audit">
+      <Suspense fallback={<PageSkeleton label="Technische Prüfung wird geladen …" />}>
+        <TechnicalAuditBody params={params} />
+      </Suspense>
+    </AppShell>
+  );
+}
+
+// Data-dependent body — streamed behind Suspense so the shell paints immediately.
+async function TechnicalAuditBody({
+  params,
+}: {
+  params: Record<string, string | string[] | undefined>;
+}) {
   const data = await loadTechnicalAuditOverview({
     issueStatus: firstParam(params.status),
     issueSeverity: firstParam(params.severity),
@@ -301,6 +321,7 @@ export default async function Page({
   const actionBanner = resolveActionBanner({
     error: firstParam(params.error),
     started: firstParam(params.started),
+    crawlWarning: firstParam(params.crawlWarning),
   });
 
   // Flatten the current searchParams to a single-value map for href building,
@@ -326,6 +347,8 @@ export default async function Page({
     data.latestHealthScore && data.previousHealthScore
       ? data.latestHealthScore.score - data.previousHealthScore.score
       : null;
+  // Honest caveat when the score is computed over thin/partial crawl data.
+  const dataQuality = deriveCrawlDataQuality(data.recentCrawlRuns[0]?.summary);
 
   // A run only blocks the start button while it is *actively* running. A run
   // stuck in "running" (worker died / drain timed out) must not lock the button
@@ -338,14 +361,11 @@ export default async function Page({
     ) ?? null;
   const crawlLock = actionLock(data.readiness, ["project", "site"]);
   const feedback = feedbackMessage(params);
-
-  // Verdict values — the "auf einen Blick" strip under the header.
-  const indexableStage = data.funnelStages.find((s) => s.key === "indexable");
-  const indexableValue = indexableStage && indexableStage.value !== null ? indexableStage.value : null;
-  const fmt = (n: number) => n.toLocaleString("de-DE");
+  // Two-mode: hide the funnel/treemap/issues/URL-explorer/diff machinery until a crawl has run.
+  const hasAudit = data.recentCrawlRuns.length > 0;
 
   return (
-    <AppShell activePath="/technical-audit">
+    <>
       {actionBanner ? (
         <p className={`notice ${actionBanner.tone}`} role={actionBanner.role}>
           {actionBanner.message}
@@ -359,64 +379,61 @@ export default async function Page({
         </p>
       ) : null}
 
-      <header className="page-header">
-        <div className="page-header__titles">
-          <p className="kicker">Technical Audit</p>
-          <h1>
-            <TermTooltip term="crawl">Analyse</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
-          </h1>
-          <p className="page-header__purpose">
-            Wo verlieren wir URLs auf dem Weg in den Index, wie gesund sind die Bereiche und welche
-            Probleme kosten am meisten — nach Wirkung priorisiert.
-          </p>
-        </div>
-        <div className="page-header__aside">
-          <span className={data.connected ? "badge success" : "badge danger"}>
-            {data.connected ? "Daten verbunden" : "Daten offline"}
-          </span>
-        </div>
-      </header>
-
-      {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-      {!data.connected ? <OfflineNotice /> : null}
-
-      <HelpDisclosure summary="So lesen Sie das Technical Audit">
+      <section className="card hero-card">
+        <HeroBand src="/brand/hdr-technical-audit.jpg" />
+        <p className="kicker">Technische Prüfung</p>
+        <h1>
+          <TermTooltip term="crawl">Analyse</TermTooltip>-Überblick: Indexierbarkeit, Health &amp; Issues
+        </h1>
         <p>
-          Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt, wo URLs
-          auf dem Weg in den Google-Index verloren gehen. Der{" "}
-          <GlossarLink term="health score">Health Score</GlossarLink> bündelt alle offenen Issues zu
-          einer Zahl. Die Treemap verrät, welche Website-Bereiche die meisten Probleme tragen — dort
-          lohnt sich die Arbeit zuerst.
+          Wo verlieren wir URLs auf dem Weg in den Index, wie gesund sind unsere Website-Bereiche und
+          welche Probleme kosten am meisten? Dieser Überblick priorisiert technische SEO-Arbeit nach
+          Wirkung.
+        </p>
+        <div className="badge-row">
+          <ConnectionBadge connected={data.connected} />
+        </div>
+        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+        {!data.connected ? <OfflineNotice /> : null}
+      </section>
+
+      {/* Primary action: start a crawl (the entry point of the whole loop) */}
+      <CrawlStartPanel
+        project={data.project}
+        site={data.site}
+        lock={crawlLock}
+        connected={data.connected}
+        runningRun={runningRun}
+      />
+
+      {/* Help zone — collapsed by default (one-time reading, not permanent). */}
+      <HelpDisclosure summary="So lesen Sie die Technische Prüfung">
+        <p>
+          Der <GlossarLink term="indexierbarkeit">Indexierbarkeits</GlossarLink>-Funnel zeigt,
+          wo URLs auf dem Weg in den Google-Index verloren gehen. Der{" "}
+          <GlossarLink term="health score">Health Score</GlossarLink> bündelt alle offenen
+          Issues zu einer Zahl. Die Treemap verrät, welche Website-Bereiche die meisten
+          Probleme tragen — dort lohnt sich die Arbeit zuerst.
         </p>
       </HelpDisclosure>
 
-      {/* At-a-glance verdict: the three numbers that frame strengths & weaknesses */}
-      <div className="verdict-strip verdict-strip--3">
-        <MetricCard
-          label="Health Score"
-          value={healthValue !== null ? String(healthValue) : "—"}
-          note={
-            data.latestHealthScore ? `${fmt(data.latestHealthScore.totalIssues)} gewertete Issues` : "Noch nicht berechnet"
-          }
-          info="Aggregierter technischer Gesundheitswert aus offenen Issues und deren Schwere (0–100)."
+      {!hasAudit && (
+        <ModulesPending
+          icon="troubleshoot"
+          title="Noch keine Analyse"
+          text="Indexierbarkeits-Funnel, Health Score, die Bereichs-Treemap, gefundene Issues und der URL-Explorer erscheinen hier nach Ihrer ersten Analyse."
+          ctaHref="/technical-audit#crawl-start"
+          ctaLabel="Analyse starten →"
+          ctaDisabled={crawlLock.locked}
+          disabledReason={crawlLock.reason ?? undefined}
         />
-        <MetricCard
-          label="Offene Issues"
-          value={fmt(data.openIssueTotal)}
-          note="nach Regel & Schweregrad gruppiert"
-          info="Alle aktuell offenen technischen Befunde über die zuletzt gecrawlten URLs."
-        />
-        <MetricCard
-          label="Indexierbar"
-          value={indexableValue !== null ? fmt(indexableValue) : "—"}
-          note="URLs am Ende des Funnels"
-          info="URLs, die nach Abruf & Rendering nicht blockiert und damit indexierbar sind."
-        />
-      </div>
+      )}
 
-      {/* Lead: indexability funnel (primary) beside the start action + health gauge */}
-      <div className="split-lead">
-        <section className="card">
+      {hasAudit && (
+      <>
+      {/* Health gauge + indexability funnel */}
+      <section className="audit-overview-grid">
+        <div className="card">
           <p className="kicker">
             <TermTooltip term="indexierbarkeit">Indexierbarkeit</TermTooltip>-Funnel
             <InfoTip>
@@ -425,38 +442,41 @@ export default async function Page({
             </InfoTip>
           </p>
           <p className="muted">
-            Wo verliert die Seite URLs auf dem Weg zu Google? Entdeckt → Gecrawlt → Indexierbar (aus
-            der letzten Analyse).
+            Wo verliert die Seite URLs auf dem Weg zu Google? Entdeckt → Gecrawlt → Indexierbar
+            (aus der letzten Analyse).
           </p>
           <IndexabilityFunnel stages={data.funnelStages} />
           <WhyItMatters>
             Jeder Abfall zwischen den Stufen ist Traffic, der nie im Index ankommt — hier wird er
             sichtbar.
           </WhyItMatters>
-        </section>
-
-        <div className="side-rail">
-          <CrawlStartPanel
-            project={data.project}
-            site={data.site}
-            lock={crawlLock}
-            connected={data.connected}
-            runningRun={runningRun}
-          />
-          <div className="card">
-            <p className="kicker">
-              <TermTooltip term="health score">Health Score</TermTooltip>
-            </p>
-            <ScoreGauge value={healthValue} label="Health" />
-            <div className="audit-gauge-row">
-              {healthDelta !== null ? <DeltaChip value={healthDelta} unit=" Punkte" /> : null}
-              <ConfidenceBadge level="A" />
-            </div>
-          </div>
         </div>
-      </div>
 
-      {/* Section treemap — wants width, stays full-bleed */}
+        <div className="card">
+          <p className="kicker">
+            <TermTooltip term="health score">Health Score</TermTooltip>
+          </p>
+          <ScoreGauge value={healthValue} label="Health" />
+          <div className="audit-gauge-row">
+            {healthDelta !== null ? <DeltaChip value={healthDelta} unit=" Punkte" /> : null}
+            <ConfidenceBadge level="A" />
+          </div>
+          <p className="muted">
+            {data.latestHealthScore
+              ? `${data.latestHealthScore.totalIssues} gewertete Issues · Stand ${new Date(
+                  data.latestHealthScore.generatedAt
+                ).toLocaleString("de-DE")}`
+              : "Noch kein Health Score berechnet."}
+          </p>
+          {dataQuality ? (
+            <p className={`audit-data-quality audit-data-quality--${dataQuality.level}`} role="status">
+              {dataQuality.message}
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Section treemap */}
       <section className="card">
         <p className="kicker">Gesundheit nach Website-Bereich</p>
         <p className="muted">
@@ -477,9 +497,12 @@ export default async function Page({
             </span>
           </div>
         ) : null}
+        <WhyItMatters>
+          Zeigt auf einen Blick, welche Bereiche der Website die meisten Probleme tragen.
+        </WhyItMatters>
       </section>
 
-      {/* Issue groups — the primary triage surface */}
+      {/* Issue groups */}
       <section className="card">
         <p className="kicker">Issue-Gruppen</p>
         <p className="muted">
@@ -562,84 +585,76 @@ export default async function Page({
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
       </section>
 
-      {/* Secondary: run comparison, history & next steps — collapsed by default */}
-      <details className="advanced-section">
-        <summary>
-          <span className="advanced-section__title">Verlauf, Vergleich &amp; nächste Schritte</span>
-          <span className="advanced-section__hint">
-            Zwei Analysen gegenüberstellen, die Historie ansehen und weiterführende Aktionen wählen.
-          </span>
-        </summary>
-
-        {data.recentCrawlRuns.length > 0 ? (
-          <section className="card">
-            <p className="kicker">Nächster Schritt</p>
-            <h2>Aus den Befunden Wirkung machen</h2>
-            <p className="muted">
-              Die Analyse liegt vor — so geht es weiter: Verbesserungschancen priorisieren oder eine
-              einzelne Seite im Detail prüfen.
-            </p>
-            <div className="cluster">
-              <a className="button" href="/content-opportunities">Chancen ansehen →</a>
-              <a className="button secondary" href="/url-dossier">Einzelne Seite prüfen →</a>
-            </div>
-          </section>
-        ) : null}
-
-        {/* Crawl-Vergleich (crawl-diff) */}
-        <CrawlDiffSection data={data} currentParams={currentParams} />
-
-        {/* Recent crawl runs */}
+      {/* Next-step guidance — only once there is at least one analysis to act on. */}
+      {data.recentCrawlRuns.length > 0 ? (
         <section className="card">
-          <p className="kicker">Letzte Analysen</p>
-          {data.recentCrawlRuns.length > 0 ? (
-            <div className="audit-runs">
-              {data.recentCrawlRuns.map((run) => (
-                <div className="audit-run" key={run.id}>
-                  <div className="audit-run__meta">
-                    <span className="audit-run__when">
-                      {new Date(run.startedAt).toLocaleString("de-DE")} · {crawlTriggerLabel(run.trigger)}
-                    </span>
-                    <span className="audit-run__detail">
-                      {run.summary.discoveredUrls.toLocaleString("de-DE")} URLs entdeckt ·{" "}
-                      {run.summary.openIssues.toLocaleString("de-DE")} offene Issues
-                      {run.summary.healthScore !== null ? ` · Health ${run.summary.healthScore}` : ""}
-                    </span>
-                  </div>
-                  <span
-                    className={`badge ${
-                      run.status === "succeeded"
-                        ? "success"
-                        : run.status === "failed"
-                          ? "danger"
-                          : "primary"
-                    }`}
-                  >
-                    {RUN_STATUS_LABEL[run.status] ?? run.status}
+          <p className="kicker">Nächster Schritt</p>
+          <h2>Aus den Befunden Wirkung machen</h2>
+          <p className="muted">
+            Die Analyse liegt vor — so geht es weiter: Verbesserungschancen priorisieren oder eine
+            einzelne Seite im Detail prüfen.
+          </p>
+          <div className="cluster">
+            <a className="button" href="/content-opportunities">Chancen ansehen →</a>
+            <a className="button secondary" href="/url-dossier">Einzelne Seite prüfen →</a>
+          </div>
+        </section>
+      ) : null}
+
+      {/* Crawl-Vergleich (crawl-diff) */}
+      <CrawlDiffSection data={data} currentParams={currentParams} />
+
+      {/* Recent crawl runs */}
+      <section className="card">
+        <p className="kicker">Letzte Analysen</p>
+        {data.recentCrawlRuns.length > 0 ? (
+          <div className="audit-runs">
+            {data.recentCrawlRuns.map((run) => (
+              <div className="audit-run" key={run.id}>
+                <div className="audit-run__meta">
+                  <span className="audit-run__when">
+                    {new Date(run.startedAt).toLocaleString("de-DE")} · {crawlTriggerLabel(run.trigger)}
+                  </span>
+                  <span className="audit-run__detail">
+                    {run.summary.discoveredUrls.toLocaleString("de-DE")} URLs entdeckt ·{" "}
+                    {run.summary.openIssues.toLocaleString("de-DE")} offene Issues
+                    {run.summary.healthScore !== null ? ` · Health ${run.summary.healthScore}` : ""}
                   </span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">
-              Noch keine Analyse. Starten Sie eine Analyse, um Indexierbarkeit und Issues zu erfassen.
-            </p>
-          )}
-          <Pagination page={runPage} currentParams={currentParams} param="runOffset" />
-        </section>
-      </details>
-    </AppShell>
+                <span
+                  className={`badge ${
+                    run.status === "succeeded"
+                      ? "success"
+                      : run.status === "failed"
+                        ? "danger"
+                        : "primary"
+                  }`}
+                >
+                  {RUN_STATUS_LABEL[run.status] ?? run.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">
+            Noch keine Analyse. Starten Sie eine Analyse, um Indexierbarkeit und Issues zu erfassen.
+          </p>
+        )}
+        <Pagination page={runPage} currentParams={currentParams} param="runOffset" />
+      </section>
+      </>
+      )}
+    </>
   );
 }
 
 function feedbackMessage(
   params: Record<string, string | string[] | undefined>
 ): { kind: "success" | "danger"; message: string } | null {
-  const error = firstParam(params.error);
-  if (error) return { kind: "danger", message: error };
-  if (firstParam(params.started)) {
-    return { kind: "success", message: "Crawl gestartet — die Ergebnisse erscheinen unten." };
-  }
+  // `error`, `started` and `crawlWarning` are owned by the top-of-page actionBanner
+  // (resolveActionBanner) — handling them here too rendered TWO notices for the same event (and on a
+  // failed inline crawl even a green "gestartet" next to the orange warning). This hero notice only
+  // covers the events the banner does not: issue-lifecycle changes and a manual health recompute.
   if (firstParam(params.health)) {
     return { kind: "success", message: "Health Score neu berechnet." };
   }

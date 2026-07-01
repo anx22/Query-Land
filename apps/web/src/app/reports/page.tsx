@@ -8,6 +8,9 @@ import {
 } from "@seo-tool/domain-model";
 import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
+import { ConnectionBadge } from "../../components/connection-badge";
+import { SubmitButton } from "../../components/submit-button";
+import { HeroBand } from "../../components/hero-band";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { MetricCard } from "../../components/metric-card";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -54,6 +57,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   const triggeredCount = countTriggered(data.alertEvents);
   const projectId = data.selectedProject?.id ?? "";
   const disabled = !data.connected || !data.selectedProject;
+  // Two-mode: a 4-card "0 / 0 / 0 / 0" grid on a fresh project is pure noise. Show the KPI grid only
+  // once at least one report, schedule or alert rule exists. The create form + the inventory cards
+  // below (each with its own empty state) carry the first-run flow.
+  const hasReportingData =
+    data.reports.length > 0 || data.schedules.length > 0 || data.alertRules.length > 0;
 
   // Build a per-metric chart model from rules + events (metric vs. threshold).
   const alertMetrics = metricsFromRules(data.alertRules);
@@ -69,20 +77,27 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
 
   return (
     <AppShell activePath="/reports">
-      <header className="page-header">
-        <div className="page-header__titles">
-          <p className="kicker">Berichte &amp; Warnungen</p>
-          <h1>
-            <TermTooltip term="Report / Alert">Reports</TermTooltip> &amp; <TermTooltip term="Report / Alert">Alarme</TermTooltip>
-          </h1>
-          <p className="page-header__purpose">
-            Berichte als Momentaufnahme Ihrer wichtigsten Kennzahlen (Health, Sichtbarkeit, Chancen,
-            Backlinks) — sofort als CSV, HTML oder PDF exportierbar, mit Warnungen, sobald ein Wert
-            eine festgelegte Schwelle über- oder unterschreitet.
-          </p>
+      {/* Hero — metaphor lives only in the framing copy (Serious-Zone elsewhere). */}
+      <section className="card hero-card">
+        <HeroBand src="/brand/hdr-reports.jpg" />
+        <p className="kicker">Berichte &amp; Warnungen</p>
+        <h1>
+          <TermTooltip term="Report / Alert">Reports</TermTooltip> &amp; <TermTooltip term="Report / Alert">Alarme</TermTooltip>
+        </h1>
+        <p>
+          Berichte als Momentaufnahme Ihrer wichtigsten Kennzahlen (Health, Sichtbarkeit, Chancen,
+          Backlinks) — sofort als CSV, HTML oder PDF exportierbar, mit Warnungen, sobald ein Wert
+          eine festgelegte Schwelle über- oder unterschreitet.
+        </p>
+        <div className="badge-row">
+          <ConnectionBadge connected={data.connected} />
         </div>
-        <div className="page-header__aside">
-          <span className={data.connected ? "badge success" : "badge danger"}>{data.connected ? "Daten verbunden" : "Daten offline"}</span>
+        {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
+        {!data.connected ? <OfflineNotice /> : null}
+        {data.connected && !data.selectedProject ? (
+          <p className="notice">Keine Website ausgewählt. Legen Sie zuerst eine Website an, um Berichte zu erzeugen.</p>
+        ) : null}
+        <div className="action-row">
           <form action={generateReportAction}>
             <input type="hidden" name="projectId" value={projectId} />
             <label>
@@ -93,12 +108,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 ))}
               </select>
             </label>
-            <button className="button" type="submit" disabled={disabled}>Bericht erstellen</button>
+            <SubmitButton className="button" pendingLabel="wird erstellt …" disabled={disabled}>Bericht erstellen</SubmitButton>
           </form>
-          <form action={runDueAction}>
-            <input type="hidden" name="projectId" value={projectId} />
-            <button className="button secondary" type="submit" disabled={disabled}>Fällige Lieferungen ausführen</button>
-          </form>
+          {/* Only relevant once a schedule exists — until then it's a dead control on an empty screen. */}
+          {data.schedules.length > 0 ? (
+            <form action={runDueAction}>
+              <input type="hidden" name="projectId" value={projectId} />
+              <SubmitButton className="button secondary" pendingLabel="wird ausgeführt …" disabled={disabled}>Fällige Lieferungen ausführen</SubmitButton>
+            </form>
+          ) : null}
           {disabled ? (
             <span className="locked-action__reason">
               <Icon name="lock" />
@@ -106,16 +124,11 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             </span>
           ) : null}
         </div>
-      </header>
+      </section>
 
-      {feedback ? <p className={`notice ${feedback.kind}`}>{feedback.message}</p> : null}
-      {!data.connected ? <OfflineNotice /> : null}
-      {data.connected && !data.selectedProject ? (
-        <p className="notice">Keine Website ausgewählt. Legen Sie zuerst eine Website an, um Berichte zu erzeugen.</p>
-      ) : null}
-
-      {/* At-a-glance verdict strip */}
-      <div className="verdict-strip verdict-strip--4">
+      {/* Metric grid — only once there is something to count (see hasReportingData). */}
+      {hasReportingData && (
+      <section className="metric-grid">
         <MetricCard
           label="Berichte"
           value={String(data.reports.length)}
@@ -140,7 +153,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           info="Fälle, in denen eine Kennzahl die festgelegte Schwelle verletzt hat."
           note={`von ${data.alertEvents.length} geprüften Messungen`}
         />
-      </div>
+      </section>
+      )}
 
       {/* Reports inventory */}
       <section className="card">
@@ -188,25 +202,15 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           </div>
         ) : (
           <div className="reports-empty">
-            <span className="reports-empty__glyph" aria-hidden="true">🗺️</span>
+            <span className="reports-empty__glyph" aria-hidden="true"><Icon name="description" /></span>
             <strong className="reports-empty__title">Noch kein Report vorhanden</strong>
             <span>Erstellen Sie oben den ersten Bericht, um den Stand Ihrer Sichtbarkeit festzuhalten.</span>
           </div>
         )}
-      </section>
-
-      {/* Secondary: latest-report detail, delivery & scheduling — collapsed by default */}
-      <details className="advanced-section">
-        <summary>
-          <span className="advanced-section__title">Letzter Report, Versand &amp; Planung</span>
-          <span className="advanced-section__hint">
-            Den zuletzt erzeugten Bericht im Detail ansehen, ihn versenden oder Berichte planen.
-          </span>
-        </summary>
 
         {/* Latest report detail + delivery */}
         {data.latestReport ? (
-          <section className="card">
+          <div>
             <h3>Letzter Report: {data.latestReport.title}</h3>
             {data.latestReport.sections.map((section) => (
               <div key={section.title}>
@@ -242,7 +246,7 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                 <input type="text" name="target" required placeholder="E-Mail-Adresse oder Webhook-URL" />
               </label>
               <div className="locked-action">
-                <button className="button" type="submit" disabled={!data.connected}>Versenden</button>
+                <SubmitButton className="button" pendingLabel="wird versendet …" disabled={!data.connected}>Versenden</SubmitButton>
                 {!data.connected ? (
                   <span className="locked-action__reason">
                     <Icon name="lock" />
@@ -256,79 +260,9 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               eingerichtet wurde — bis dahin wird eine E-Mail-Lieferung ehrlich als „übersprungen“ vermerkt.
               Für Slack, Discord oder Zapier tragen Sie einfach deren Webhook-URL als Kanal „Webhook“ ein.
             </p>
-          </section>
+          </div>
         ) : null}
-
-        <div className="cards-2">
-          {/* Lieferung planen */}
-          <section className="card">
-            <p className="kicker">Automatische Lieferung</p>
-            <h3>Lieferung planen</h3>
-            <form action={createScheduleAction}>
-              <input type="hidden" name="projectId" value={projectId} />
-              <label>
-                Berichtstyp
-                <select name="type" defaultValue="weekly_summary">
-                  {REPORT_TYPES.map((t) => (
-                    <option key={t} value={t}>{labelForReportType(t)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Rhythmus
-                <select name="cadence" defaultValue="weekly">
-                  {REPORT_CADENCES.map((c) => (
-                    <option key={c} value={c}>{labelForCadence(c)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Lieferkanal (optional)
-                <select name="channel">
-                  <option value="">— kein Versand —</option>
-                  <option value="email">E-Mail</option>
-                  <option value="webhook">Webhook</option>
-                </select>
-              </label>
-              <label>
-                Empfänger (bei gewähltem Kanal)
-                <input type="text" name="target" placeholder="E-Mail-Adresse oder Webhook-URL" />
-              </label>
-              <button className="button" type="submit" disabled={disabled}>Lieferung planen</button>
-            </form>
-          </section>
-
-          {/* Regel erstellen */}
-          <section className="card">
-            <p className="kicker">Warnungen</p>
-            <h3>Regel erstellen</h3>
-            <form action={createAlertRuleAction}>
-              <input type="hidden" name="projectId" value={projectId} />
-              <label>
-                Kennzahl
-                <select name="metric" defaultValue="visibility_score">
-                  {ALERT_METRICS.map((m) => (
-                    <option key={m} value={m}>{labelForMetric(m)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Vergleich
-                <select name="comparator" defaultValue="lt">
-                  {ALERT_COMPARATORS.map((c) => (
-                    <option key={c} value={c}>{labelForComparator(c)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Schwelle
-                <input type="number" name="threshold" step="any" placeholder="z. B. 50" required />
-              </label>
-              <button className="button" type="submit" disabled={disabled}>Regel anlegen</button>
-            </form>
-          </section>
-        </div>
-      </details>
+      </section>
 
       <section className="content-grid">
         {/* Schedules */}
@@ -364,9 +298,43 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           ) : (
             <div className="reports-empty">
               <strong className="reports-empty__title">Noch keine Lieferungen geplant</strong>
-              <span>Legen Sie unter „Letzter Report, Versand &amp; Planung“ einen Rhythmus fest, damit Berichte automatisch erstellt werden.</span>
+              <span>Legen Sie unten einen Rhythmus fest, damit Berichte automatisch erstellt werden.</span>
             </div>
           )}
+
+          <h3>Lieferung planen</h3>
+          <form action={createScheduleAction} className="form-card">
+            <input type="hidden" name="projectId" value={projectId} />
+            <label>
+              Berichtstyp
+              <select name="type" defaultValue="weekly_summary">
+                {REPORT_TYPES.map((t) => (
+                  <option key={t} value={t}>{labelForReportType(t)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Rhythmus
+              <select name="cadence" defaultValue="weekly">
+                {REPORT_CADENCES.map((c) => (
+                  <option key={c} value={c}>{labelForCadence(c)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Lieferkanal (optional)
+              <select name="channel">
+                <option value="">— kein Versand —</option>
+                <option value="email">E-Mail</option>
+                <option value="webhook">Webhook</option>
+              </select>
+            </label>
+            <label>
+              Empfänger (bei gewähltem Kanal)
+              <input type="text" name="target" placeholder="E-Mail-Adresse oder Webhook-URL" />
+            </label>
+            <SubmitButton className="button" pendingLabel="wird geplant …" disabled={disabled}>Lieferung planen</SubmitButton>
+          </form>
         </div>
 
         {/* Alerts */}
@@ -416,13 +384,41 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           ) : (
             <div className="reports-empty">
               <strong className="reports-empty__title">Noch keine Warn-Regeln</strong>
-              <span>Definieren Sie unter „Letzter Report, Versand &amp; Planung“ eine Schwelle auf eine Kennzahl, um Einbrüche automatisch zu erkennen.</span>
+              <span>Definieren Sie unten eine Schwelle auf eine Kennzahl, um Einbrüche automatisch zu erkennen.</span>
             </div>
           )}
 
+          <h3>Regel erstellen</h3>
+          <form action={createAlertRuleAction} className="form-card">
+            <input type="hidden" name="projectId" value={projectId} />
+            <div className="form-row">
+            <label>
+              Kennzahl
+              <select name="metric" defaultValue="visibility_score">
+                {ALERT_METRICS.map((m) => (
+                  <option key={m} value={m}>{labelForMetric(m)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Vergleich
+              <select name="comparator" defaultValue="lt">
+                {ALERT_COMPARATORS.map((c) => (
+                  <option key={c} value={c}>{labelForComparator(c)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Schwelle
+              <input type="number" name="threshold" step="any" placeholder="z. B. 50" required />
+            </label>
+            </div>
+            <SubmitButton className="button" pendingLabel="wird angelegt …" disabled={disabled}>Regel anlegen</SubmitButton>
+          </form>
+
           <form action={evaluateAlertsAction} className="action-row">
             <input type="hidden" name="projectId" value={projectId} />
-            <button className="button secondary" type="submit" disabled={disabled}>Warnungen prüfen</button>
+            <SubmitButton className="button secondary" pendingLabel="wird geprüft …" disabled={disabled}>Warnungen prüfen</SubmitButton>
           </form>
 
           {/* Recent alert events — factual list with severity */}

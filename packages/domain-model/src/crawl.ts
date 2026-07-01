@@ -116,6 +116,30 @@ export interface CrawlHealthScore {
   generatedAt: string;
 }
 
+/** A single URL in a crawl run's resumable BFS frontier (migration 016). */
+export interface CrawlFrontierEntry {
+  crawlRunId: string;
+  normalizedUrl: string;
+  depth: number;
+  discoveredFrom: string | null;
+  status: "pending" | "in_progress" | "done";
+}
+
+/**
+ * Durable per-page audit signals for a crawl run (migration 017). Captures
+ * exactly what the audit rules need so a resumable crawl can be finalized from
+ * storage after the frontier drains (no in-memory page set required).
+ */
+export interface CrawlPageSignal {
+  crawlRunId: string;
+  normalizedUrl: string;
+  finalUrl: string;
+  statusCode: number | null;
+  title: string | null;
+  canonicalUrl: string | null;
+  outgoingLinks: Array<{ url: string; statusCode: number | null }>;
+}
+
 /** Lightweight projection of an audit issue as it appears in a crawl-diff result. */
 export interface CrawlRunDiffIssue {
   id: string;

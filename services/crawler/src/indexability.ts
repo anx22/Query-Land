@@ -1,13 +1,15 @@
 import type { IndexabilityAssessment } from "@seo-tool/domain-model";
+import { parsePage } from "./html-parse.js";
 import type { AuditPageInput } from "./types.js";
 import { normalizeCrawlUrl } from "./url-normalization.js";
 
 export function assessIndexability(input: AuditPageInput): IndexabilityAssessment {
   const headers = lowercaseHeaders(input.headers ?? {});
-  const canonicalUrl = extractCanonical(input.html ?? "");
-  const robotsMeta = extractRobotsMeta(input.html ?? "");
-  const xRobots = headers["x-robots-tag"] ?? "";
   const finalUrl = input.finalUrl ?? input.url;
+  const parsed = input.parsed ?? parsePage(input.html ?? "", finalUrl);
+  const canonicalUrl = parsed.canonicalUrl;
+  const robotsMeta = parsed.robotsMeta;
+  const xRobots = headers["x-robots-tag"] ?? "";
 
   if (input.statusCode === null || input.statusCode >= 400 || input.statusCode < 200) {
     return assessment(input.url, "blocked_by_status", false, [`HTTP status ${input.statusCode ?? "network_error"}`], canonicalUrl);
@@ -34,14 +36,4 @@ function lowercaseHeaders(headers: Record<string, string>): Record<string, strin
 
 function assessment(url: string, state: IndexabilityAssessment["state"], isIndexable: boolean, reasons: string[], canonicalUrl: string | null): IndexabilityAssessment {
   return { url, state, isIndexable, reasons, canonicalUrl };
-}
-
-function extractCanonical(html: string): string | null {
-  const match = html.match(/<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']+)["'][^>]*>/i) ?? html.match(/<link[^>]+href=["']([^"']+)["'][^>]*rel=["']canonical["'][^>]*>/i);
-  return match?.[1]?.trim() ?? null;
-}
-
-function extractRobotsMeta(html: string): string {
-  const match = html.match(/<meta[^>]+name=["']robots["'][^>]*content=["']([^"']+)["'][^>]*>/i) ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]*name=["']robots["'][^>]*>/i);
-  return match?.[1] ?? "";
 }

@@ -46,9 +46,9 @@ export function IndexabilityFunnel({
   if (isEmpty) {
     return (
       <div className="audit-funnel-empty" role="img" aria-label={`${title} — keine Daten vorhanden`}>
-        <strong className="audit-funnel-empty__title">Noch kein Crawl-Lauf ausgewertet</strong>
+        <strong className="audit-funnel-empty__title">Noch keine Analyse ausgewertet</strong>
         <span className="audit-funnel-empty__hint">
-          Starten Sie einen Crawl, um zu sehen, wo URLs auf dem Weg in den Index verloren gehen.
+          Starten Sie eine Analyse, um zu sehen, wo URLs auf dem Weg in den Index verloren gehen.
         </span>
       </div>
     );

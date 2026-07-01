@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { gzipSync } from "node:zlib";
 import test from "node:test";
-import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, isInCrawlScope, isRobotsAllowed, parseRobotsTxt } from "../src/index.js";
+import type { CrawlFrontierEntry } from "@seo-tool/domain-model";
+import { DEFAULT_CRAWLER_USER_AGENT, assessIndexability, backoffDelayMs, calculateHealthScore, discoverUrlsFromSitemap, discoverUrlsFromSitemapIndex, evaluateAuditIssues, extractOutgoingLinks, fetchUrl, hasRepeatedSegments, isInCrawlScope, isRobotsAllowed, loadRobotsPolicy, normalizeCrawlUrl, parsePage, parseRobotsTxt, robotsCrawlDelaySeconds } from "../src/index.js";
 
 test("discovers seed and sitemap URLs with source metadata", () => {
   const urls = discoverUrlsFromSitemap({
@@ -80,6 +82,71 @@ test("extracts and normalizes outgoing links", () => {
 });
 
 
+test("parsePage ignores links inside comments, scripts and styles (DOM, not regex)", () => {
+  const html = `
+    <html><body>
+      <!-- <a href="/commented-out">ghost</a> -->
+      <script>var s = '<a href="/from-script">x</a>';</script>
+      <style>.x { background: url('/from-style'); }</style>
+      <a href="/real">real</a>
+    </body></html>`;
+  assert.deepEqual(parsePage(html, "https://example.com/").links.map((l) => l.url), ["https://example.com/real"]);
+});
+
+test("parsePage resolves relative links against <base href>", () => {
+  const html = `<html><head><base href="https://example.com/sub/"></head><body><a href="page">P</a><a href="../top">T</a></body></html>`;
+  assert.deepEqual(parsePage(html, "https://example.com/other/where").links.map((l) => l.url), ["https://example.com/sub/page", "https://example.com/top"]);
+});
+
+test("parsePage flags rel=nofollow links and decodes entity-encoded hrefs", () => {
+  const html = `<a href="/keep?a=1&amp;b=2">k</a><a href="/skip" rel="nofollow ugc">s</a>`;
+  const links = parsePage(html, "https://example.com/").links;
+  assert.deepEqual(links, [
+    { url: "https://example.com/keep?a=1&b=2", nofollow: false },
+    { url: "https://example.com/skip", nofollow: true }
+  ]);
+});
+
+test("parsePage extracts canonical/robots/title robustly (token rel, multi-space title)", () => {
+  const html = `<html><head>
+    <title>  Spaced   &amp;   Title  </title>
+    <link rel="alternate canonical" href="https://example.com/canon">
+    <meta name="ROBOTS" content="noindex, follow">
+  </head></html>`;
+  const parsed = parsePage(html, "https://example.com/x");
+  assert.equal(parsed.title, "Spaced & Title");
+  assert.equal(parsed.canonicalUrl, "https://example.com/canon");
+  assert.equal(parsed.robotsMeta, "noindex, follow");
+});
+
+test("crawl frontier does not follow rel=nofollow links but still audits them for breakage", async () => {
+  const store = await createStore("sqlite::memory:");
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: "https://example.com", payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+
+  const fetched: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const requestedUrl = String(url);
+    fetched.push(requestedUrl);
+    if (requestedUrl.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (requestedUrl.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    if (requestedUrl.endsWith("/nofollowed")) return new Response("gone", { status: 404, headers: { "content-type": "text/html" } });
+    return new Response('<html><head><title>Seed</title></head><body><a href="/nofollowed" rel="nofollow">nf</a></body></html>', { status: 200, headers: { "content-type": "text/html" } });
+  };
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", maxOutgoingLinkChecks: 5 });
+  assert.equal(result.status, "succeeded");
+  // The nofollow target is NOT followed into the frontier (seed only is fetched as a page)…
+  assert.equal(result.fetchedUrls, 1);
+  assert.equal(result.discoveredUrls, 1);
+  // …but the broken-link audit still probes it and reports the 404.
+  assert.equal(fetched.includes("https://example.com/nofollowed"), true);
+  const issues = envelopeData<Array<{ rule: string; message: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
+  assert.equal(issues.some((issue) => issue.rule === "broken_link" && issue.message.includes("https://example.com/nofollowed")), true);
+  await store.close();
+});
+
 test("fetchUrl retries deterministic network errors before classifying the fetch", async () => {
   let attempts = 0;
   const result = await fetchUrl({
@@ -156,6 +223,35 @@ test("robots selects the most specific matching agent group and falls back to *"
   assert.equal(isRobotsAllowed("https://example.com/page", policy), true);
 });
 
+test("robots wildcard (*) and end-anchor ($) path matching", () => {
+  const policy = {
+    fetchedUrl: "https://example.com/robots.txt",
+    rules: parseRobotsTxt("User-agent: *\nDisallow: /*.pdf$\nDisallow: /private/*/secret\n")
+  };
+  assert.equal(isRobotsAllowed("https://example.com/file.pdf", policy), false); // *.pdf$ matches
+  assert.equal(isRobotsAllowed("https://example.com/file.pdf?x=1", policy), true); // $ anchors end → query means no match
+  assert.equal(isRobotsAllowed("https://example.com/a/b/file.pdf", policy), false); // * spans path segments
+  assert.equal(isRobotsAllowed("https://example.com/private/a/secret", policy), false); // /private/*/secret matches
+  assert.equal(isRobotsAllowed("https://example.com/private/secret", policy), true); // no middle segment → no match
+});
+
+test("robots Crawl-delay is parsed per group with wildcard fallback", async () => {
+  const policy = await loadRobotsPolicy({
+    baseUrl: "https://example.com",
+    fetchImpl: async () => new Response("User-agent: *\nCrawl-delay: 2\nUser-agent: SeoToolBot\nCrawl-delay: 5\n", { status: 200, headers: { "content-type": "text/plain" } })
+  });
+  assert.equal(robotsCrawlDelaySeconds(policy, "SeoToolBot/1.0"), 5); // specific group
+  assert.equal(robotsCrawlDelaySeconds(policy, "OtherBot/9"), 2); // wildcard fallback
+});
+
+test("robots Sitemap: directives are collected and absolutized", async () => {
+  const policy = await loadRobotsPolicy({
+    baseUrl: "https://example.com",
+    fetchImpl: async () => new Response("Sitemap: https://example.com/sm1.xml\nSitemap: /sm2.xml\nUser-agent: *\nDisallow:\n", { status: 200, headers: { "content-type": "text/plain" } })
+  });
+  assert.deepEqual(policy.sitemaps, ["https://example.com/sm1.xml", "https://example.com/sm2.xml"]);
+});
+
 test("backoffDelayMs produces a capped exponential sequence", () => {
   assert.deepEqual([1, 2, 3, 4, 5].map((attempt) => backoffDelayMs(attempt, 100, 5000)), [100, 200, 400, 800, 1600]);
   // Cap applies.
@@ -213,6 +309,63 @@ test("fetchUrl sends the configured User-Agent header (and a default otherwise)"
   assert.equal(sentCustom, "CustomBot/2.0");
 });
 
+test("fetchUrl does not read binary (non-textual) response bodies", async () => {
+  const result = await fetchUrl({
+    url: "https://example.com/logo.png",
+    fetchImpl: async () => new Response("\x89PNG\r\n\x1a\n binary bytes", { status: 200, headers: { "content-type": "image/png" } })
+  });
+  assert.equal(result.statusClass, "success");
+  assert.equal(result.headers["content-type"], "image/png");
+  assert.equal(result.responseBody, ""); // body discarded, never fed to the HTML parser
+});
+
+test("fetchUrl decodes non-UTF-8 bodies using the declared charset", async () => {
+  // 0xE4 is 'ä' in ISO-8859-1; naive UTF-8 decoding would mangle it.
+  const body = Buffer.from([0x3c, 0x70, 0x3e, 0xe4, 0x3c, 0x2f, 0x70, 0x3e]); // <p>ä</p>
+  const result = await fetchUrl({
+    url: "https://example.com/latin1",
+    fetchImpl: async () => new Response(body, { status: 200, headers: { "content-type": "text/html; charset=iso-8859-1" } })
+  });
+  assert.equal(result.responseBody, "<p>ä</p>");
+});
+
+test("fetchUrl caps the response body at maxBodyBytes", async () => {
+  const result = await fetchUrl({
+    url: "https://example.com/huge",
+    maxBodyBytes: 4,
+    fetchImpl: async () => new Response("0123456789", { status: 200, headers: { "content-type": "text/plain" } })
+  });
+  assert.equal(result.responseBody, "0123");
+});
+
+test("fetchUrl sends an Accept header preferring HTML/XML", async () => {
+  let accept: string | null = null;
+  await fetchUrl({
+    url: "https://example.com/",
+    fetchImpl: async (_url, init) => {
+      accept = new Headers(init?.headers).get("accept");
+      return new Response("ok", { status: 200 });
+    }
+  });
+  assert.match(accept ?? "", /^text\/html/);
+});
+
+test("fetchUrl inflates gzipped sitemap payloads (.gz / application/gzip)", async () => {
+  const xml = "<urlset><url><loc>https://example.com/gz-page</loc></url></urlset>";
+  const gz = gzipSync(Buffer.from(xml, "utf-8"));
+  const byExt = await fetchUrl({
+    url: "https://example.com/sitemap.xml.gz",
+    fetchImpl: async () => new Response(gz, { status: 200, headers: { "content-type": "application/octet-stream" } })
+  });
+  assert.equal(byExt.responseBody, xml); // detected by .gz extension
+
+  const byType = await fetchUrl({
+    url: "https://example.com/sitemap",
+    fetchImpl: async () => new Response(gz, { status: 200, headers: { "content-type": "application/gzip" } })
+  });
+  assert.equal(byType.responseBody, xml); // detected by content-type
+});
+
 test("fetchUrl on garbage/invalid sitemap content still classifies without throwing", async () => {
   const result = await fetchUrl({
     url: "https://example.com/sitemap.xml",
@@ -223,10 +376,59 @@ test("fetchUrl on garbage/invalid sitemap content still classifies without throw
 });
 
 
-test("crawl scope keeps only same-protocol same-host URLs", () => {
+test("normalizeCrawlUrl strips tracking params and sorts the rest for stable dedupe", () => {
+  assert.equal(normalizeCrawlUrl("https://example.com/p?utm_source=x&b=2&a=1&gclid=y", "https://example.com"), "https://example.com/p?a=1&b=2");
+  assert.equal(normalizeCrawlUrl("https://example.com/p?utm_campaign=x", "https://example.com"), "https://example.com/p");
+  // meaningful params are preserved (only known trackers are dropped).
+  assert.equal(normalizeCrawlUrl("https://example.com/p?id=5&page=2", "https://example.com"), "https://example.com/p?id=5&page=2");
+});
+
+test("hasRepeatedSegments detects spider-trap paths", () => {
+  assert.equal(hasRepeatedSegments("/a/a/a"), true);
+  assert.equal(hasRepeatedSegments("/shop/shop"), false); // 2 consecutive is allowed (maxRepeats=2)
+  assert.equal(hasRepeatedSegments("/blog/blog-post"), false); // distinct segments
+  assert.equal(hasRepeatedSegments("/a/b/c/d"), false);
+});
+
+test("crawl worker waits the robots Crawl-delay between same-host fetches", async () => {
+  const store = await createStore("sqlite::memory:");
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: "https://example.com", payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+
+  const delays: number[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nCrawl-delay: 2\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    const links = path === "/" ? '<a href="/a">a</a>' : "";
+    return new Response(`<html><head><title>${path}</title></head><body>${links}</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+  };
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", sleep: async (ms: number) => { delays.push(ms); } });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.fetchedUrls, 2); // seed + /a
+  assert.ok(delays.includes(2000), `expected a 2000ms politeness wait before the same-host fetch, got ${JSON.stringify(delays)}`);
+  await store.close();
+});
+
+test("crawl scope is scheme- and www-tolerant with domain/subdomain/folder modes", () => {
+  // domain (default): apex + www + any subdomain; scheme-tolerant.
   assert.equal(isInCrawlScope("https://example.com/a", "https://example.com"), true);
-  assert.equal(isInCrawlScope("http://example.com/a", "https://example.com"), false);
+  assert.equal(isInCrawlScope("http://example.com/a", "https://example.com"), true); // http↔https same site
+  assert.equal(isInCrawlScope("https://www.example.com/a", "https://example.com"), true); // www == apex
+  assert.equal(isInCrawlScope("https://blog.example.com/a", "https://example.com", "domain"), true); // subdomain in domain scope
   assert.equal(isInCrawlScope("https://other.example/a", "https://example.com"), false);
+  assert.equal(isInCrawlScope("ftp://example.com/a", "https://example.com"), false); // non-http(s)
+
+  // subdomain: exactly the base host (modulo www), no other subdomains.
+  assert.equal(isInCrawlScope("https://www.example.com/a", "https://example.com", "subdomain"), true);
+  assert.equal(isInCrawlScope("https://blog.example.com/a", "https://example.com", "subdomain"), false);
+
+  // folder: same host + path prefix.
+  assert.equal(isInCrawlScope("https://example.com/shop/x", "https://example.com/shop", "folder"), true);
+  assert.equal(isInCrawlScope("https://example.com/blog/x", "https://example.com/shop", "folder"), false);
 });
 
 
@@ -284,9 +486,161 @@ function apiClientForStore(store: Store): CrawlWorkerApiClient {
     recordAuditIssues: (projectId, siteId, issues, checkedDiscoveredUrlIds) => post(`/projects/${projectId}/sites/${siteId}/audit-issues`, { issues, checkedDiscoveredUrlIds }),
     computeHealthScore: (projectId, siteId) => post(`/projects/${projectId}/sites/${siteId}/health-scores/compute`, {}),
     completeCrawlRun: (projectId, siteId, crawlRunId, status, errorMessage) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/complete`, { status, errorMessage }),
-    completeJob: (jobId, status, lastError) => post(`/jobs/${jobId}/complete`, { status, lastError })
+    completeJob: (jobId, status, lastError) => post(`/jobs/${jobId}/complete`, { status, lastError }),
+    // Resumable-crawl extensions (migrations 016/017).
+    enqueueCrawlFrontier: (projectId, siteId, crawlRunId, entries) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier`, { entries }),
+    claimCrawlFrontier: async (projectId, siteId, crawlRunId, limit) => {
+      const response = await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier/claim`, { limit });
+      const body = response.body as { data: CrawlFrontierEntry[]; meta?: { pending?: number } };
+      return { items: body.data, pending: Number(body.meta?.pending ?? 0) };
+    },
+    completeCrawlFrontier: (projectId, siteId, crawlRunId, normalizedUrls) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier/complete`, { normalizedUrls }),
+    countPendingCrawlFrontier: async (projectId, siteId, crawlRunId) => {
+      const response = await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/frontier`);
+      return Number((response.body as { data: { pending: number } }).data.pending);
+    },
+    recordCrawlPageSignals: (projectId, siteId, crawlRunId, signals) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/page-signals`, { signals }),
+    listCrawlPageSignals: async (projectId, siteId, crawlRunId) => {
+      const response = await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/page-signals`);
+      return envelopeData(response);
+    },
+    createCrawlSeedJob: (projectId, subject, payload) => post(`/jobs`, { projectId, type: "crawl_seed", subject, payload })
   };
 }
+
+/** Build a deterministic fetchImpl for an in-memory link graph (no sitemap; robots allow-all). */
+function linkGraphFetchImpl(graph: Record<string, string[]>): typeof fetch {
+  return (async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    const links = graph[path] ?? [];
+    const body = `<html><head><title>${path}</title></head><body>${links.map((l) => `<a href="${l}">x</a>`).join("")}</body></html>`;
+    return new Response(body, { status: 200, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+}
+
+const LINK_GRAPH: Record<string, string[]> = { "/": ["/a", "/b"], "/a": ["/a1"], "/b": ["/", "/a"], "/a1": [] };
+
+async function seedGraphJob(store: Store) {
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: "https://example.com", payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+  return { app, projectId, siteId };
+}
+
+test("crawl worker follows in-scope links (BFS) across the whole link graph", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z" });
+  assert.equal(result.status, "succeeded");
+  // seed + /a + /b + /a1 (reached via /a) — BFS, deduped (/b links back to / and /a).
+  assert.equal(result.fetchedUrls, 4);
+  assert.equal(result.truncated, false);
+  await store.close();
+});
+
+test("crawl worker honors maxDepth (does not follow links beyond the limit)", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z", maxDepth: 1 });
+  assert.equal(result.status, "succeeded");
+  // depth 0 seed → depth 1 /a,/b; /a1 (depth 2) is NOT followed.
+  assert.equal(result.fetchedUrls, 3);
+  await store.close();
+});
+
+test("crawl worker truncates at maxUrls and flags it", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z", maxUrls: 2 });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.fetchedUrls, 2);
+  assert.equal(result.truncated, true);
+  await store.close();
+});
+
+test("crawl worker per-URL error boundary: one failing page does not abort the run", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  const base = apiClientForStore(store);
+  // Make persisting the fetch of /b fail; the run must still crawl seed + /a + /a1.
+  const apiClient: CrawlWorkerApiClient = {
+    ...base,
+    recordFetchResult: (projectId, siteId, discoveredUrlId, result) =>
+      result.url.replace(/\/$/, "").endsWith("/b") ? Promise.reject(new Error("boom")) : base.recordFetchResult(projectId, siteId, discoveredUrlId, result)
+  };
+  const result = await runCrawlWorkerCycle({ apiClient, fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z" });
+  assert.equal(result.status, "succeeded");
+  assert.ok((result.pageErrors ?? 0) >= 1, "the failing page is counted as a per-URL error");
+  assert.ok((result.fetchedUrls ?? 0) >= 3, "seed + /a + /a1 still crawled despite /b failing");
+  await store.close();
+});
+
+test("crawl worker fetches pages concurrently up to maxConcurrency", async () => {
+  const store = await createStore("sqlite::memory:");
+  await seedGraphJob(store);
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    inFlight -= 1;
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    const links = LINK_GRAPH[path] ?? [];
+    return new Response(`<html><head><title>${path}</title></head><body>${links.map((l) => `<a href="${l}">x</a>`).join("")}</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", maxConcurrency: 3 });
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.fetchedUrls, 4); // same coverage as the serial BFS
+  assert.ok(maxInFlight >= 2, `expected overlapping fetches under maxConcurrency, max in-flight was ${maxInFlight}`);
+  await store.close();
+});
+
+test("resumable crawl finalizes correctly across continuation invocations", async () => {
+  const store = await createStore("sqlite::memory:");
+  const { app, projectId, siteId } = await setupSite(store);
+  const run = envelopeData<{ id: string }>(await app("POST", `/projects/${projectId}/sites/${siteId}/crawl-runs`, { trigger: "manual" }));
+  await app("POST", "/jobs", { projectId, type: "crawl_seed", subject: `https://example.com:run:${run.id}`, payload: { siteId, baseUrl: "https://example.com", crawlRunId: run.id, sitemapUrl: "https://example.com/sitemap.xml" } });
+
+  const fetchImpl = (async (url: string | URL | Request) => {
+    const u = String(url);
+    if (u.endsWith("/robots.txt")) return new Response("User-agent: *\nAllow: /\n", { status: 200, headers: { "content-type": "text/plain" } });
+    if (u.endsWith("/sitemap.xml")) return new Response("missing", { status: 404, headers: { "content-type": "text/html" } });
+    const path = new URL(u).pathname === "/" ? "/" : new URL(u).pathname.replace(/\/$/, "");
+    if (path === "/missing") return new Response("gone", { status: 404, headers: { "content-type": "text/html" } });
+    const links = path === "/" ? ["/a", "/missing"] : [];
+    return new Response(`<html><head><title>${path}</title></head><body>${links.map((l) => `<a href="${l}">x</a>`).join("")}</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+  }) as typeof fetch;
+
+  const apiClient = apiClientForStore(store);
+  // Tiny per-cycle budget + batch size 1 forces the crawl to span several
+  // continuation invocations — exercising bootstrap → resume → finalize.
+  let invocations = 0;
+  for (let i = 0; i < 30; i += 1) {
+    const result = await runCrawlWorkerCycle({ apiClient, fetchImpl, now: () => "2026-06-03T10:00:00.000Z", timeBudgetMs: 0, frontierBatchSize: 1, maxConcurrency: 1 });
+    if (!result.claimed) break;
+    invocations += 1;
+  }
+  assert.ok(invocations >= 2, `expected continuation across multiple invocations, got ${invocations}`);
+
+  // The run is finalized, all three pages captured, and the audit — computed from
+  // persisted signals gathered across DIFFERENT invocations — caught the issues.
+  const runs = envelopeData<Array<{ id: string; status: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs`));
+  assert.equal(runs.find((r) => r.id === run.id)?.status, "succeeded");
+  const signals = envelopeData<Array<{ normalizedUrl: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/crawl-runs/${run.id}/page-signals`));
+  assert.equal(signals.length, 3); // seed + /a + /missing
+  const issues = envelopeData<Array<{ rule: string; url: string; message: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
+  assert.equal(issues.some((iss) => iss.rule === "http_error" && iss.url === "https://example.com/missing"), true);
+  assert.equal(issues.some((iss) => iss.rule === "broken_link" && iss.message.includes("https://example.com/missing")), true);
+  await store.close();
+});
 
 test("crawl worker creates a crawl run when legacy crawl_seed payload has no crawlRunId", async () => {
   const store = await createStore("sqlite::memory:");
@@ -388,10 +742,11 @@ test("crawl worker checks limited in-scope outgoing links and records broken_lin
 
   const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl, now: () => "2026-06-03T10:00:00.000Z", maxOutgoingLinkChecks: 5 });
   assert.equal(result.status, "succeeded");
-  assert.equal(result.discoveredUrls, 1);
-  assert.equal(result.fetchedUrls, 1);
+  // BFS now follows the in-scope link: seed + /missing are both discovered and fetched.
+  assert.equal(result.discoveredUrls, 2);
+  assert.equal(result.fetchedUrls, 2);
   assert.equal(fetched.includes("https://example.com/missing"), true);
-  assert.equal(fetched.includes("https://outside.example/missing"), false);
+  assert.equal(fetched.includes("https://outside.example/missing"), false); // external stays out of scope
 
   const issues = envelopeData<Array<{ rule: string; url: string; message: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
   assert.equal(issues.some((issue) => issue.rule === "broken_link" && issue.url === "https://example.com/" && issue.message.includes("https://example.com/missing")), true);

@@ -10,6 +10,7 @@
 
 import type { CrawlRun } from "@seo-tool/domain-model";
 import { Icon } from "../../components/icon";
+import { SubmitButton } from "../../components/submit-button";
 import type { ActionLock } from "../../lib/readiness";
 import type { FoundationProject, FoundationSite } from "../../lib/foundation-api";
 import { startCrawlAction } from "./actions";
@@ -63,9 +64,9 @@ export function CrawlStartPanel({ project, site, lock, connected, runningRun }: 
             <input type="hidden" name="projectId" value={project?.id ?? ""} />
             <input type="hidden" name="siteId" value={site?.id ?? ""} />
             <input type="hidden" name="baseUrl" value={site?.baseUrl ?? ""} />
-            <button className="button" type="submit" disabled={disabled}>
+            <SubmitButton className="button" pendingLabel="Analyse läuft …" disabled={disabled}>
               Analyse starten
-            </button>
+            </SubmitButton>
           </form>
           {disabled && reason ? (
             <span className="locked-action__reason">

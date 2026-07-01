@@ -1,3 +1,12 @@
+/** Crawl scope strategy (mirrors sites.scope_type). */
+export type CrawlScopeType = "domain" | "subdomain" | "folder";
+
+/** Known tracking/analytics query params dropped so URLs dedupe to one canonical key. */
+const TRACKING_PARAMS = new Set([
+  "gclid", "gbraid", "wbraid", "fbclid", "msclkid", "dclid", "yclid",
+  "mc_cid", "mc_eid", "igshid", "ref", "ref_src", "_ga", "_gl", "spm", "mkt_tok"
+]);
+
 export function normalizeCrawlUrl(rawUrl: string, baseUrl: string): string {
   const url = new URL(rawUrl.trim(), baseUrl);
   url.hash = "";
@@ -7,17 +16,95 @@ export function normalizeCrawlUrl(rawUrl: string, baseUrl: string): string {
   if (url.pathname !== "/" && url.pathname.endsWith("/")) {
     url.pathname = url.pathname.slice(0, -1);
   }
+  stripAndSortQuery(url);
   return url.toString();
 }
 
-export function isInCrawlScope(candidateUrl: string, baseUrl: string): boolean {
+/**
+ * Drop known tracking params (utm_* and the set above) and sort the remaining
+ * query params, so `?utm_source=x`, `?b=2&a=1` and `?a=1&b=2` all collapse to
+ * the same normalized key. Only *known* tracking params are removed — meaningful
+ * params (e.g. `?id=5`, `?page=2`) are preserved.
+ */
+function stripAndSortQuery(url: URL): void {
+  const params = url.searchParams;
+  for (const key of [...params.keys()]) {
+    const lower = key.toLowerCase();
+    if (lower.startsWith("utm_") || TRACKING_PARAMS.has(lower)) {
+      params.delete(key);
+    }
+  }
+  params.sort();
+}
+
+/**
+ * Spider-trap signal: a path with the same segment repeated more than `maxRepeats`
+ * times consecutively (e.g. `/a/a/a`, common with mis-resolved relative links).
+ */
+export function hasRepeatedSegments(pathname: string, maxRepeats = 2): boolean {
+  const segments = pathname.split("/").filter(Boolean);
+  let run = 1;
+  for (let index = 1; index < segments.length; index += 1) {
+    if (segments[index] === segments[index - 1]) {
+      run += 1;
+      if (run > maxRepeats) return true;
+    } else {
+      run = 1;
+    }
+  }
+  return false;
+}
+
+/** Lower-cased host with a leading "www." removed — the apex we compare against. */
+function hostApex(hostname: string): string {
+  const host = hostname.toLowerCase();
+  return host.startsWith("www.") ? host.slice(4) : host;
+}
+
+/**
+ * Is `candidateUrl` within the crawl scope of `baseUrl` under `scopeType`?
+ *
+ * Scheme-tolerant (http/https are treated as the same site — sites routinely
+ * redirect http→https) and www-tolerant (www.example.com ≡ example.com).
+ *  - domain    : the apex domain and ALL its subdomains (incl. www).
+ *  - subdomain : exactly the base host, modulo www.
+ *  - folder    : same host (modulo www) AND the base URL's path prefix.
+ *
+ * Returns false on unparseable input.
+ */
+export function isInCrawlScope(candidateUrl: string, baseUrl: string, scopeType: CrawlScopeType = "domain"): boolean {
+  let candidate: URL;
+  let base: URL;
   try {
-    const candidate = new URL(candidateUrl);
-    const base = new URL(baseUrl);
-    return candidate.protocol === base.protocol && candidate.hostname === base.hostname;
+    candidate = new URL(candidateUrl);
+    base = new URL(baseUrl);
   } catch {
     return false;
   }
+  if (candidate.protocol !== "http:" && candidate.protocol !== "https:") return false;
+
+  const cHost = candidate.hostname.toLowerCase();
+  const bHost = base.hostname.toLowerCase();
+  const bApex = hostApex(bHost);
+
+  switch (scopeType) {
+    case "subdomain":
+      return hostApex(cHost) === hostApex(bHost) && stripWww(cHost) === stripWww(bHost);
+    case "folder": {
+      if (stripWww(cHost) !== stripWww(bHost)) return false;
+      const basePath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
+      const candidatePath = candidate.pathname.endsWith("/") ? candidate.pathname : `${candidate.pathname}/`;
+      return candidatePath.startsWith(basePath);
+    }
+    case "domain":
+    default:
+      // apex itself, or any subdomain of the apex (www, blog, shop, …).
+      return cHost === bApex || cHost === `www.${bApex}` || cHost.endsWith(`.${bApex}`);
+  }
+}
+
+function stripWww(host: string): string {
+  return host.startsWith("www.") ? host.slice(4) : host;
 }
 
 export function stableSlug(value: string): string {

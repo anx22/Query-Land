@@ -30,14 +30,22 @@ export function ProjectSwitcher({ projects, activeProjectId }: ProjectSwitcherPr
   const [isPending, startTransition] = useTransition();
 
   if (projects.length === 0) {
+    // No website exists yet — an "Aktive Website" caption would name a state that isn't true (and
+    // contradicts the top-bar "Keine Website — zuerst hinzufügen"). Show just the add action.
     return (
       <div className="project-switcher project-switcher--empty">
-        <span className="project-switcher__label">Aktive Website</span>
         <a className="project-switcher__cta" href="/projects">
           + Website hinzufügen
         </a>
       </div>
     );
+  }
+
+  // With a single website there is nothing to switch — the dropdown would just duplicate the
+  // "Websites"/"Übersicht" nav and the active-site crumb in the top bar. Only surface the switcher
+  // once there are at least two websites to choose between.
+  if (projects.length === 1) {
+    return null;
   }
 
   function onChange(event: React.ChangeEvent<HTMLSelectElement>) {

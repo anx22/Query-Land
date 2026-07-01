@@ -330,22 +330,37 @@ class SQLiteContentStore implements ContentStore {
   async listRefreshCandidates(projectId: string, siteId: string, options: { limit?: number } = {}): Promise<RefreshCandidate[]> {
     await this.assertSiteScope(projectId, siteId);
     // Decay is derived deterministically from the clicks time-series: trend = latest - earliest.
-    const rows = await this.db.prepare(`SELECT url, value, captured_at FROM page_metrics WHERE project_id = ? AND site_id = ? AND metric = 'clicks' ORDER BY url ASC, captured_at ASC`).all(projectId, siteId) as Array<{ url: string; value: number; captured_at: string }>;
-    const series = new Map<string, Array<{ value: number; capturedAt: string }>>();
-    for (const row of rows) {
-      const list = series.get(String(row.url)) ?? [];
-      list.push({ value: Number(row.value), capturedAt: String(row.captured_at) });
-      series.set(String(row.url), list);
-    }
+    // One grouped query collapses each URL's history to its earliest/latest clicks (only URLs with
+    // >= 2 points qualify) instead of pulling the full history and aggregating in app code.
+    const trendRows = await this.db.prepare(
+      `SELECT url,
+              (array_agg(value ORDER BY captured_at ASC))[1]  AS earliest,
+              (array_agg(value ORDER BY captured_at DESC))[1] AS latest
+         FROM page_metrics
+        WHERE project_id = ? AND site_id = ? AND metric = 'clicks'
+        GROUP BY url
+       HAVING COUNT(*) >= 2
+        ORDER BY url ASC`
+    ).all(projectId, siteId) as Array<{ url: string; earliest: number; latest: number }>;
 
-    const inputs = [] as Array<{ url: string; clicksTrend: number; latestClicks: number; openIssues: number }>;
-    for (const [url, points] of series) {
-      if (points.length < 2) continue;
-      const earliest = points[0].value;
-      const latest = points[points.length - 1].value;
-      const openIssues = await this.openIssuesForUrl(projectId, siteId, url);
-      inputs.push({ url, clicksTrend: Math.round(latest - earliest), latestClicks: latest, openIssues });
-    }
+    // One grouped query for all open-issue counts, keyed by URL (default 0 when absent).
+    const issueRows = await this.db.prepare(
+      `SELECT url, COUNT(*) AS c FROM audit_issues
+        WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL AND dismissed_at IS NULL
+        GROUP BY url`
+    ).all(projectId, siteId) as Array<{ url: string; c: number }>;
+    const openIssuesByUrl = new Map<string, number>(issueRows.map((row) => [String(row.url), Number(row.c)]));
+
+    const inputs = trendRows.map((row) => {
+      const earliest = Number(row.earliest);
+      const latest = Number(row.latest);
+      return {
+        url: String(row.url),
+        clicksTrend: Math.round(latest - earliest),
+        latestClicks: latest,
+        openIssues: openIssuesByUrl.get(String(row.url)) ?? 0
+      };
+    });
     return rankRefreshCandidates(inputs, options);
   }
 
@@ -375,32 +390,54 @@ class SQLiteContentStore implements ContentStore {
     requireString(url, "url");
     const suggestions = new Map<string, ContentInternalLink>();
 
-    // 1) Sibling pages: pages that share an inbound source (hub) with the target but do NOT yet
-    //    link to it. The shared hub is a natural place to add an internal link.
-    const sources = await this.db.prepare(`SELECT DISTINCT from_url FROM internal_link_edges WHERE site_id = ? AND to_url = ?`).all(siteId, url) as Array<{ from_url: string }>;
-    for (const source of sources) {
-      const siblings = await this.db.prepare(`SELECT DISTINCT to_url FROM internal_link_edges WHERE site_id = ? AND from_url = ? AND to_url <> ?`).all(siteId, source.from_url, url) as Array<{ to_url: string }>;
-      for (const sibling of siblings) {
-        const target = String(sibling.to_url);
-        if (target === url || suggestions.has(target)) continue;
-        // Suggest linking the target to a sibling that the shared hub already links to.
-        if (!(await this.edgeExists(siteId, url, target))) {
-          suggestions.set(target, { url: target, anchor: null, reason: `Gemeinsam verlinkt vom Hub ${source.from_url}` });
-        }
-      }
+    // 1) Sibling pages: pages that share an inbound hub with the target but the target does NOT yet
+    //    link to. One self-join over the link graph (hub -> target AND hub -> sibling), excluding
+    //    siblings the target already links to (NOT EXISTS). MIN(hub) gives a deterministic source.
+    const siblings = await this.db.prepare(
+      `SELECT sib.to_url AS target, MIN(hub.from_url) AS hub
+         FROM internal_link_edges hub
+         JOIN internal_link_edges sib
+           ON sib.site_id = hub.site_id AND sib.from_url = hub.from_url
+        WHERE hub.site_id = ? AND hub.to_url = ?
+          AND sib.to_url <> ?
+          AND NOT EXISTS (
+            SELECT 1 FROM internal_link_edges ex
+             WHERE ex.site_id = hub.site_id AND ex.from_url = ? AND ex.to_url = sib.to_url
+          )
+        GROUP BY sib.to_url`
+    ).all(siteId, url, url, url) as Array<{ target: string; hub: string }>;
+    for (const row of siblings) {
+      const target = String(row.target);
+      if (suggestions.has(target)) continue;
+      suggestions.set(target, { url: target, anchor: null, reason: `Gemeinsam verlinkt vom Hub ${String(row.hub)}` });
     }
 
-    // 2) Hubs that link to the target's siblings but not to the target itself (inbound link gaps).
-    const outTargets = await this.db.prepare(`SELECT DISTINCT to_url FROM internal_link_edges WHERE site_id = ? AND from_url = ?`).all(siteId, url) as Array<{ to_url: string }>;
-    for (const out of outTargets) {
-      const hubs = await this.db.prepare(`SELECT DISTINCT from_url, anchor FROM internal_link_edges WHERE site_id = ? AND to_url = ? AND from_url <> ?`).all(siteId, String(out.to_url), url) as Array<{ from_url: string; anchor: string | null }>;
-      for (const hub of hubs) {
-        const candidate = String(hub.from_url);
-        if (candidate === url || suggestions.has(candidate)) continue;
-        if (!(await this.edgeExists(siteId, candidate, url))) {
-          suggestions.set(candidate, { url: candidate, anchor: hub.anchor === null ? null : String(hub.anchor), reason: `Verlinkt eine verwandte Seite (${String(out.to_url)}), aber nicht diese URL` });
-        }
-      }
+    // 2) Hubs that link to a page the target also links to, but not to the target itself (inbound
+    //    link gaps). One self-join (target -> related AND candidate -> related), excluding candidates
+    //    that already link to the target. Deterministic anchor/related via ordered aggregates.
+    const hubs = await this.db.prepare(
+      `SELECT cand.from_url AS candidate,
+              (array_agg(cand.anchor ORDER BY cand.to_url ASC))[1] AS anchor,
+              MIN(rel.to_url) AS related
+         FROM internal_link_edges rel
+         JOIN internal_link_edges cand
+           ON cand.site_id = rel.site_id AND cand.to_url = rel.to_url
+        WHERE rel.site_id = ? AND rel.from_url = ?
+          AND cand.from_url <> ?
+          AND NOT EXISTS (
+            SELECT 1 FROM internal_link_edges ex
+             WHERE ex.site_id = rel.site_id AND ex.from_url = cand.from_url AND ex.to_url = ?
+          )
+        GROUP BY cand.from_url`
+    ).all(siteId, url, url, url) as Array<{ candidate: string; anchor: string | null; related: string }>;
+    for (const row of hubs) {
+      const candidate = String(row.candidate);
+      if (suggestions.has(candidate)) continue;
+      suggestions.set(candidate, {
+        url: candidate,
+        anchor: row.anchor === null ? null : String(row.anchor),
+        reason: `Verlinkt eine verwandte Seite (${String(row.related)}), aber nicht diese URL`
+      });
     }
 
     return [...suggestions.values()].sort((left, right) => left.url.localeCompare(right.url)).slice(0, 20);
@@ -438,10 +475,6 @@ class SQLiteContentStore implements ContentStore {
     if (recommendation.validationMetric) lines.push(`Validation metric: ${recommendation.validationMetric}`);
     if (recommendation.notes) lines.push(`Notes: ${recommendation.notes}`);
     return lines.join("\n");
-  }
-
-  private async edgeExists(siteId: string, fromUrl: string, toUrl: string): Promise<boolean> {
-    return !!(await this.db.prepare(`SELECT 1 FROM internal_link_edges WHERE site_id = ? AND from_url = ? AND to_url = ?`).get(siteId, fromUrl, toUrl));
   }
 
   private async openIssuesForUrl(projectId: string, siteId: string, url: string): Promise<number> {

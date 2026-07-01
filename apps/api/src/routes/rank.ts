@@ -16,6 +16,11 @@ export const routeRank: ResourceRoute = async (store, method, pathname, searchPa
     return null;
   }
 
+  const latestPositionsMatch = pathname.match(/^\/projects\/([^/]+)\/rank-snapshots\/latest$/);
+  if (method === "GET" && latestPositionsMatch) {
+    return json(200, { data: await store.latestKeywordPositions(latestPositionsMatch[1], searchParams.get("market") ?? undefined) });
+  }
+
   const serpMatch = pathname.match(/^\/projects\/([^/]+)\/keywords\/([^/]+)\/serp-snapshots$/);
   if (method === "GET" && serpMatch) {
     return json(200, { data: await store.listSerpSnapshots(serpMatch[1], serpMatch[2]) });

@@ -38,7 +38,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const call = (method: string, path: string, body?: unknown) => callInternalApi(method, path, body);
 
-  const crawl = await drainCrawlJobs({ call });
+  // Opt-in resumable crawling (migrations 016/017): when CRAWL_RESUMABLE=1, each
+  // cycle processes a time-bounded frontier batch and enqueues a continuation job
+  // for large sites. Unset → the classic single-invocation in-memory crawl.
+  const cycleTimeBudgetMs = process.env.CRAWL_RESUMABLE === "1" ? 45_000 : undefined;
+  const crawl = await drainCrawlJobs({ call, cycleTimeBudgetMs });
   // Refresh connector data: enqueue one sync per integration per day, then drain.
   const enqueued = await enqueueDueConnectorSyncs(call);
   const connectors = await drainConnectorSyncJobs({ call });

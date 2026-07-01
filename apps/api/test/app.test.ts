@@ -13,7 +13,7 @@ async function testApp() {
 }
 
 test("migrations are versioned and idempotent", async () => {
-  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql", "015_report_webhook_channel.sql"];
+  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql", "015_report_webhook_channel.sql", "016_crawl_frontier.sql", "017_crawl_page_signals.sql"];
   const db = await createDatabase("sqlite::memory:");
   try {
     const first = await runMigrations(db);
@@ -37,7 +37,9 @@ test("migrations are versioned and idempotent", async () => {
       { version: 12, name: "ai_aeo" },
       { version: 13, name: "issue_lifecycle" },
       { version: 14, name: "content_workspace" },
-      { version: 15, name: "report_webhook_channel" }
+      { version: 15, name: "report_webhook_channel" },
+      { version: 16, name: "crawl_frontier" },
+      { version: 17, name: "crawl_page_signals" }
     ]);
 
     const second = await runMigrations(db);
@@ -193,6 +195,7 @@ test("POST /crawl-runs/schedule creates a crawl run and typed crawl_seed job tog
     baseUrl: "https://example.com/",
     crawlRunId: body.data.crawlRun.id,
     sitemapUrl: "https://example.com/sitemap.xml",
+    scopeType: "domain",
     subject: `https://example.com/:run:${body.data.crawlRun.id}`
   });
   await store.close();
@@ -605,6 +608,73 @@ test("crawl run API records issues, computes health, and completes run summaries
   await store.close();
 });
 
+
+test("crawl frontier API enqueues, claims in BFS order, and completes (migration 016)", async () => {
+  const { app, store } = await testApp();
+  const run = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" });
+  const runId = (run.body as { data: { id: string } }).data.id;
+  const base = `/projects/proj-demo/sites/site-demo/crawl-runs/${runId}/frontier`;
+
+  // Enqueue is idempotent per (run, url): the duplicate /a is not re-added.
+  const enqueue = await app("POST", base, {
+    entries: [
+      { normalizedUrl: "https://example.com/a", depth: 1, discoveredFrom: "https://example.com/" },
+      { normalizedUrl: "https://example.com/", depth: 0, discoveredFrom: null },
+      { normalizedUrl: "https://example.com/a", depth: 1, discoveredFrom: "https://example.com/" }
+    ]
+  });
+  assert.equal(enqueue.status, 201);
+  assert.deepEqual((enqueue.body as { data: { enqueued: number; pending: number } }).data, { enqueued: 2, pending: 2 });
+
+  // Claim one → shallowest first (depth 0 seed), one still pending.
+  const claim = await app("POST", `${base}/claim`, { limit: 1 });
+  assert.equal(claim.status, 200);
+  const claimed = (claim.body as { data: Array<{ normalizedUrl: string; depth: number }>; meta: { pending: number } });
+  assert.equal(claimed.data.length, 1);
+  assert.equal(claimed.data[0]?.normalizedUrl, "https://example.com/");
+  assert.equal(claimed.meta.pending, 2); // in_progress + still-pending both count as outstanding work
+
+  // Complete the claimed URL → pending drops to the remaining /a.
+  const complete = await app("POST", `${base}/complete`, { normalizedUrls: ["https://example.com/"] });
+  assert.equal(complete.status, 200);
+  assert.deepEqual((complete.body as { data: { done: number; pending: number } }).data, { done: 1, pending: 1 });
+
+  const count = await app("GET", base);
+  assert.equal((count.body as { data: { pending: number } }).data.pending, 1);
+
+  // Unknown run is rejected (scope guard).
+  const bad = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs/run-nope/frontier", { entries: [] });
+  assert.equal(bad.status, 404);
+  await store.close();
+});
+
+test("crawl page-signals API records and reads back durable audit signals (migration 017)", async () => {
+  const { app, store } = await testApp();
+  const run = await app("POST", "/projects/proj-demo/sites/site-demo/crawl-runs", { trigger: "manual" });
+  const runId = (run.body as { data: { id: string } }).data.id;
+  const base = `/projects/proj-demo/sites/site-demo/crawl-runs/${runId}/page-signals`;
+
+  const record = await app("POST", base, {
+    signals: [
+      { normalizedUrl: "https://example.com/", finalUrl: "https://example.com/", statusCode: 200, title: "Home", canonicalUrl: null, outgoingLinks: [{ url: "https://example.com/a", statusCode: 200 }, { url: "https://example.com/missing", statusCode: 404 }] },
+      { normalizedUrl: "https://example.com/a", finalUrl: "https://example.com/a", statusCode: 200, title: "Home", canonicalUrl: "https://example.com/canon", outgoingLinks: [] }
+    ]
+  });
+  assert.equal(record.status, 201);
+  assert.equal((record.body as { data: { recorded: number } }).data.recorded, 2);
+
+  // Upsert: re-recording the same URL updates rather than duplicating.
+  await app("POST", base, { signals: [{ normalizedUrl: "https://example.com/a", finalUrl: "https://example.com/a", statusCode: 200, title: "Changed", canonicalUrl: null, outgoingLinks: [] }] });
+
+  const list = await app("GET", base);
+  const signals = (list.body as { data: Array<{ normalizedUrl: string; title: string | null; outgoingLinks: Array<{ url: string; statusCode: number | null }> }> }).data;
+  assert.equal(signals.length, 2); // still 2 (upsert, not insert)
+  const home = signals.find((s) => s.normalizedUrl === "https://example.com/");
+  assert.equal(home?.outgoingLinks.length, 2);
+  assert.equal(home?.outgoingLinks[1]?.statusCode, 404);
+  assert.equal(signals.find((s) => s.normalizedUrl === "https://example.com/a")?.title, "Changed");
+  await store.close();
+});
 
 test("audit issue recording resolves stale open issues on recrawl", async () => {
   const { app, store } = await testApp();
