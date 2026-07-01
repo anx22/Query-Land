@@ -488,6 +488,24 @@ code, kbd, samp,
   color: var(--warning);
 }
 
+/* Honest caveat next to the Health Score when the crawl data is thin/partial. */
+.audit-data-quality {
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  background: #fff3d8;
+  color: var(--warning);
+  border: 1px solid rgba(160, 90, 0, 0.25);
+}
+
+.audit-data-quality--partial {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: rgba(55, 48, 163, 0.2);
+}
+
 .status.failed,
 .status.blocked,
 .status.not_connected {

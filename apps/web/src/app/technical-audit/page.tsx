@@ -21,6 +21,7 @@ import { IssueGroups } from "../../features/technical-audit/issue-groups";
 import { IssueFilterBar } from "../../features/technical-audit/issue-filter-bar";
 import { UrlExplorerTable } from "../../features/technical-audit/url-explorer-table";
 import { CrawlStartPanel } from "../../features/technical-audit/crawl-start";
+import { deriveCrawlDataQuality } from "../../features/technical-audit/crawl-data-quality";
 import { actionLock } from "../../lib/readiness";
 import {
   computePageInfo,
@@ -346,6 +347,8 @@ async function TechnicalAuditBody({
     data.latestHealthScore && data.previousHealthScore
       ? data.latestHealthScore.score - data.previousHealthScore.score
       : null;
+  // Honest caveat when the score is computed over thin/partial crawl data.
+  const dataQuality = deriveCrawlDataQuality(data.recentCrawlRuns[0]?.summary);
 
   // A run only blocks the start button while it is *actively* running. A run
   // stuck in "running" (worker died / drain timed out) must not lock the button
@@ -465,6 +468,11 @@ async function TechnicalAuditBody({
                 ).toLocaleString("de-DE")}`
               : "Noch kein Health Score berechnet."}
           </p>
+          {dataQuality ? (
+            <p className={`audit-data-quality audit-data-quality--${dataQuality.level}`} role="status">
+              {dataQuality.message}
+            </p>
+          ) : null}
         </div>
       </section>
 
