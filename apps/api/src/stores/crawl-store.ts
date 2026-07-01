@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { calculateHealthScore, type AuditIssueHistoryEntry, type AuditIssueRecord, type AuditIssueSeverity, type CrawlFrontierEntry, type CrawlHealthScore, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type IndexabilityRecord, type UrlFetchRecord } from "@seo-tool/domain-model";
+import { calculateHealthScore, type AuditIssueHistoryEntry, type AuditIssueRecord, type AuditIssueSeverity, type CrawlFrontierEntry, type CrawlHealthScore, type CrawlPageSignal, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type IndexabilityRecord, type UrlFetchRecord } from "@seo-tool/domain-model";
 import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueHistoryEntry, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapUrlFetchRecord } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
@@ -73,6 +73,9 @@ export interface CrawlStore {
   claimCrawlFrontier(projectId: string, siteId: string, crawlRunId: string, limit: number): Promise<{ items: CrawlFrontierEntry[]; pending: number }>;
   completeCrawlFrontier(projectId: string, siteId: string, crawlRunId: string, normalizedUrls: string[]): Promise<{ done: number; pending: number }>;
   countPendingCrawlFrontier(projectId: string, siteId: string, crawlRunId: string): Promise<number>;
+  // --- Durable per-page audit signals for resumable finalization (migration 017). ---
+  recordCrawlPageSignals(projectId: string, siteId: string, crawlRunId: string, signals: Array<Omit<CrawlPageSignal, "crawlRunId">>): Promise<{ recorded: number }>;
+  listCrawlPageSignals(projectId: string, siteId: string, crawlRunId: string): Promise<CrawlPageSignal[]>;
 }
 
 export function createCrawlStore(db: AsyncDatabase, audit: AuditLog): CrawlStore {
@@ -87,6 +90,26 @@ function mapCrawlFrontierEntry(crawlRunId: string, row: unknown): CrawlFrontierE
     depth: Number(record.depth),
     discoveredFrom: record.discovered_from ?? null,
     status: record.status as CrawlFrontierEntry["status"]
+  };
+}
+
+function mapCrawlPageSignal(crawlRunId: string, row: unknown): CrawlPageSignal {
+  const record = row as { normalized_url: string; final_url: string; status_code: number | null; title: string | null; canonical_url: string | null; outgoing_links: string };
+  let outgoingLinks: Array<{ url: string; statusCode: number | null }> = [];
+  try {
+    const parsed = JSON.parse(record.outgoing_links ?? "[]");
+    if (Array.isArray(parsed)) outgoingLinks = parsed;
+  } catch {
+    // Corrupt JSON degrades to no outgoing links rather than throwing.
+  }
+  return {
+    crawlRunId,
+    normalizedUrl: String(record.normalized_url),
+    finalUrl: String(record.final_url),
+    statusCode: record.status_code === null || record.status_code === undefined ? null : Number(record.status_code),
+    title: record.title ?? null,
+    canonicalUrl: record.canonical_url ?? null,
+    outgoingLinks
   };
 }
 
@@ -678,6 +701,30 @@ class SQLiteCrawlStore implements CrawlStore {
   async countPendingCrawlFrontier(_projectId: string, _siteId: string, crawlRunId: string): Promise<number> {
     const row = await this.db.prepare(`SELECT COUNT(*) AS count FROM crawl_frontier WHERE crawl_run_id = ? AND status IN ('pending', 'in_progress')`).get(crawlRunId);
     return Number((row as { count?: number })?.count ?? 0);
+  }
+
+  async recordCrawlPageSignals(projectId: string, siteId: string, crawlRunId: string, signals: Array<Omit<CrawlPageSignal, "crawlRunId">>): Promise<{ recorded: number }> {
+    await this.assertCrawlRunScope(projectId, siteId, crawlRunId);
+    const now = new Date().toISOString();
+    for (const signal of signals) {
+      await this.db.prepare(`
+        INSERT INTO crawl_page_signals (id, crawl_run_id, project_id, site_id, normalized_url, final_url, status_code, title, canonical_url, outgoing_links, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(crawl_run_id, normalized_url) DO UPDATE SET
+          final_url = excluded.final_url,
+          status_code = excluded.status_code,
+          title = excluded.title,
+          canonical_url = excluded.canonical_url,
+          outgoing_links = excluded.outgoing_links
+      `).run(`signal-${randomUUID()}`, crawlRunId, projectId, siteId, signal.normalizedUrl, signal.finalUrl, signal.statusCode, signal.title, signal.canonicalUrl, JSON.stringify(signal.outgoingLinks ?? []), now);
+    }
+    return { recorded: signals.length };
+  }
+
+  async listCrawlPageSignals(projectId: string, siteId: string, crawlRunId: string): Promise<CrawlPageSignal[]> {
+    await this.assertCrawlRunScope(projectId, siteId, crawlRunId);
+    const rows = await this.db.prepare(`SELECT * FROM crawl_page_signals WHERE crawl_run_id = ? ORDER BY created_at ASC`).all(crawlRunId);
+    return rows.map((row) => mapCrawlPageSignal(crawlRunId, row));
   }
 
   private async assertCrawlRunScope(projectId: string, siteId: string, crawlRunId: string): Promise<void> {

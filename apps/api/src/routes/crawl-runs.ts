@@ -1,7 +1,7 @@
 import { computeCrawlRunDiff, createCrawlSeedJobInput } from "@seo-tool/domain-model";
 import { json } from "../http.js";
 import { RequestError } from "../stores/store-errors.js";
-import { claimCrawlFrontierRequest, completeCrawlFrontierRequest, completeCrawlRunRequest, createCrawlRunRequest, enqueueCrawlFrontierRequest, scheduleCrawlSeedRequest } from "../request-validators.js";
+import { claimCrawlFrontierRequest, completeCrawlFrontierRequest, completeCrawlRunRequest, createCrawlRunRequest, enqueueCrawlFrontierRequest, recordCrawlPageSignalsRequest, scheduleCrawlSeedRequest } from "../request-validators.js";
 import { enumQuery, pageMeta, paginationOptions, type ResourceRoute } from "./shared.js";
 
 export const routeCrawlRuns: ResourceRoute = async (store, method, pathname, searchParams, body) => {
@@ -80,6 +80,18 @@ export const routeCrawlRuns: ResourceRoute = async (store, method, pathname, sea
       const input = enqueueCrawlFrontierRequest(body);
       const result = await store.enqueueCrawlFrontier(frontierMatch[1], frontierMatch[2], frontierMatch[3], input.entries);
       return json(201, { data: result });
+    }
+    return null;
+  }
+
+  const pageSignalsMatch = pathname.match(/^\/projects\/([^/]+)\/sites\/([^/]+)\/crawl-runs\/([^/]+)\/page-signals$/);
+  if (pageSignalsMatch) {
+    if (method === "GET") {
+      return json(200, { data: await store.listCrawlPageSignals(pageSignalsMatch[1], pageSignalsMatch[2], pageSignalsMatch[3]) });
+    }
+    if (method === "POST") {
+      const input = recordCrawlPageSignalsRequest(body);
+      return json(201, { data: await store.recordCrawlPageSignals(pageSignalsMatch[1], pageSignalsMatch[2], pageSignalsMatch[3], input.signals) });
     }
     return null;
   }
