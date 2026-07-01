@@ -126,6 +126,36 @@ export function completeCrawlFrontierRequest(body: unknown): { normalizedUrls: s
   };
 }
 
+export function recordCrawlPageSignalsRequest(body: unknown): { signals: Array<{ normalizedUrl: string; finalUrl: string; statusCode: number | null; title: string | null; canonicalUrl: string | null; outgoingLinks: Array<{ url: string; statusCode: number | null }> }> } {
+  const input = objectBody(body);
+  if (!Array.isArray(input.signals)) {
+    throw new RequestError(400, "missing_field", "signals is required", { field: "signals" });
+  }
+  return {
+    signals: input.signals.map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        throw new RequestError(400, "invalid_page_signal", "Each page signal must be an object", { index });
+      }
+      const signal = item as Record<string, unknown>;
+      const outgoing = Array.isArray(signal.outgoingLinks) ? signal.outgoingLinks : [];
+      return {
+        normalizedUrl: urlField(signal, "normalizedUrl"),
+        finalUrl: urlField(signal, "finalUrl"),
+        statusCode: signal.statusCode === null || signal.statusCode === undefined ? null : integerField(signal, "statusCode", 0),
+        title: signal.title === null || signal.title === undefined ? null : String(signal.title),
+        canonicalUrl: signal.canonicalUrl === null || signal.canonicalUrl === undefined ? null : String(signal.canonicalUrl),
+        outgoingLinks: outgoing.map((link) => {
+          const entry = (link && typeof link === "object" ? link : {}) as Record<string, unknown>;
+          return {
+            url: typeof entry.url === "string" ? entry.url : "",
+            statusCode: entry.statusCode === null || entry.statusCode === undefined ? null : Number(entry.statusCode)
+          };
+        }).filter((link) => link.url !== "")
+      };
+    })
+  };
+}
+
 export function recordAuditIssuesRequest(body: unknown): RecordAuditIssuesRequest {
   const input = objectBody(body);
   if (!Array.isArray(input.issues)) {
