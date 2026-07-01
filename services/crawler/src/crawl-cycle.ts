@@ -12,6 +12,7 @@ import { hasRepeatedSegments, isInCrawlScope, normalizeCrawlUrl, type CrawlScope
 const DEFAULT_MAX_OUTGOING_LINK_CHECKS = 50;
 
 export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Promise<CrawlWorkerCycleResult> {
+  const cycleStartMs = Date.now();
   const job = await options.apiClient.claimNextJob();
   if (!job) {
     return { claimed: false };
@@ -227,14 +228,14 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
     await options.apiClient.completeCrawlRun(job.projectId, siteId, crawlRunId, "succeeded");
     const completed = await options.apiClient.completeJob(job.id, "succeeded");
 
-    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, discoveredUrls: known.size, fetchedUrls, issues: issues.length, pageErrors, truncated };
+    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, discoveredUrls: known.size, fetchedUrls, issues: issues.length, pageErrors, truncated, durationMs: Date.now() - cycleStartMs };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown crawl worker error";
     if (siteId && crawlRunId) {
       await options.apiClient.completeCrawlRun(job.projectId, siteId, crawlRunId, "failed", errorMessage).catch(() => undefined);
     }
     const completed = await options.apiClient.completeJob(job.id, "failed", errorMessage);
-    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, errorMessage };
+    return { claimed: true, jobId: job.id, status: completed.status, crawlRunId, errorMessage, durationMs: Date.now() - cycleStartMs };
   }
 }
 

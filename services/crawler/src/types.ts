@@ -134,6 +134,8 @@ export interface CrawlWorkerCycleResult {
   pageErrors?: number;
   /** True when maxUrls/maxDepth capped the crawl before the frontier was exhausted. */
   truncated?: boolean;
+  /** Wall-clock duration of the crawl_seed cycle in ms. */
+  durationMs?: number;
   errorMessage?: string;
 }
 
