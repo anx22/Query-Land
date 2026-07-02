@@ -5,7 +5,8 @@ import { AppShell } from "../../components/app-shell";
 import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
-import { MetricCard } from "../../components/metric-card";
+import { SummaryHead } from "../../components/summary-head";
+import { deriveAuditVerdict } from "../../lib/verdict";
 import { ScoreGauge } from "../../components/charts/score-gauge";
 import { ModulesPending } from "../../components/modules-pending";
 import { IndexabilityFunnel } from "../../components/charts/indexability-funnel";
@@ -440,31 +441,30 @@ async function TechnicalAuditBody({
 
       {hasAudit && (
       <>
-      {/* At-a-glance verdict: the three numbers that frame strengths & weaknesses */}
-      <div className="verdict-strip verdict-strip--3">
-        <MetricCard
-          label="Health Score"
-          value={healthValue !== null ? String(healthValue) : "—"}
-          note={
-            data.latestHealthScore
-              ? `${fmt(data.latestHealthScore.totalIssues)} gewertete Issues`
-              : "Noch nicht berechnet"
-          }
-          info="Aggregierter technischer Gesundheitswert aus offenen Issues und deren Schwere (0–100)."
-        />
-        <MetricCard
-          label="Offene Issues"
-          value={fmt(data.openIssueTotal)}
-          note="nach Regel & Schweregrad gruppiert"
-          info="Alle aktuell offenen technischen Befunde über die zuletzt gecrawlten URLs."
-        />
-        <MetricCard
-          label="Indexierbar"
-          value={indexableValue !== null ? fmt(indexableValue) : "—"}
-          note="URLs am Ende des Funnels"
-          info="URLs, die nach Abruf & Rendering nicht blockiert und damit indexierbar sind."
-        />
-      </div>
+      {/* Schicht 1: rule-based Kernbefund + at-a-glance KPIs (SummaryHead). */}
+      <SummaryHead
+        verdict={deriveAuditVerdict({ health: healthValue, healthDelta, openIssues: data.openIssueTotal, indexable: indexableValue }) ?? undefined}
+        metrics={[
+          {
+            label: "Health Score",
+            value: healthValue !== null ? String(healthValue) : "—",
+            note: data.latestHealthScore ? `${fmt(data.latestHealthScore.totalIssues)} gewertete Issues` : "Noch nicht berechnet",
+            info: "Aggregierter technischer Gesundheitswert aus offenen Issues und deren Schwere (0–100).",
+          },
+          {
+            label: "Offene Issues",
+            value: fmt(data.openIssueTotal),
+            note: "nach Regel & Schweregrad gruppiert",
+            info: "Alle aktuell offenen technischen Befunde über die zuletzt gecrawlten URLs.",
+          },
+          {
+            label: "Indexierbar",
+            value: indexableValue !== null ? fmt(indexableValue) : "—",
+            note: "URLs am Ende des Funnels",
+            info: "URLs, die nach Abruf & Rendering nicht blockiert und damit indexierbar sind.",
+          },
+        ]}
+      />
 
       {/* Lead: indexability funnel (primary) beside the start action + health gauge */}
       <div className="split-lead">
