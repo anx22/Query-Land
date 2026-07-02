@@ -19,7 +19,7 @@ export interface SectionCardProps {
 
 export function SectionCard({ num, title, confidence, confidenceLabel = false, children }: SectionCardProps) {
   return (
-    <div className="card">
+    <div className="card dossier-anchor" id={`dossier-${num}`}>
       <div className="dossier-section-head">
         <span className="dossier-section-num" aria-hidden="true">
           {num}

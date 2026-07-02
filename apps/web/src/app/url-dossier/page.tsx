@@ -4,7 +4,9 @@ import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
 import { ConfidenceBadge } from "../../components/confidence-badge";
-import { MetricCard } from "../../components/metric-card";
+import { SummaryHead } from "../../components/summary-head";
+import { SectionRail } from "../../components/section-rail";
+import { deriveDossierVerdict } from "../../lib/verdict";
 import { HelpDisclosure } from "../../components/help-disclosure";
 import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
@@ -109,34 +111,36 @@ export default async function Page({
 
       {data.selectedUrl ? (
         <>
-          {/* At-a-glance verdict: top status KPIs for the selected URL */}
-          <div className="verdict-strip verdict-strip--5">
-            <MetricCard
-              label="HTTP-Status"
-              value={data.latestFetch ? String(data.latestFetch.statusCode ?? "network") : "—"}
-              info="HTTP-Statuscode des letzten Abrufs dieser URL."
-            />
-            <MetricCard
-              label="Indexierbar"
-              value={data.latestIndexability ? (data.latestIndexability.isIndexable ? "ja" : "nein") : "—"}
-              info="Ob die Seite nach Abruf & Bewertung indexierbar ist."
-            />
-            <MetricCard
-              label="Klicks"
-              value={data.gsc ? formatCount(data.gsc.clicks) : "—"}
-              info="Klicks aus der Google-Suche auf diese URL."
-            />
-            <MetricCard
-              label="Impressionen"
-              value={data.gsc ? formatCount(data.gsc.impressions) : "—"}
-              info="Wie oft diese URL in den Suchergebnissen erschien."
-            />
-            <MetricCard
-              label="Ø Position"
-              value={data.gsc ? formatPosition(data.gsc.position) : "—"}
-              info="Durchschnittliche Ranking-Position in der Google-Suche."
-            />
-          </div>
+          {/* Schicht 1: rule-based Kernbefund + top status KPIs for the selected URL. */}
+          <SummaryHead
+            columns={5}
+            verdict={deriveDossierVerdict({
+              statusCode: data.latestFetch ? (data.latestFetch.statusCode ?? 0) : null,
+              indexable: data.latestIndexability ? data.latestIndexability.isIndexable : null,
+              openIssues: data.issues.filter((issue) => !issue.resolvedAt).length,
+            }) ?? undefined}
+            metrics={[
+              { label: "HTTP-Status", value: data.latestFetch ? String(data.latestFetch.statusCode ?? "network") : "—", info: "HTTP-Statuscode des letzten Abrufs dieser URL." },
+              { label: "Indexierbar", value: data.latestIndexability ? (data.latestIndexability.isIndexable ? "ja" : "nein") : "—", info: "Ob die Seite nach Abruf & Bewertung indexierbar ist." },
+              { label: "Klicks", value: data.gsc ? formatCount(data.gsc.clicks) : "—", info: "Klicks aus der Google-Suche auf diese URL." },
+              { label: "Impressionen", value: data.gsc ? formatCount(data.gsc.impressions) : "—", info: "Wie oft diese URL in den Suchergebnissen erschien." },
+              { label: "Ø Position", value: data.gsc ? formatPosition(data.gsc.position) : "—", info: "Durchschnittliche Ranking-Position in der Google-Suche." },
+            ]}
+          />
+          {/* Schicht 2: sticky jump-nav so the long single-object page is navigable without blind scrolling. */}
+          <SectionRail
+            items={[
+              { id: "dossier-1", label: "Identität" },
+              { id: "dossier-2", label: "Zustand" },
+              { id: "dossier-3", label: "Suchleistung" },
+              { id: "dossier-4", label: "Rankings" },
+              { id: "dossier-5", label: "Interne Links" },
+              { id: "dossier-6", label: "Backlinks" },
+              { id: "dossier-7", label: "Web Vitals" },
+              { id: "dossier-8", label: "Issues" },
+              { id: "dossier-9", label: "Chancen" },
+            ]}
+          />
           {/* 1 — Identität + Quell-Verknüpfung */}
           <section className="content-grid">
             <SectionCard

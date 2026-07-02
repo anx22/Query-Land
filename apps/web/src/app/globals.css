@@ -2290,6 +2290,22 @@ form:has(button[data-pending]) {
 .card-tab__kpi--bad { color: var(--danger); }
 .card-tab__hint { font-size: 0.8rem; color: var(--muted); }
 
+/* SectionRail: sticky "Auf dieser Seite" jump-nav for long single-object pages. */
+.section-rail {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem;
+  padding: var(--space-3) 0; margin-bottom: var(--space-4);
+  background: var(--background); border-bottom: 1px solid var(--line);
+}
+.section-rail__label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.section-rail__list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.section-rail__link {
+  display: inline-block; padding: 0.2rem 0.6rem; border: 1px solid var(--line); border-radius: 999px;
+  font-size: 0.85rem; color: var(--ink); text-decoration: none;
+}
+.section-rail__link:hover { border-color: var(--primary); color: var(--primary); }
+.dossier-anchor { scroll-margin-top: 4.5rem; }
+
 /* 3. Lead composition — primary viz + side facts/secondary viz.             */
 .split-lead { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.9fr);
   gap: var(--space-5); margin-bottom: var(--space-5); align-items: start; }

@@ -66,6 +66,36 @@ export function deriveOpportunitiesVerdict(input: {
   return { text, tone };
 }
 
+/** URL-Dossier: crawl/index state + open issues for one URL. */
+export function deriveDossierVerdict(input: {
+  statusCode: number | null;
+  indexable: boolean | null;
+  openIssues: number;
+}): Verdict | null {
+  if (input.statusCode === null && input.indexable === null) return null;
+
+  const parts: string[] = [];
+  let tone: VerdictTone = "good";
+
+  if (input.statusCode !== null) {
+    parts.push(`HTTP ${input.statusCode}`);
+    if (input.statusCode >= 400 || input.statusCode === 0) tone = "bad";
+  } else {
+    parts.push("kein Abruf");
+    tone = "neutral";
+  }
+
+  if (input.indexable !== null) {
+    parts.push(input.indexable ? "indexierbar" : "nicht indexierbar");
+    if (!input.indexable && tone !== "bad") tone = "bad";
+  }
+
+  parts.push(input.openIssues > 0 ? `${nf(input.openIssues)} offene Issues` : "keine offenen Issues");
+  if (input.openIssues > 0 && tone === "good") tone = "warn";
+
+  return { text: parts.join(" · "), tone };
+}
+
 /** Keywords & Rankings: visibility index + avg position + tracked set (+ visibility trend). */
 export function deriveKeywordsVerdict(input: {
   visibility: number | null;
