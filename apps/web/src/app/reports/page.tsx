@@ -15,6 +15,7 @@ import { MetricCard } from "../../components/metric-card";
 import { TermTooltip } from "../../components/term-tooltip";
 import { GlossarLink } from "../../components/glossar-link";
 import { Icon } from "../../components/icon";
+import { SelectMenu } from "../../components/select-menu";
 import { PREREQUISITE_META } from "../../lib/readiness";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { AlertMetricChart } from "../../features/reports/alert-metric-chart";
@@ -94,11 +95,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
             <input type="hidden" name="projectId" value={projectId} />
             <label>
               Berichtstyp
-              <select name="type" defaultValue="weekly_summary">
-                {REPORT_TYPES.map((t) => (
-                  <option key={t} value={t}>{labelForReportType(t)}</option>
-                ))}
-              </select>
+              <SelectMenu
+                name="type"
+                defaultValue="weekly_summary"
+                aria-label="Berichtstyp"
+                variant="default"
+                options={REPORT_TYPES.map((t) => ({ value: t, label: labelForReportType(t) }))}
+              />
             </label>
             <SubmitButton className="button" pendingLabel="wird erstellt …" disabled={disabled}>Bericht erstellen</SubmitButton>
           </form>
@@ -244,10 +247,16 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <input type="hidden" name="reportId" value={data.latestReport.id} />
               <label>
                 Kanal
-                <select name="channel" defaultValue="email">
-                  <option value="email">E-Mail</option>
-                  <option value="webhook">Webhook</option>
-                </select>
+                <SelectMenu
+                  name="channel"
+                  defaultValue="email"
+                  aria-label="Kanal"
+                  variant="default"
+                  options={[
+                    { value: "email", label: "E-Mail" },
+                    { value: "webhook", label: "Webhook" },
+                  ]}
+                />
               </label>
               <label>
                 Empfänger
@@ -280,27 +289,36 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <input type="hidden" name="projectId" value={projectId} />
               <label>
                 Berichtstyp
-                <select name="type" defaultValue="weekly_summary">
-                  {REPORT_TYPES.map((t) => (
-                    <option key={t} value={t}>{labelForReportType(t)}</option>
-                  ))}
-                </select>
+                <SelectMenu
+                  name="type"
+                  defaultValue="weekly_summary"
+                  aria-label="Berichtstyp"
+                  variant="default"
+                  options={REPORT_TYPES.map((t) => ({ value: t, label: labelForReportType(t) }))}
+                />
               </label>
               <label>
                 Rhythmus
-                <select name="cadence" defaultValue="weekly">
-                  {REPORT_CADENCES.map((c) => (
-                    <option key={c} value={c}>{labelForCadence(c)}</option>
-                  ))}
-                </select>
+                <SelectMenu
+                  name="cadence"
+                  defaultValue="weekly"
+                  aria-label="Rhythmus"
+                  variant="default"
+                  options={REPORT_CADENCES.map((c) => ({ value: c, label: labelForCadence(c) }))}
+                />
               </label>
               <label>
                 Lieferkanal (optional)
-                <select name="channel">
-                  <option value="">— kein Versand —</option>
-                  <option value="email">E-Mail</option>
-                  <option value="webhook">Webhook</option>
-                </select>
+                <SelectMenu
+                  name="channel"
+                  aria-label="Lieferkanal (optional)"
+                  variant="default"
+                  options={[
+                    { value: "", label: "— kein Versand —" },
+                    { value: "email", label: "E-Mail" },
+                    { value: "webhook", label: "Webhook" },
+                  ]}
+                />
               </label>
               <label>
                 Empfänger (bei gewähltem Kanal)
@@ -319,19 +337,23 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               <div className="form-row">
               <label>
                 Kennzahl
-                <select name="metric" defaultValue="visibility_score">
-                  {ALERT_METRICS.map((m) => (
-                    <option key={m} value={m}>{labelForMetric(m)}</option>
-                  ))}
-                </select>
+                <SelectMenu
+                  name="metric"
+                  defaultValue="visibility_score"
+                  aria-label="Kennzahl"
+                  variant="default"
+                  options={ALERT_METRICS.map((m) => ({ value: m, label: labelForMetric(m) }))}
+                />
               </label>
               <label>
                 Vergleich
-                <select name="comparator" defaultValue="lt">
-                  {ALERT_COMPARATORS.map((c) => (
-                    <option key={c} value={c}>{labelForComparator(c)}</option>
-                  ))}
-                </select>
+                <SelectMenu
+                  name="comparator"
+                  defaultValue="lt"
+                  aria-label="Vergleich"
+                  variant="default"
+                  options={ALERT_COMPARATORS.map((c) => ({ value: c, label: labelForComparator(c) }))}
+                />
               </label>
               <label>
                 Schwelle

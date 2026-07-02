@@ -14,6 +14,7 @@
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { ACTIVE_PROJECT_COOKIE } from "../lib/active-project-cookie";
+import { SelectMenu } from "./select-menu";
 
 export interface ProjectSwitcherOption {
   id: string;
@@ -48,30 +49,26 @@ export function ProjectSwitcher({ projects, activeProjectId }: ProjectSwitcherPr
     return null;
   }
 
-  function onChange(event: React.ChangeEvent<HTMLSelectElement>) {
-    const id = event.target.value;
+  function onChange(id: string) {
     document.cookie = `${ACTIVE_PROJECT_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=31536000; samesite=lax`;
     startTransition(() => router.refresh());
   }
 
   return (
     <div className="project-switcher" data-pending={isPending ? "" : undefined}>
-      <label className="project-switcher__label" htmlFor="project-switcher-select">
+      <label className="project-switcher__label" id="project-switcher-label" htmlFor="project-switcher-select">
         Aktive Website
       </label>
-      <select
-        id="project-switcher-select"
+      <SelectMenu
+        variant="plain"
         className="project-switcher__select"
         value={activeProjectId ?? projects[0]?.id}
         onChange={onChange}
         disabled={isPending}
-      >
-        {projects.map((project) => (
-          <option key={project.id} value={project.id}>
-            {project.name}
-          </option>
-        ))}
-      </select>
+        options={projects.map((p) => ({ value: p.id, label: p.name }))}
+        id="project-switcher-select"
+        aria-labelledby="project-switcher-label"
+      />
     </div>
   );
 }

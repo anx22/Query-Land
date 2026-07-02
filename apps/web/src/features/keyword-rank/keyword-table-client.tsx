@@ -21,6 +21,7 @@ import type { KeywordIntent } from "@seo-tool/domain-model";
 import { Sparkline } from "../../components/charts/sparkline";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
+import { SelectMenu } from "../../components/select-menu";
 import { TermTooltip } from "../../components/term-tooltip";
 import {
   KEYWORD_INTENT_OPTIONS,
@@ -107,29 +108,43 @@ export function KeywordTableClient({ rows, inspectors }: KeywordTableClientProps
       <div className="filter-row kw-filterbar" role="group" aria-label="Keywords filtern">
         <label>
           <TermTooltip term="Keyword / Intent">Intent</TermTooltip>
-          <select value={filter.intent ?? "all"} onChange={(e) => setParam("intent", e.target.value)}>
-            <option value="all">Alle</option>
-            {KEYWORD_INTENT_OPTIONS.map((i) => (
-              <option key={i} value={i}>{intentLabel(i)}</option>
-            ))}
-          </select>
+          <SelectMenu
+            variant="pill"
+            value={filter.intent ?? "all"}
+            onChange={(v) => setParam("intent", v)}
+            options={[
+              { value: "all", label: "Alle" },
+              ...KEYWORD_INTENT_OPTIONS.map((i) => ({ value: i, label: intentLabel(i) })),
+            ]}
+            aria-label="Intent"
+          />
         </label>
         <label>
           Marke
-          <select value={filter.brand ?? "all"} onChange={(e) => setParam("brand", e.target.value)}>
-            <option value="all">Alle</option>
-            <option value="brand">Mit Marke</option>
-            <option value="nonbrand">Ohne Marke</option>
-          </select>
+          <SelectMenu
+            variant="pill"
+            value={filter.brand ?? "all"}
+            onChange={(v) => setParam("brand", v)}
+            options={[
+              { value: "all", label: "Alle" },
+              { value: "brand", label: "Mit Marke" },
+              { value: "nonbrand", label: "Ohne Marke" },
+            ]}
+            aria-label="Marke"
+          />
         </label>
         <label>
           Markt
-          <select value={filter.market ?? "all"} onChange={(e) => setParam("market", e.target.value)}>
-            <option value="all">Alle</option>
-            {markets.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <SelectMenu
+            variant="pill"
+            value={filter.market ?? "all"}
+            onChange={(v) => setParam("market", v)}
+            options={[
+              { value: "all", label: "Alle" },
+              ...markets.map((m) => ({ value: m, label: m })),
+            ]}
+            aria-label="Markt"
+          />
         </label>
       </div>
 

@@ -22,6 +22,7 @@ import {
   serializeLines,
   serializeTerms,
 } from "./brief-form";
+import { SelectMenu } from "../../components/select-menu";
 
 export interface BriefEditorProps {
   brief: ContentRecommendation;
@@ -67,13 +68,16 @@ export function BriefEditor({ brief, onSave }: BriefEditorProps) {
 
         <label className="cw-field">
           <span className="cw-field__label">Such-Intent</span>
-          <select className="cw-input" name="intent" defaultValue={brief.intent}>
-            {CONTENT_INTENTS.map((intent: ContentIntent) => (
-              <option key={intent} value={intent}>
-                {intentLabel(intent)}
-              </option>
-            ))}
-          </select>
+          <SelectMenu
+            className="cw-input"
+            variant="default"
+            name="intent"
+            defaultValue={brief.intent}
+            options={CONTENT_INTENTS.map((intent: ContentIntent) => ({
+              value: intent,
+              label: intentLabel(intent),
+            }))}
+          />
         </label>
 
         <label className="cw-field">

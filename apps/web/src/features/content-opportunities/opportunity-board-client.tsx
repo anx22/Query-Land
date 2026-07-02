@@ -23,6 +23,7 @@ import { Sparkline } from "../../components/charts/sparkline";
 import { PriorityMatrix, type PriorityBubble } from "../../components/charts/priority-matrix";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { CardTabs } from "../../components/card-tabs";
+import { SelectMenu } from "../../components/select-menu";
 import {
   BOARD_STATUSES,
   KANBAN_COLUMNS,
@@ -421,39 +422,55 @@ function TableView({
       <div className="filter-row board-filterbar" role="group" aria-label="Chancen filtern">
         <label>
           Typ
-          <select value={filter.type ?? "all"} onChange={(e) => onParam("type", e.target.value)}>
-            <option value="all">Alle</option>
-            {OPPORTUNITY_TYPES.map((t) => (
-              <option key={t} value={t}>{opportunityTypeLabel(t)}</option>
-            ))}
-          </select>
+          <SelectMenu
+            variant="pill"
+            value={filter.type ?? "all"}
+            onChange={(v) => onParam("type", v)}
+            options={[
+              { value: "all", label: "Alle" },
+              ...OPPORTUNITY_TYPES.map((t) => ({ value: t, label: opportunityTypeLabel(t) })),
+            ]}
+            aria-label="Typ"
+          />
         </label>
         <label>
           Status
-          <select value={filter.status ?? "all"} onChange={(e) => onParam("status", e.target.value)}>
-            <option value="all">Alle</option>
-            {BOARD_STATUSES.map((s: OpportunityStatus) => (
-              <option key={s} value={s}>{opportunityStatusLabel(s)}</option>
-            ))}
-          </select>
+          <SelectMenu
+            variant="pill"
+            value={filter.status ?? "all"}
+            onChange={(v) => onParam("status", v)}
+            options={[
+              { value: "all", label: "Alle" },
+              ...BOARD_STATUSES.map((s: OpportunityStatus) => ({ value: s, label: opportunityStatusLabel(s) })),
+            ]}
+            aria-label="Status"
+          />
         </label>
         <label>
           Wirkung ≥
-          <select value={String(filter.minImpact ?? 0)} onChange={(e) => onParam("minImpact", e.target.value)}>
-            <option value="0">Alle</option>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
+          <SelectMenu
+            variant="pill"
+            value={String(filter.minImpact ?? 0)}
+            onChange={(v) => onParam("minImpact", v)}
+            options={[
+              { value: "0", label: "Alle" },
+              ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) })),
+            ]}
+            aria-label="Wirkung ≥"
+          />
         </label>
         <label>
           Aufwand ≤
-          <select value={String(filter.maxEffort ?? 0)} onChange={(e) => onParam("maxEffort", e.target.value)}>
-            <option value="0">Alle</option>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
+          <SelectMenu
+            variant="pill"
+            value={String(filter.maxEffort ?? 0)}
+            onChange={(v) => onParam("maxEffort", v)}
+            options={[
+              { value: "0", label: "Alle" },
+              ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) })),
+            ]}
+            aria-label="Aufwand ≤"
+          />
         </label>
       </div>
 

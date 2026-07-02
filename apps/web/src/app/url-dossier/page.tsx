@@ -12,6 +12,7 @@ import { TermTooltip } from "../../components/term-tooltip";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { Sparkline } from "../../components/charts/sparkline";
 import { loadUrlDossier } from "../../lib/dossier-api";
+import { SelectMenu } from "../../components/select-menu";
 import { EmptyLine, SectionCard } from "../../features/url-dossier/section-card";
 import {
   formatCount,
@@ -75,13 +76,12 @@ export default async function Page({
             <form className="filter-row" action="/url-dossier">
               <label>
                 URL
-                <select name="pageUrl" defaultValue={data.selectedUrl ?? ""}>
-                  {data.urlOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu
+                  name="pageUrl"
+                  defaultValue={data.selectedUrl ?? ""}
+                  variant="default"
+                  options={data.urlOptions.map((option) => ({ value: option, label: option }))}
+                />
               </label>
               <button className="button secondary" type="submit">
                 Öffnen
