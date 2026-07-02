@@ -4,9 +4,35 @@ import { fileURLToPath } from "node:url";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(projectRoot, "..", "..");
 
+// Content-Security-Policy — konservativ und am realen Bedarf ausgerichtet:
+// Next.js/React injizieren Inline-Styles/-Scripts (Hydration) → 'unsafe-inline';
+// Recharts ist SVG-basiert (kein eval). Die Web-App ruft die API unter
+// NEXT_PUBLIC_API_BASE_URL → in connect-src aufnehmen, sofern gesetzt.
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const connectSrc = ["'self'", apiBaseUrl].filter(Boolean).join(" ");
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "img-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline'",
+  `connect-src ${connectSrc}`,
+  "frame-ancestors 'none'",
+  "base-uri 'self'"
+].join("; ");
+
+const securityHeaders = [
+  { key: "Content-Security-Policy", value: contentSecurityPolicy },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  async headers() {
+    return [{ source: "/(.*)", headers: securityHeaders }];
+  },
   transpilePackages: ["@seo-tool/api", "@seo-tool/domain-model", "@seo-tool/shared-config"],
   // PGlite (embedded Postgres WASM, local dev only) must not be bundled by the
   // Next server compiler — webpack mishandles its WASM/fs loading and throws
