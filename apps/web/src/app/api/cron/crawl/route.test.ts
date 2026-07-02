@@ -8,6 +8,7 @@ vi.mock("../../../../lib/connector-sync-cron", () => ({
   drainConnectorSyncJobs: vi.fn(async () => ({ processed: 0 })),
 }));
 vi.mock("../../../../lib/reports-cron", () => ({ runDueReportSchedules: vi.fn(async () => ({ delivered: 0 })) }));
+vi.mock("../../../../lib/gsc-refresh", () => ({ runGscRefreshAll: vi.fn(async () => ({ refreshed: 0 })) }));
 
 import { NextRequest } from "next/server";
 import { GET } from "./route";
