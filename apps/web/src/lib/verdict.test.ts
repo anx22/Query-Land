@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveAuditVerdict, deriveKeywordsVerdict, deriveOpportunitiesVerdict } from "./verdict";
+import { deriveAuditVerdict, deriveDossierVerdict, deriveKeywordsVerdict, deriveOpportunitiesVerdict } from "./verdict";
 
 describe("deriveAuditVerdict", () => {
   it("returns null when there is nothing to summarise", () => {
@@ -61,5 +61,26 @@ describe("deriveKeywordsVerdict", () => {
     const v = deriveKeywordsVerdict({ visibility: 65, visibilityDelta: -3, avgPosition: null, totalKeywords: 40 });
     expect(v?.text).toContain("Sichtbarkeit fällt (-3)");
     expect(v?.tone).toBe("warn");
+  });
+});
+
+describe("deriveDossierVerdict", () => {
+  it("returns null when the URL has no fetch or indexability data", () => {
+    expect(deriveDossierVerdict({ statusCode: null, indexable: null, openIssues: 0 })).toBeNull();
+  });
+
+  it("is good for a healthy indexable URL with no issues", () => {
+    expect(deriveDossierVerdict({ statusCode: 200, indexable: true, openIssues: 0 })).toEqual({
+      text: "HTTP 200 · indexierbar · keine offenen Issues",
+      tone: "good",
+    });
+  });
+
+  it("is bad when not indexable", () => {
+    expect(deriveDossierVerdict({ statusCode: 200, indexable: false, openIssues: 0 })?.tone).toBe("bad");
+  });
+
+  it("warns on open issues for an otherwise healthy URL", () => {
+    expect(deriveDossierVerdict({ statusCode: 200, indexable: true, openIssues: 3 })?.tone).toBe("warn");
   });
 });
