@@ -22,6 +22,7 @@ import { nextOpportunityStatuses, type Opportunity, type OpportunityStatus } fro
 import { Sparkline } from "../../components/charts/sparkline";
 import { PriorityMatrix, type PriorityBubble } from "../../components/charts/priority-matrix";
 import { ConfidenceBadge } from "../../components/confidence-badge";
+import { CardTabs } from "../../components/card-tabs";
 import {
   BOARD_STATUSES,
   KANBAN_COLUMNS,
@@ -230,50 +231,43 @@ export function OpportunityBoardClient({
         <PriorityMatrix bubbles={bubbles} selectedId={selectedId} onSelect={setSelectedId} />
       </section>
 
-      {/* View toggle */}
-      <div className="board-toolbar">
-        <div className="board-viewtoggle" role="tablist" aria-label="Ansicht wählen">
-          {VIEWS.map((v) => (
-            <button
-              key={v.key}
-              type="button"
-              role="tab"
-              aria-selected={view === v.key}
-              className={`button compact ${view === v.key ? "" : "secondary"}`}
-              onClick={() => setParam("view", v.key === "matrix" ? null : v.key)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
-        <span className="muted board-count">{filtered.length} von {opportunities.length} Chancen</span>
-      </div>
-
-      {/* Toggled view */}
-      {view === "kanban" ? (
-        <KanbanView opportunities={filtered} onSelect={setSelectedId} />
-      ) : view === "table" ? (
-        <TableView
-          opportunities={filtered}
-          filter={filter}
-          activeChips={activeChips}
-          onParam={setParam}
-          onSelect={setSelectedId}
-          checkedIds={checkedIds}
-          allChecked={allChecked}
-          selectable={Boolean(onBulkTransition)}
-          onToggleOne={toggleOne}
-          onToggleAll={toggleAll}
-        />
-      ) : (
-        <section className="card">
-          <p className="kicker">Matrix-Ansicht</p>
-          <p className="muted">
-            Wähle eine Chance in der Matrix oben, um die Evidenz-Kette zu öffnen. Wechsle zu „Kanban" oder „Tabelle" für die
-            detaillierte Bearbeitung.
-          </p>
-        </section>
-      )}
+      {/* Work-area switcher (Schicht 2): rich card-tabs with a mini-KPI preview per view. */}
+      <CardTabs
+        ariaLabel="Ansicht wählen"
+        active={view}
+        onSelect={(id) => setParam("view", id === "matrix" ? null : id)}
+        tabs={VIEWS.map((v) => ({
+          id: v.key,
+          label: v.label,
+          hint: v.key === "matrix" ? "Impact×Effort-Triage" : v.key === "kanban" ? "Status-Fluss offen → validiert" : "Filtern & bearbeiten",
+          kpi: v.key === "matrix" ? `${opportunities.length} gesamt` : `${filtered.length} sichtbar`,
+        }))}
+      >
+        {view === "kanban" ? (
+          <KanbanView opportunities={filtered} onSelect={setSelectedId} />
+        ) : view === "table" ? (
+          <TableView
+            opportunities={filtered}
+            filter={filter}
+            activeChips={activeChips}
+            onParam={setParam}
+            onSelect={setSelectedId}
+            checkedIds={checkedIds}
+            allChecked={allChecked}
+            selectable={Boolean(onBulkTransition)}
+            onToggleOne={toggleOne}
+            onToggleAll={toggleAll}
+          />
+        ) : (
+          <section className="card">
+            <p className="kicker">Matrix-Ansicht</p>
+            <p className="muted">
+              Wähle eine Chance in der Matrix oben, um die Evidenz-Kette zu öffnen. Wechsle zu „Kanban" oder „Tabelle" für die
+              detaillierte Bearbeitung.
+            </p>
+          </section>
+        )}
+      </CardTabs>
 
       <EvidenceChainDrawer opportunity={selected} onClose={() => setSelectedId(null)} />
 
