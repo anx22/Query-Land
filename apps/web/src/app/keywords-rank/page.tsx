@@ -5,7 +5,8 @@ import { AppShell } from "../../components/app-shell";
 import { PageSkeleton } from "../../components/page-skeleton";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
-import { MetricCard } from "../../components/metric-card";
+import { SummaryHead } from "../../components/summary-head";
+import { deriveKeywordsVerdict } from "../../lib/verdict";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { TermTooltip } from "../../components/term-tooltip";
 import { GlossarLink } from "../../components/glossar-link";
@@ -176,44 +177,50 @@ async function KeywordsRankBody({
 
       {hasKeywords ? (
         <>
-          {/* At-a-glance verdict: the numbers that frame visibility & reach */}
-          <div className="verdict-strip verdict-strip--4">
-            <MetricCard
-              label="Visibility-Index"
-              value={visScore != null ? String(visScore) : "—"}
-              info={
-                <>
-                  Positionsgewichtete Sichtbarkeit (0–100) auf dem eigenen Keyword-Set. Mehr im{" "}
-                  <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
-                </>
-              }
-              note={
-                hasVisibility
+          {/* Schicht 1: rule-based Kernbefund + the numbers that frame visibility & reach. */}
+          <SummaryHead
+            verdict={deriveKeywordsVerdict({
+              visibility: visScore ?? null,
+              visibilityDelta: visDelta ?? null,
+              avgPosition: hasVisibility ? data.latestVisibility!.averagePosition ?? null : null,
+              totalKeywords: data.totalKeywords,
+            }) ?? undefined}
+            metrics={[
+              {
+                label: "Visibility-Index",
+                value: visScore != null ? String(visScore) : "—",
+                info: (
+                  <>
+                    Positionsgewichtete Sichtbarkeit (0–100) auf dem eigenen Keyword-Set. Mehr im{" "}
+                    <GlossarLink term="Visibility-Index">Glossar</GlossarLink>.
+                  </>
+                ),
+                note: hasVisibility
                   ? `${data.latestVisibility!.trackedKeywords} getrackt · Ø Pos ${data.latestVisibility!.averagePosition ?? "—"}${
                       visDelta != null ? ` · ${visDelta > 0 ? "+" : ""}${visDelta} Pkt` : ""
                     } · Konfidenz C (SERP-Stichprobe)`
-                  : "erscheint nach der ersten Ranking-Messung"
-              }
-            />
-            <MetricCard
-              label="Keywords"
-              value={String(data.totalKeywords)}
-              info="Alle im Projekt kuratierten Begriffe — die Grundlage für Rankings und Sichtbarkeit."
-              note={`${data.rows.length} geladen`}
-            />
-            <MetricCard
-              label="Cluster"
-              value={String(data.groups.length)}
-              info="Thematisch gebündelte Keyword-Gruppen für Reporting und Analyse."
-              note="Themen-/Keyword-Gruppen"
-            />
-            <MetricCard
-              label="Brand"
-              value={String(brandCount)}
-              info="Keywords mit der eigenen Marke (Brand). Sie ranken meist leicht und sagen wenig über Wachstumspotenzial."
-              note="von den geladenen Keywords"
-            />
-          </div>
+                  : "erscheint nach der ersten Ranking-Messung",
+              },
+              {
+                label: "Keywords",
+                value: String(data.totalKeywords),
+                info: "Alle im Projekt kuratierten Begriffe — die Grundlage für Rankings und Sichtbarkeit.",
+                note: `${data.rows.length} geladen`,
+              },
+              {
+                label: "Cluster",
+                value: String(data.groups.length),
+                info: "Thematisch gebündelte Keyword-Gruppen für Reporting und Analyse.",
+                note: "Themen-/Keyword-Gruppen",
+              },
+              {
+                label: "Brand",
+                value: String(brandCount),
+                info: "Keywords mit der eigenen Marke (Brand). Sie ranken meist leicht und sagen wenig über Wachstumspotenzial.",
+                note: "von den geladenen Keywords",
+              },
+            ]}
+          />
 
           {/* Charts: PositionDistribution + Visibility TrendChart */}
           <section className="kw-charts">

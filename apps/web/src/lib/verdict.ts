@@ -44,3 +44,51 @@ export function deriveAuditVerdict(input: {
 
   return { text, tone };
 }
+
+/** Content & Chancen: opportunity backlog — total, active, quick wins, top priority. */
+export function deriveOpportunitiesVerdict(input: {
+  total: number;
+  active: number;
+  quickWins: number;
+  topPriority: number | null;
+}): Verdict | null {
+  if (input.total === 0) return null;
+
+  const parts = [`${nf(input.total)} Chancen`, `${nf(input.active)} aktiv`];
+  let tone: VerdictTone = input.active > 0 ? "warn" : "neutral";
+  if (input.quickWins > 0) {
+    parts.push(`${nf(input.quickWins)} Quick Wins zuerst`);
+    tone = "good";
+  }
+
+  let text = parts.join(" · ");
+  if (input.topPriority !== null) text += ` — Top-Priorität ${nf(input.topPriority)}`;
+  return { text, tone };
+}
+
+/** Keywords & Rankings: visibility index + avg position + tracked set (+ visibility trend). */
+export function deriveKeywordsVerdict(input: {
+  visibility: number | null;
+  visibilityDelta: number | null;
+  avgPosition: number | null;
+  totalKeywords: number;
+}): Verdict | null {
+  if (input.totalKeywords === 0) return null;
+
+  const parts: string[] = [];
+  let tone: VerdictTone = "neutral";
+  if (input.visibility !== null) {
+    parts.push(`Visibility ${nf(input.visibility)}/100`);
+    tone = input.visibility >= 60 ? "good" : input.visibility >= 30 ? "warn" : "bad";
+  }
+  if (input.avgPosition !== null) parts.push(`Ø Position ${input.avgPosition.toLocaleString("de-DE")}`);
+  parts.push(`${nf(input.totalKeywords)} Keywords`);
+
+  let text = parts.join(" · ");
+  if (input.visibilityDelta !== null && input.visibilityDelta !== 0) {
+    const rising = input.visibilityDelta > 0;
+    text += ` — Sichtbarkeit ${rising ? "steigt" : "fällt"} (${rising ? "+" : ""}${nf(input.visibilityDelta)})`;
+    if (!rising && tone === "good") tone = "warn";
+  }
+  return { text, tone };
+}
