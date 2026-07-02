@@ -4,7 +4,8 @@ import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
 import { Icon } from "../../components/icon";
-import { MetricCard } from "../../components/metric-card";
+import { SummaryHead } from "../../components/summary-head";
+import { deriveOpportunitiesVerdict } from "../../lib/verdict";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { HelpDisclosure } from "../../components/help-disclosure";
 import { OpportunityBoardClient } from "../../features/content-opportunities";
@@ -121,17 +122,16 @@ export default async function Page({
             </WhyItMatters>
           </HelpDisclosure>
 
-          {/* At-a-glance verdict: the four numbers that frame the opportunity backlog */}
-          <div className="verdict-strip verdict-strip--4">
-            <MetricCard label="Opportunities" value={String(data.meta.total)} note={`${opportunities.length} geladen`} />
-            <MetricCard label="Aktiv (offen)" value={String(openCount)} note="nicht validiert/dismissed/expired" />
-            <MetricCard label="Quick Wins" value={String(quickWins)} note="hohe Wirkung, niedriger Aufwand" />
-            <MetricCard
-              label="Validiert"
-              value={String(validatedCount)}
-              note={topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt"}
-            />
-          </div>
+          {/* Schicht 1: rule-based Kernbefund + the four numbers that frame the opportunity backlog. */}
+          <SummaryHead
+            verdict={deriveOpportunitiesVerdict({ total: data.meta.total, active: openCount, quickWins, topPriority: topPriority?.priority ?? null }) ?? undefined}
+            metrics={[
+              { label: "Opportunities", value: String(data.meta.total), note: `${opportunities.length} geladen` },
+              { label: "Aktiv (offen)", value: String(openCount), note: "nicht validiert/dismissed/expired" },
+              { label: "Quick Wins", value: String(quickWins), note: "hohe Wirkung, niedriger Aufwand" },
+              { label: "Validiert", value: String(validatedCount), note: topPriority ? `Top-Prio ${topPriority.priority}` : "Vorher/Nachher bestätigt" },
+            ]}
+          />
 
           <OpportunityBoardClient
             opportunities={opportunities}
