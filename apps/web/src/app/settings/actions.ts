@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { friendlyActionError } from "../../lib/action-errors";
 import { redirect } from "next/navigation";
 import { apiPost } from "../../lib/api-client";
-import { createFoundationIntegration, createFoundationJob } from "../../lib/foundation-api";
+import { createFoundationIntegration } from "../../lib/foundation-api";
+import { callInternalApi } from "../../lib/server-api";
+import { runGscRefreshForProject } from "../../lib/gsc-refresh";
 
 const allowedProviders = ["gsc", "ga4"] as const;
 
@@ -29,17 +31,53 @@ export async function scheduleConnectorSyncAction(formData: FormData) {
   try {
     const projectId = requiredString(formData, "projectId");
     provider = providerString(formData);
-    await createFoundationJob({
-      projectId,
-      type: "connector_sync",
-      subject: provider
-    });
+    // Schedule via the connector's own day-scoped sync-schedule endpoint (which carries the required
+    // integrationId). The old generic-job path created a connector_sync job WITHOUT integrationId,
+    // which the drain always rejected — so "geplant" was shown while the job could never run.
+    const integrationId = await findIntegrationId(projectId, provider);
+    if (!integrationId) {
+      throw new Error("Diese Datenquelle ist noch nicht verbunden.");
+    }
+    const response = await callInternalApi("POST", `/integrations/${integrationId}/sync/schedule`);
+    if (response.status >= 400) {
+      throw new Error("Der Datenabgleich konnte nicht geplant werden.");
+    }
   } catch (error) {
     redirect(`/settings?error=${encodeURIComponent(messageFor(error))}`);
   }
 
   revalidateSettingsViews();
   redirect(`/settings?scheduled=${provider}`);
+}
+
+/**
+ * Run a full GSC refresh right now (search-performance + rank/visibility + URL index status) so the
+ * user does not have to wait for the daily cron. Honest feedback: `synced=empty` when the connection
+ * works but Google returned no data yet (e.g. a brand-new property).
+ */
+export async function syncConnectorNowAction(formData: FormData) {
+  let outcome: "done" | "empty" = "done";
+  try {
+    const projectId = requiredString(formData, "projectId");
+    const result = await runGscRefreshForProject(callInternalApi, projectId);
+    if (!result.connected) {
+      throw new Error("Google Search Console ist für dieses Projekt nicht verbunden.");
+    }
+    const anyData = result.searchPerformanceRows > 0 || result.rankKeywords > 0 || result.urlsInspected > 0;
+    outcome = anyData ? "done" : "empty";
+  } catch (error) {
+    redirect(`/settings?error=${encodeURIComponent(messageFor(error))}`);
+  }
+
+  revalidateSettingsViews();
+  redirect(`/settings?synced=${outcome}`);
+}
+
+/** Find the integration id for a project+provider via the internal API (or null when not connected). */
+async function findIntegrationId(projectId: string, provider: ConnectorProvider): Promise<string | null> {
+  const response = await callInternalApi("GET", "/integrations");
+  const integrations = (response.body as { data?: Array<{ id: string; provider: string; projectId?: string }> } | null)?.data ?? [];
+  return integrations.find((integration) => integration.provider === provider && integration.projectId === projectId)?.id ?? null;
 }
 
 export async function createSourceMapEntryAction(formData: FormData) {

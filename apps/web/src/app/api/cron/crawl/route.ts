@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { callInternalApi } from "../../../../lib/server-api";
 import { drainCrawlJobs } from "../../../../lib/crawl-cron";
 import { drainConnectorSyncJobs, enqueueDueConnectorSyncs } from "../../../../lib/connector-sync-cron";
+import { runGscRefreshAll } from "../../../../lib/gsc-refresh";
 import { runDueReportSchedules } from "../../../../lib/reports-cron";
 
 export const dynamic = "force-dynamic";
@@ -46,8 +47,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Refresh connector data: enqueue one sync per integration per day, then drain.
   const enqueued = await enqueueDueConnectorSyncs(call);
   const connectors = await drainConnectorSyncJobs({ call });
+  // Pull the rest of the GSC data paths (search-performance, rank/visibility, index status) for every
+  // connected project. skipConnectorSync: the drain above already ran the aggregate connector sync.
+  const gsc = await runGscRefreshAll(call, { skipConnectorSync: true });
   // Generate + deliver any report schedules that have fallen due.
   const reports = await runDueReportSchedules(call);
 
-  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued }, reports });
+  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued }, gsc, reports });
 }

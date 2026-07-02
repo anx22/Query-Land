@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createGscClient } from "@seo-tool/api";
 import { callInternalApi } from "../../../../../lib/server-api";
+import { runGscRefreshForProject } from "../../../../../lib/gsc-refresh";
 import { hostOf, matchGscProperty, verifyOAuthState, type GscPropertyEntry } from "../../../../../lib/oauth-google";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// The immediate post-connect refresh does real GSC fetches; give the handler room like the cron.
+export const maxDuration = 60;
 
 /**
  * Google Search Console OAuth callback. Verifies the CSRF state, exchanges the code for tokens,
@@ -58,6 +61,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       expiresAt: tokens.expiresAt,
     });
     if (upsert.status >= 400) return fail("Die Verbindung konnte nicht gespeichert werden.");
+
+    // Immediate first refresh so data shows up right after connecting. Best effort + light (URL
+    // inspection is left to the cron/button so this redirect handler can't time out); a failure here
+    // never blocks the redirect — the daily cron and the "Jetzt synchronisieren" button retry.
+    try {
+      await runGscRefreshForProject(callInternalApi, state.projectId, { skipUrlInspection: true });
+    } catch {
+      // ignore — data will fill on the next scheduled/manual refresh
+    }
 
     settings.searchParams.set("connected", "gsc");
     return NextResponse.redirect(settings);

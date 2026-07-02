@@ -18,6 +18,7 @@ import { routeReports } from "./routes/reports.js";
 import { routeSearchPerformance } from "./routes/search-performance.js";
 import { routeSites } from "./routes/sites.js";
 import { routeSourceMap } from "./routes/source-map.js";
+import { routeUrlInspection } from "./routes/url-inspection.js";
 import { routeWebVitals } from "./routes/web-vitals.js";
 import type { ProjectChildStore, ResourceRoute } from "./routes/shared.js";
 
@@ -37,6 +38,7 @@ const resourceRoutes: ResourceRoute[] = [
   routeKeywords,
   routeRank,
   routeSearchPerformance,
+  routeUrlInspection,
   routeBacklinks,
   routeReports,
   routeAlerts,

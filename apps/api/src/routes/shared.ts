@@ -1,8 +1,8 @@
 import type { ApiResponse, RequestContext } from "../http.js";
-import type { AiStore, AlertStore, BacklinkStore, ContentStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, OpportunityStore, ProjectStore, ProposalStore, RankStore, ReportStore, SearchPerformanceStore, SourceMapStore } from "../store.js";
+import type { AiStore, AlertStore, BacklinkStore, ContentStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, OpportunityStore, ProjectStore, ProposalStore, RankStore, ReportStore, SearchPerformanceStore, SourceMapStore, UrlIndexStore } from "../store.js";
 
 // Store-Slice, den alle ressourcenspezifischen Routen-Module gemeinsam erwarten.
-export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore & ContentStore;
+export type ProjectChildStore = ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & UrlIndexStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore & ContentStore;
 
 // Einheitliche Signatur jedes Ressourcen-Routers: liefert eine ApiResponse, wenn er den
 // Pfad bedient, sonst null (der Aggregator probiert dann den nächsten Router).

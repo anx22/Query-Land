@@ -12,6 +12,7 @@ import type { SearchAnalyticsRow } from "../search-performance/index.js";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const SITES_ENDPOINT = "https://www.googleapis.com/webmasters/v3/sites";
 const SEARCH_ANALYTICS_BASE = "https://www.googleapis.com/webmasters/v3/sites";
+const URL_INSPECTION_ENDPOINT = "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect";
 
 export const GSC_OAUTH_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 export const GSC_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -47,6 +48,17 @@ export interface GscApiRow {
   position: number;
 }
 
+/** Normalised URL Inspection result (index coverage). Shares the webmasters.readonly scope. */
+export interface UrlInspectionResult {
+  /** Google's overall verdict: PASS | PARTIAL | FAIL | NEUTRAL | VERDICT_UNSPECIFIED. */
+  verdict: string | null;
+  /** Human-readable coverage state, e.g. "Submitted and indexed" / "URL is unknown to Google". */
+  coverageState: string | null;
+  /** True when Google reports the URL as indexed (coverageState indicates it is in the index). */
+  indexed: boolean;
+  lastCrawlTime: string | null;
+}
+
 export class GscApiError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) {
     super(message);
@@ -69,6 +81,8 @@ export interface GscClient {
   refreshAccessToken(refreshToken: string): Promise<GscTokens>;
   listSites(accessToken: string): Promise<GscSiteEntry[]>;
   querySearchAnalytics(accessToken: string, property: string, body: SearchAnalyticsQueryBody): Promise<GscApiRow[]>;
+  /** URL Inspection API — index coverage for one URL (same webmasters.readonly scope). */
+  inspectUrl(accessToken: string, siteUrl: string, inspectionUrl: string): Promise<UrlInspectionResult>;
 }
 
 export type GscClientFactory = (opts: GscClientOptions) => GscClient;
@@ -130,7 +144,27 @@ export function createGscClient({ clientId, clientSecret, fetchImpl }: GscClient
       if (!res.ok) throw new GscApiError(`Search Analytics query failed (${res.status})`, res.status);
       return Array.isArray(json.rows) ? (json.rows as GscApiRow[]) : [];
     },
+    async inspectUrl(accessToken, siteUrl, inspectionUrl) {
+      const res = await doFetch(URL_INSPECTION_ENDPOINT, {
+        method: "POST",
+        headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({ inspectionUrl, siteUrl }),
+      });
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) throw new GscApiError(`URL inspection failed (${res.status})`, res.status);
+      return mapUrlInspection(json);
+    },
   };
+}
+
+/** Map a URL Inspection API response to our normalised shape. `indexed` = Google's PASS verdict. */
+export function mapUrlInspection(json: Record<string, unknown>): UrlInspectionResult {
+  const inspection = (json.inspectionResult ?? {}) as Record<string, unknown>;
+  const index = (inspection.indexStatusResult ?? {}) as Record<string, unknown>;
+  const verdict = typeof index.verdict === "string" ? index.verdict : null;
+  const coverageState = typeof index.coverageState === "string" ? index.coverageState : null;
+  const lastCrawlTime = typeof index.lastCrawlTime === "string" ? index.lastCrawlTime : null;
+  return { verdict, coverageState, indexed: verdict === "PASS", lastCrawlTime };
 }
 
 // ---------------------------------------------------------------------------

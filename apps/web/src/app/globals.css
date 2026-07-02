@@ -2250,9 +2250,45 @@ form:has(button[data-pending]) {
 
 /* 2. Verdict strip — strengths & weaknesses "auf einen Blick".               */
 .verdict-strip { display: grid; gap: var(--space-4); margin-bottom: var(--space-5); }
+.verdict-strip--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .verdict-strip--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .verdict-strip--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .verdict-strip--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+/* SummaryHead: rule-based Kernbefund line over the KPI strip (Schicht 1). */
+.summary-head { display: grid; gap: var(--space-3); }
+.summary-head .verdict-strip { margin-bottom: 0; }
+.summary-head__verdict {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  margin: 0; font-size: 1.05rem; line-height: 1.4; font-weight: 600; color: var(--ink);
+}
+.summary-head__dot { position: relative; top: -0.1em; width: 0.55rem; height: 0.55rem; border-radius: 999px; background: var(--muted); flex: none; }
+.summary-head__verdict--good .summary-head__dot { background: var(--success); }
+.summary-head__verdict--warn .summary-head__dot { background: var(--warning); }
+.summary-head__verdict--bad .summary-head__dot { background: var(--danger); }
+.summary-head__verdict--neutral .summary-head__dot { background: var(--muted); }
+
+/* CardTabs: card-style tabs with a mini-KPI preview (Schicht 2 work-area switcher). */
+.card-tabs { display: grid; gap: var(--space-4); }
+.card-tabs__bar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--space-3); }
+@media (max-width: 720px) { .card-tabs__bar { grid-auto-flow: row; grid-auto-columns: auto; } }
+.card-tab {
+  display: grid; gap: 0.2rem; text-align: left; cursor: pointer; font: inherit;
+  padding: var(--space-3); border: 1px solid var(--line); border-radius: 0.75rem;
+  background: var(--surface); color: var(--ink);
+}
+.card-tab:hover { border-color: var(--muted); }
+.card-tab--active { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); background: var(--primary-soft); }
+.card-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.card-tab__row { display: flex; align-items: center; gap: 0.4rem; }
+.card-tab__icon { display: inline-flex; color: var(--muted); }
+.card-tab__label { font-weight: 600; }
+.card-tab__kpi { margin-left: auto; font-family: var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; font-size: 0.9rem; color: var(--muted); }
+.card-tab--active .card-tab__kpi { color: var(--ink); }
+.card-tab__kpi--good { color: var(--success); }
+.card-tab__kpi--warn { color: var(--warning); }
+.card-tab__kpi--bad { color: var(--danger); }
+.card-tab__hint { font-size: 0.8rem; color: var(--muted); }
 
 /* 3. Lead composition — primary viz + side facts/secondary viz.             */
 .split-lead { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 0.9fr);

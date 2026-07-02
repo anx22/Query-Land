@@ -472,7 +472,7 @@ export async function loadTechnicalAuditOverview(
   // Empty ≠ Error: a failed fetch records its section here so the page can show an
   // honest error notice instead of a silent empty/healthy state (archetype B).
   const loadErrors: string[] = [];
-  const [runsEnv, healthScores, issuesEnv, urlsEnv, urlExplorerEnv] = await Promise.all([
+  const [runsEnv, healthScores, issuesEnv, urlsEnv, urlExplorerEnv, indexStatus] = await Promise.all([
     apiGetEnvelope<CrawlRun[]>(`${base}/crawl-runs?limit=${RUN_PAGE_SIZE}&offset=${runOffset}`)
       .then((env) => env)
       .catch(() => { loadErrors.push("Crawl-Läufe"); return { data: [] as CrawlRun[], meta: undefined }; }),
@@ -486,6 +486,10 @@ export async function loadTechnicalAuditOverview(
     apiGetEnvelope<UrlExplorerRow[]>(`${base}/url-explorer?${buildUrlExplorerQuery(requestedUrlOffset, activeUrlFilter)}`)
       .then((env) => env)
       .catch(() => { loadErrors.push("URL-Explorer"); return { data: [] as UrlExplorerRow[], meta: undefined }; }),
+    // Index coverage from the GSC URL Inspection sync. Supplementary — a miss here leaves the funnel's
+    // "indexed" stage empty (honest) rather than flagging the whole audit as errored.
+    apiGet<{ indexed: number; total: number; inspectedAt: string | null }>(`${base}/index-status/summary`)
+      .catch(() => ({ indexed: 0, total: 0, inspectedAt: null })),
   ]);
 
   // --- Crawl runs (active page, latest first) ---
@@ -558,8 +562,9 @@ export async function loadTechnicalAuditOverview(
     discovered: latestRun?.summary.discoveredUrls ?? (urls.length > 0 ? discoveredUrlTotal : null),
     fetched: latestRun?.summary.fetchedUrls ?? null,
     indexable: latestRun?.summary.indexabilityAssessments ?? null,
-    // "indexed" needs GSC coverage data — not available via these endpoints.
-    indexed: undefined,
+    // "indexed" is the count Google reports as indexed via the URL Inspection sync. Undefined (honest
+    // empty) until a URL-inspection run has happened for this site.
+    indexed: indexStatus.total > 0 ? indexStatus.indexed : undefined,
   });
   const funnelEmpty = funnelStages.every((s) => s.value === null);
 

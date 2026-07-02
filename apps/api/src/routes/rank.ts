@@ -21,6 +21,12 @@ export const routeRank: ResourceRoute = async (store, method, pathname, searchPa
     return json(200, { data: await store.latestKeywordPositions(latestPositionsMatch[1], searchParams.get("market") ?? undefined) });
   }
 
+  const refreshMatch = pathname.match(/^\/projects\/([^/]+)\/rank-snapshots\/refresh$/);
+  if (method === "POST" && refreshMatch) {
+    const input = body && typeof body === "object" && !Array.isArray(body) ? body as { market?: string } : {};
+    return json(202, { data: await store.refreshRankSnapshots(refreshMatch[1], { market: typeof input.market === "string" ? input.market : undefined }) });
+  }
+
   const serpMatch = pathname.match(/^\/projects\/([^/]+)\/keywords\/([^/]+)\/serp-snapshots$/);
   if (method === "GET" && serpMatch) {
     return json(200, { data: await store.listSerpSnapshots(serpMatch[1], serpMatch[2]) });
