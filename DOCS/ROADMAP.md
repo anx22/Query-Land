@@ -1,6 +1,6 @@
 # Roadmap — Stand & Nächstes
 
-> Stand: 2026-07-01 · **Was war, was ist, was kommt.**
+> Stand: 2026-07-02 · **Was war, was ist, was kommt.**
 > Produkt/Scope: [`PRODUCT_MASTER_SPEC.md`](./PRODUCT_MASTER_SPEC.md) · Architektur-Nahtstellen:
 > [`ARCHITECTURE.md`](./ARCHITECTURE.md) · Entscheidungen: [`DECISIONS.md`](./DECISIONS.md).
 
@@ -21,9 +21,11 @@ Alle sieben Produkt-Wellen sind implementiert; das Fundament ist in der Vercel-P
 | AI Visibility & AEO | ✅ Prompts/Snapshots, AI-Visibility-Score (Klasse E), AEO-Checks (Klasse A), Proposals |
 | Backlinks & Authority | ✅ Snapshot-Diff (New/Lost), Authority-Summary (GSC-Stub, Klasse B) |
 | AuthZ-Gate | ✅ implementiert, `AUTH_GATE_ENABLED` (default OFF) |
-| Härtung | ✅ app-weiter Bug-Audit + Fixes; Empty≠Error-Surfacing (Referenz: Technical Audit) |
+| Härtung | ✅ app-weiter Bug-Audit + Fixes; Empty≠Error-Surfacing (alle Modul-Loader honest, im /improve-Audit verifiziert) |
+| Interner Linkgraph | ✅ Crawler befüllt `internal_link_edges` (from/to/anchor/rel), beide Crawl-Pfade — GAP-LINK-001 geschlossen |
 | Google-OAuth-Flow (GSC) | ✅ Web-Flow vorhanden; wird live, sobald die 4 OAuth-Env-Vars gesetzt sind |
-| Tests | ✅ Node + Web grün (`npm run check`, `@seo-tool/web test`) |
+| Tests | ✅ Node (241) + Web (376) grün; Route-Handler-Tests (Cron/OAuth/Export) ergänzt |
+| CI & Tooling | ✅ GitHub Actions führt `npm run check` (push/PR); ESLint 9 + Prettier (nicht-blockierend, warn-level); `CLAUDE.md` Agent-Guide |
 
 ## Was fehlt zum Scharfschalten (Momentanes)
 
@@ -35,7 +37,10 @@ Das Produkt läuft; „live-echt" wird es mit **Credentials**, nicht mit Umbau:
 - **AuthZ scharf** — Web-Layer muss das Session-Token bei serverseitigen API-Calls weiterreichen, dann
   `AUTH_GATE_ENABLED=true`. Erst danach ist der Actor echt (statt `"system"`).
 - **PSI-API-Key** (optional) — schaltet echte Web-Vitals statt Stub frei.
-- **Empty≠Error-Muster** auf die übrigen Modul-Loader ausrollen (overview/backlinks/keywords/reports/content).
+- **Empty≠Error** — die Rest-Module (backlinks/keywords/reports/ai-visibility) sind bereits honest
+  (verifiziert im /improve-Audit: Two-Mode, Provider-vs-leer-Unterscheidung, Guards gegen Fake-0-Werte).
+  Offen ist nur die *optionale* Komponenten-Vereinheitlichung auf `ModulesPending` — rein stilistisch,
+  visuell zu verifizieren, kein Ehrlichkeits-Gap.
 
 ## Was noch offen ist (Geplantes / GAP)
 
@@ -46,7 +51,6 @@ Das Produkt läuft; „live-echt" wird es mit **Credentials**, nicht mit Umbau:
 | GAP-AI-003 | MCP-Write | offen — echtes Ticket-/PR-Backend hinter `accept` |
 | GAP-REPORT-002 | Delivery | offen — echter SMTP/Slack-Adapter |
 | GAP-AUTH-002/-003 | Authority | offen — Drittanbieter-Backlinks (Lizenz), Competitor-Gap |
-| GAP-LINK-001 | Crawler | offen — Linkgraph-Befüllung |
 | DEC-008 | Mandanten/GSC-Ownership | offen — User-/Rollen-Isolation vor Öffnung für externe Nutzer |
 | GAP-SEC-001 | Security | `postcss` (moderate, transitiv via `next`) — build-time, akzeptiertes Restrisiko bis zum nächsten Next-Upgrade |
 
@@ -64,4 +68,5 @@ Das Produkt läuft; „live-echt" wird es mit **Credentials**, nicht mit Umbau:
 ```bash
 npm run check
 npm --workspace @seo-tool/web run build
+npm run lint   # informativ (nicht-blockierend); Windows: npm test via Git Bash wg. NODE_ENV-Präfix
 ```
