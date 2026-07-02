@@ -2,6 +2,7 @@ import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
 import { SubmitButton } from "../../components/submit-button";
+import { SelectMenu } from "../../components/select-menu";
 import { createSiteAction, createWebsiteAction, deleteWebsiteAction, setActiveProjectAction } from "./actions";
 import { loadProjectControlData } from "../../lib/foundation-api";
 
@@ -149,19 +150,29 @@ function addWebsiteForm({ connected, autoFocus }: { connected: boolean; autoFocu
         </label>
         <label>
           Was soll analysiert werden?
-          <select name="scopeType" defaultValue="domain">
-            <option value="domain">Ganze Domain</option>
-            <option value="subdomain">Nur eine Subdomain</option>
-            <option value="folder">Nur ein Verzeichnis</option>
-          </select>
+          <SelectMenu
+            name="scopeType"
+            defaultValue="domain"
+            variant="default"
+            options={[
+              { value: "domain", label: "Ganze Domain" },
+              { value: "subdomain", label: "Nur eine Subdomain" },
+              { value: "folder", label: "Nur ein Verzeichnis" },
+            ]}
+          />
         </label>
         <label>
           Wie oft prüfen?
-          <select name="crawlFrequency" defaultValue="weekly">
-            <option value="manual">Nur manuell</option>
-            <option value="daily">Täglich</option>
-            <option value="weekly">Wöchentlich</option>
-          </select>
+          <SelectMenu
+            name="crawlFrequency"
+            defaultValue="weekly"
+            variant="default"
+            options={[
+              { value: "manual", label: "Nur manuell" },
+              { value: "daily", label: "Täglich" },
+              { value: "weekly", label: "Wöchentlich" },
+            ]}
+          />
         </label>
         <label>
           Wie wichtig ist diese Website? (1–100)

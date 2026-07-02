@@ -14,6 +14,7 @@ import { SectionTreemap } from "../../components/charts/section-treemap";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { DeltaChip } from "../../components/delta-chip";
 import { TermTooltip } from "../../components/term-tooltip";
+import { SelectMenu } from "../../components/select-menu";
 import { WhyItMatters } from "../../components/why-it-matters";
 import { InfoTip } from "../../components/info-tip";
 import { HelpDisclosure } from "../../components/help-disclosure";
@@ -189,35 +190,29 @@ function CrawlDiffSection({
             ))}
             <label className="audit-diff-selector">
               <span className="audit-diff-selector__label">Basis (älter)</span>
-              <select
+              <SelectMenu
                 className="audit-diff-select"
                 name="diffBase"
                 defaultValue={diffSelection.base ?? ""}
                 aria-label="Basis-Lauf wählen"
-              >
-                <option value="">— wählen —</option>
-                {runs.map((run) => (
-                  <option key={run.id} value={run.id}>
-                    {runOptionLabel(run)}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "— wählen —" },
+                  ...runs.map((run) => ({ value: run.id, label: runOptionLabel(run) })),
+                ]}
+              />
             </label>
             <label className="audit-diff-selector">
               <span className="audit-diff-selector__label">Vergleich (neuer)</span>
-              <select
+              <SelectMenu
                 className="audit-diff-select"
                 name="diffCompare"
                 defaultValue={diffSelection.compare ?? ""}
                 aria-label="Vergleichs-Lauf wählen"
-              >
-                <option value="">— wählen —</option>
-                {runs.map((run) => (
-                  <option key={run.id} value={run.id}>
-                    {runOptionLabel(run)}
-                  </option>
-                ))}
-              </select>
+                options={[
+                  { value: "", label: "— wählen —" },
+                  ...runs.map((run) => ({ value: run.id, label: runOptionLabel(run) })),
+                ]}
+              />
             </label>
             <button type="submit" className="button compact">
               Vergleichen

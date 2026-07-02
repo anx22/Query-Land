@@ -18,6 +18,7 @@ import { TrendChart } from "../../components/charts/trend-chart";
 import { KeywordTableClient } from "../../features/keyword-rank";
 import { NextStep } from "../../components/next-step";
 import { SubmitButton } from "../../components/submit-button";
+import { SelectMenu } from "../../components/select-menu";
 import { loadKeywordsRankData } from "../../lib/keywords-api";
 import { addKeywordsAction, computeVisibilityAction, createKeywordGroupAction } from "./actions";
 
@@ -81,12 +82,15 @@ async function KeywordsRankBody({
           </label>
           <label>
             Cluster (optional)
-            <select name="groupId" defaultValue="">
-              <option value="">— kein Cluster —</option>
-              {data.groups.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-            </select>
+            <SelectMenu
+              name="groupId"
+              defaultValue=""
+              variant="default"
+              options={[
+                { value: "", label: "— kein Cluster —" },
+                ...data.groups.map((group) => ({ value: group.id, label: group.name })),
+              ]}
+            />
           </label>
           <label>
             Brand-Begriffe (kommagetrennt, optional)

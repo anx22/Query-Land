@@ -6,6 +6,7 @@ import { AppShell } from "../../components/app-shell";
 import { OfflineNotice } from "../../components/offline-notice";
 import { ConnectionBadge } from "../../components/connection-badge";
 import { SubmitButton } from "../../components/submit-button";
+import { SelectMenu } from "../../components/select-menu";
 import { Icon } from "../../components/icon";
 import { ConfidenceBadge } from "../../components/confidence-badge";
 import { TermTooltip } from "../../components/term-tooltip";
@@ -171,11 +172,12 @@ export default async function Page({
               <form action={recordSnapshotAction} className="inline-actions">
                 <input type="hidden" name="projectId" value={projectId} />
                 <label className="visually-hidden" htmlFor="snapshot-prompt">Prompt für Snapshot</label>
-                <select id="snapshot-prompt" name="promptId" defaultValue={data.prompts[0]?.id ?? ""}>
-                  {data.prompts.map((prompt) => (
-                    <option key={prompt.id} value={prompt.id}>{prompt.prompt}</option>
-                  ))}
-                </select>
+                <SelectMenu
+                  id="snapshot-prompt"
+                  name="promptId"
+                  defaultValue={data.prompts[0]?.id ?? ""}
+                  options={data.prompts.map((prompt) => ({ value: prompt.id, label: prompt.prompt }))}
+                />
                 <button
                   className="button secondary compact"
                   type="submit"
@@ -281,13 +283,12 @@ export default async function Page({
               <div className="form-row">
                 <label>
                   Art
-                  <select name="kind" required>
-                    {PROPOSAL_KINDS.map((kind) => (
-                      <option key={kind} value={kind}>
-                        {proposalKindLabel(kind)}
-                      </option>
-                    ))}
-                  </select>
+                  <SelectMenu
+                    name="kind"
+                    required
+                    aria-label="Art"
+                    options={PROPOSAL_KINDS.map((kind) => ({ value: kind, label: proposalKindLabel(kind) }))}
+                  />
                 </label>
                 <label>
                   Titel
