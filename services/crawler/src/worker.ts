@@ -1,6 +1,6 @@
 import { apiDefaults } from "@seo-tool/shared-config";
 import type { AuditIssue, CrawlFrontierEntry, CrawlPageSignal, DiscoveredUrl, FetchResult, FoundationJob, IndexabilityAssessment } from "@seo-tool/domain-model";
-import { runCrawlWorkerCycle, type CrawlWorkerApiClient } from "./index.js";
+import { runCrawlWorkerCycle, type CrawlWorkerApiClient, type InternalLinkEdgeInput } from "./index.js";
 
 const apiBaseUrl = process.env.SEO_API_BASE_URL ?? `http://localhost:${apiDefaults.port}`;
 const pollIntervalMs = Number(process.env.CRAWLER_POLL_INTERVAL_MS ?? 5000);
@@ -39,6 +39,10 @@ export class HttpCrawlWorkerApiClient implements CrawlWorkerApiClient {
 
   computeHealthScore(projectId: string, siteId: string): Promise<unknown> {
     return this.post(`/projects/${projectId}/sites/${siteId}/health-scores/compute`, {});
+  }
+
+  recordInternalLinks(projectId: string, siteId: string, edges: InternalLinkEdgeInput[]): Promise<{ inserted: number; updated: number }> {
+    return this.post(`/projects/${projectId}/sites/${siteId}/internal-links`, { edges });
   }
 
   completeCrawlRun(projectId: string, siteId: string, crawlRunId: string, status: "succeeded" | "failed", errorMessage?: string): Promise<unknown> {

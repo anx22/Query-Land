@@ -102,8 +102,8 @@ test("parsePage flags rel=nofollow links and decodes entity-encoded hrefs", () =
   const html = `<a href="/keep?a=1&amp;b=2">k</a><a href="/skip" rel="nofollow ugc">s</a>`;
   const links = parsePage(html, "https://example.com/").links;
   assert.deepEqual(links, [
-    { url: "https://example.com/keep?a=1&b=2", nofollow: false },
-    { url: "https://example.com/skip", nofollow: true }
+    { url: "https://example.com/keep?a=1&b=2", nofollow: false, anchor: "k", rel: null },
+    { url: "https://example.com/skip", nofollow: true, anchor: "s", rel: "nofollow ugc" }
   ]);
 });
 
@@ -485,6 +485,7 @@ function apiClientForStore(store: Store): CrawlWorkerApiClient {
     recordIndexabilityAssessment: (projectId, siteId, discoveredUrlId, assessment) => post(`/projects/${projectId}/sites/${siteId}/discovered-urls/${discoveredUrlId}/indexability`, assessment),
     recordAuditIssues: (projectId, siteId, issues, checkedDiscoveredUrlIds) => post(`/projects/${projectId}/sites/${siteId}/audit-issues`, { issues, checkedDiscoveredUrlIds }),
     computeHealthScore: (projectId, siteId) => post(`/projects/${projectId}/sites/${siteId}/health-scores/compute`, {}),
+    recordInternalLinks: (projectId, siteId, edges) => post(`/projects/${projectId}/sites/${siteId}/internal-links`, { edges }),
     completeCrawlRun: (projectId, siteId, crawlRunId, status, errorMessage) => post(`/projects/${projectId}/sites/${siteId}/crawl-runs/${crawlRunId}/complete`, { status, errorMessage }),
     completeJob: (jobId, status, lastError) => post(`/jobs/${jobId}/complete`, { status, lastError }),
     // Resumable-crawl extensions (migrations 016/017).
@@ -538,6 +539,25 @@ test("crawl worker follows in-scope links (BFS) across the whole link graph", as
   // seed + /a + /b + /a1 (reached via /a) — BFS, deduped (/b links back to / and /a).
   assert.equal(result.fetchedUrls, 4);
   assert.equal(result.truncated, false);
+  await store.close();
+});
+
+test("crawl worker persists internal link edges for the link graph (GAP-LINK-001)", async () => {
+  const store = await createStore("sqlite::memory:");
+  const { projectId, siteId } = await seedGraphJob(store);
+  const result = await runCrawlWorkerCycle({ apiClient: apiClientForStore(store), fetchImpl: linkGraphFetchImpl(LINK_GRAPH), now: () => "2026-06-03T10:00:00.000Z" });
+  assert.equal(result.status, "succeeded");
+
+  const app = createApp(store);
+  const norm = (p: string) => normalizeCrawlUrl(p, "https://example.com");
+  // /a links only to /a1 (outbound).
+  const outFromA = envelopeData<Array<{ toUrl: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/internal-links?direction=out&url=${encodeURIComponent(norm("/a"))}`));
+  assert.deepEqual(outFromA.map((e) => e.toUrl), [norm("/a1")]);
+  // /a1 is linked only from /a; the fixture renders every anchor as text "x".
+  const inToA1 = envelopeData<Array<{ fromUrl: string; anchor: string | null }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/internal-links?direction=in&url=${encodeURIComponent(norm("/a1"))}`));
+  assert.equal(inToA1.length, 1);
+  assert.equal(inToA1[0]?.fromUrl, norm("/a"));
+  assert.equal(inToA1[0]?.anchor, "x");
   await store.close();
 });
 

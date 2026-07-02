@@ -81,6 +81,14 @@ export interface RobotsPolicy {
   crawlDelays?: Record<string, number>;
 }
 
+/** One same-site internal link edge to persist (matches the API's internal-links POST body items). */
+export interface InternalLinkEdgeInput {
+  fromUrl: string;
+  toUrl: string;
+  anchor?: string | null;
+  rel?: string | null;
+}
+
 export interface CrawlWorkerApiClient {
   claimNextJob(): Promise<FoundationJob | null>;
   createCrawlRun(projectId: string, siteId: string, trigger: "manual" | "scheduled" | "deploy"): Promise<{ id: string }>;
@@ -100,6 +108,9 @@ export interface CrawlWorkerApiClient {
   countPendingCrawlFrontier?(projectId: string, siteId: string, crawlRunId: string): Promise<number>;
   recordCrawlPageSignals?(projectId: string, siteId: string, crawlRunId: string, signals: Array<Omit<CrawlPageSignal, "crawlRunId">>): Promise<{ recorded: number }>;
   listCrawlPageSignals?(projectId: string, siteId: string, crawlRunId: string): Promise<CrawlPageSignal[]>;
+  /** Persist same-site internal link edges for the link graph (GAP-LINK-001). Optional: absent on
+   *  minimal/in-process clients, in which case the crawl cycle skips edge recording. */
+  recordInternalLinks?(projectId: string, siteId: string, edges: InternalLinkEdgeInput[]): Promise<{ inserted: number; updated: number }>;
   /** Enqueue a continuation crawl_seed job (same crawlRunId, resume:true). */
   createCrawlSeedJob?(projectId: string, subject: string, payload: Record<string, unknown>): Promise<unknown>;
 }

@@ -175,6 +175,18 @@ export async function runCrawlWorkerCycle(options: CrawlWorkerCycleOptions): Pro
         await options.apiClient.recordIndexabilityAssessment(job.projectId, siteId, stored.id, { ...assessment, fetchResultId: storedFetch.id, assessedAt: now() });
         fetchedUrls += 1;
 
+        // Persist same-site internal link edges for the link graph (GAP-LINK-001).
+        // Bundled per page; nofollow edges are kept (the `rel` column records it).
+        // Skipped when the client can't record edges (minimal/in-process clients).
+        if (options.apiClient.recordInternalLinks) {
+          const edges = (page.parsed?.links ?? [])
+            .filter((link) => isInCrawlScope(link.url, effectiveBase, scopeType))
+            .map((link) => ({ fromUrl: url, toUrl: link.url, anchor: link.anchor, rel: link.rel }));
+          if (edges.length > 0) {
+            await options.apiClient.recordInternalLinks(job.projectId, siteId, edges);
+          }
+        }
+
         if (depth >= maxDepth) return [];
         return (page.parsed?.links ?? [])
           .filter((link) => !link.nofollow)
@@ -366,8 +378,14 @@ async function runResumableCrawlWorkerCycle(options: CrawlWorkerCycleOptions): P
           await api.recordIndexabilityAssessment(projectId, siteId, storedId, { ...assessment, fetchResultId: (storedFetch as { id: string }).id, assessedAt: now() });
           fetchedThisRun += 1;
 
-          const inScopeLinks = parsed.links.map((l) => l.url).filter((l) => isInCrawlScope(l, effectiveBase, scopeType));
-          await api.recordCrawlPageSignals!(projectId, siteId, crawlRunId, [{ normalizedUrl: url, finalUrl: fetchResult.finalUrl, statusCode: fetchResult.statusCode, title: parsed.title, canonicalUrl: parsed.canonicalUrl, outgoingLinks: inScopeLinks.map((l) => ({ url: l, statusCode: null })) }]);
+          const inScopeLinks = parsed.links.filter((l) => isInCrawlScope(l.url, effectiveBase, scopeType));
+          await api.recordCrawlPageSignals!(projectId, siteId, crawlRunId, [{ normalizedUrl: url, finalUrl: fetchResult.finalUrl, statusCode: fetchResult.statusCode, title: parsed.title, canonicalUrl: parsed.canonicalUrl, outgoingLinks: inScopeLinks.map((l) => ({ url: l.url, statusCode: null })) }]);
+
+          // Persist same-site internal link edges (GAP-LINK-001), bundled per page.
+          if (api.recordInternalLinks) {
+            const edges = inScopeLinks.map((l) => ({ fromUrl: url, toUrl: l.url, anchor: l.anchor, rel: l.rel }));
+            if (edges.length > 0) await api.recordInternalLinks(projectId, siteId, edges);
+          }
 
           if (depth < maxDepth && baselineProcessed + fetchedThisRun < maxUrls) {
             const fresh = parsed.links.filter((l) => !l.nofollow).map((l) => l.url).filter((l) => isInCrawlScope(l, effectiveBase, scopeType)).filter((l) => passesFrontierGuards(l, distinctQueryByPath, options));

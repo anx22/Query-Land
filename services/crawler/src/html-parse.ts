@@ -18,6 +18,10 @@ export interface ParsedLink {
   url: string;
   /** True when the anchor's rel attribute contains `nofollow` (frontier skips it). */
   nofollow: boolean;
+  /** Visible anchor text (whitespace-collapsed), or null when empty. First occurrence wins. */
+  anchor: string | null;
+  /** Raw `rel` attribute value, or null when absent. */
+  rel: string | null;
 }
 
 export interface ParsedPage {
@@ -104,9 +108,11 @@ function extractLinks(root: HTMLElement, base: string): ParsedLink[] {
     }
 
     const nofollow = relTokens(anchor).includes("nofollow");
+    const anchorText = (anchor.text ?? "").replace(/\s+/g, " ").trim() || null;
+    const rel = (anchor.getAttribute("rel") ?? "").trim() || null;
     const existing = byUrl.get(normalized);
     if (!existing) {
-      byUrl.set(normalized, { url: normalized, nofollow });
+      byUrl.set(normalized, { url: normalized, nofollow, anchor: anchorText, rel });
     } else if (existing.nofollow && !nofollow) {
       // If the same URL is linked both with and without nofollow, treat it as
       // followable — a single followable path is enough to discover it.
