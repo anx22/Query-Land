@@ -38,7 +38,8 @@ npm --workspace @seo-tool/web dev
 
 Ein einzelnes Vercel-Projekt (Root `apps/web`) bündelt Frontend und API. Das Crawling läuft in-process
 über die Vercel-Cron-Route `/api/cron/crawl` (täglich, per `CRON_SECRET`) — kein externer Daemon.
-Setup-Anleitungen: [`DOCS/deployment/`](DOCS/deployment/).
+Vercel-/Cron-Konfiguration lebt im Code (`next.config.mjs`, `/api/cron/crawl`, `.env.example`); für die
+Google-Search-Console-Verbindung siehe [`DOCS/gsc-oauth-setup.md`](DOCS/gsc-oauth-setup.md).
 
 ## Doku
 

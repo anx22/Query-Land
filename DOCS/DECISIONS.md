@@ -37,4 +37,4 @@ Google-Konto am Einwilligungs-Bildschirm und sieht nur seine eigene Property. Ni
 (Wem „gehört" ein Connector? Rollen/Memberships?). **Optionen:** (a) Status quo (projekt-scoped,
 Single-Org) · (b) User↔Projekt-Membership + Rollen · (c) volle Mehrmandanten-Architektur. **Zu entscheiden,
 bevor** die App für externe/mehrere Nutzer geöffnet wird (dann auch Veröffentlichung/Verifizierung des
-Google-Consent-Screens nötig). Setup-Anleitung: [`deployment/google-oauth-setup.md`](./deployment/google-oauth-setup.md).
+Google-Consent-Screens nötig). Setup-Anleitung: [`gsc-oauth-setup.md`](./gsc-oauth-setup.md).

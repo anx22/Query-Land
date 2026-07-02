@@ -33,7 +33,7 @@ Das Produkt läuft; „live-echt" wird es mit **Credentials**, nicht mit Umbau:
 
 - **GSC-OAuth-Credentials** — 4 Env-Vars in Vercel (`GOOGLE_CLIENT_ID/SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`,
   `OAUTH_ENCRYPTION_KEY`) → der GSC-Connect-Button wird aktiv, echte Klicks/Impressionen/Positionen
-  fließen. Anleitung: [`deployment/google-oauth-setup.md`](./deployment/google-oauth-setup.md).
+  fließen. Anleitung: [`gsc-oauth-setup.md`](./gsc-oauth-setup.md).
 - **AuthZ scharf** — Web-Layer muss das Session-Token bei serverseitigen API-Calls weiterreichen, dann
   `AUTH_GATE_ENABLED=true`. Erst danach ist der Actor echt (statt `"system"`).
 - **PSI-API-Key** (optional) — schaltet echte Web-Vitals statt Stub frei.

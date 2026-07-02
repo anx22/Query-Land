@@ -1,7 +1,7 @@
 # Query-Land — Brand & Design
 
 > **Die einzige Brand-&-Design-Quelle.** Kanonische Tokens: `apps/web/src/app/globals.css` (die Datei
-> gewinnt bei Konflikt) · Assets/Vokabular: `/brand/README.md`. Stilfamilie: **Editorial Tech**
+> gewinnt bei Konflikt) · Assets/Vokabular: `/brand/brand-kit.md`. Stilfamilie: **Editorial Tech**
 > (Broadsheet × Devtool) — Serif-Headlines + Mono-Daten sind die Signatur.
 
 ## Verbindliche Entscheidungen
@@ -25,7 +25,7 @@ in der Produkt-UI.
 ## 2. Wortmarke & Logo
 - **Wortmarke `Query-Land`:** Literata 700, `letter-spacing: -0.03em`. **Genau eine** orange Geste pro
   Lockup (empfohlen: der Bindestrich orange, oder ein orange Punkt am Ende) — nie das ganze Wort orange.
-- **Kartografisches Mark-System** (ein Terrain, drei Ansichten; Vokabular `/brand/README.md`):
+- **Kartografisches Mark-System** (ein Terrain, drei Ansichten; Vokabular `/brand/brand-kit.md`):
   **Horizont** (Höhenzüge + orange Sonne) → Hero/Overview-Header · **Ridges** (Höhenlinien-Bänder) →
   Unterseiten-Header · **Contours** (konzentrische Ringe + Such-Fokuspunkt) → Logomark/Daten-Textur.
   Charcoal-1px, nie gefüllt, wie eine technische Zeichnung. Favicon = innerster orange Höhenring.

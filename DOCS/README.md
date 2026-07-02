@@ -13,11 +13,11 @@ man es betreibt. Sie doppelt nicht den Code; Details leben im Code und im API-Ve
 
 ## Arbeiten & Betreiben
 - [`MONOREPO_CONVENTIONS.md`](./MONOREPO_CONVENTIONS.md) — Workspace-Grenzen, Import-Regeln, Checks.
-- [`deployment/`](./deployment/) — Vercel-Setup, Cron-Crawl-Worker, Google-OAuth (GSC).
+- [`gsc-oauth-setup.md`](./gsc-oauth-setup.md) — Google Search Console verbinden (Env-Vars + Consent-Screen). Vercel-/Cron-Config lebt im Code.
 - [`openapi/internal-api.yaml`](./openapi/internal-api.yaml) — API-Vertrag (UI + Agent/MCP teilen den Kern).
 
 ## Marke & Design
 - [`design/brand-identity.md`](./design/brand-identity.md) — die einzige Brand-&-Design-Quelle.
-  Kanonische Tokens: `apps/web/src/app/globals.css`. Assets: [`../brand/README.md`](../brand/README.md).
+  Kanonische Tokens: `apps/web/src/app/globals.css`. Assets: [`../brand/brand-kit.md`](../brand/brand-kit.md).
 
 > Bei Konflikt gewinnt der Master-Spec fürs Produkt und `globals.css` für Design-Tokens.

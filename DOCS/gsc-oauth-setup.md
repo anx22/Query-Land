@@ -61,6 +61,3 @@ Hinweise:
 3. **Content & Chancen** → „Search Performance synchronisieren" → echte Zeilen + Optimierungschancen.
 4. **Keywords & Rankings** → Keyword anlegen → Ranking messen → Position/Visibility füllen sich.
 5. Nach ~1 Stunde erneut synchronisieren: das abgelaufene Access-Token wird automatisch erneuert.
-
-Siehe auch `DOCS/deployment/vercel-single-deployment.md` für das übrige Deployment (DATABASE_URL,
-CRON_SECRET).
