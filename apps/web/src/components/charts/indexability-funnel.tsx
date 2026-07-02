@@ -8,7 +8,7 @@
  * Rendered as a sequence of horizontal proportional bars (SVG-free, CSS-based)
  * driven by the sequential color scale. Per-stage drop is shown as a DeltaChip
  * in --danger. Stages whose value is null render an honest empty marker ("—")
- * rather than a fabricated number (e.g. "Indexiert" needs GSC coverage data).
+ * rather than a fabricated number ("Indexiert" fills from the GSC URL-inspection sync).
  *
  * Serious-Zone: factual labels, functional colors, no metaphor.
  * A11y: role="img" + aria-label summary; each row has readable text.
@@ -84,7 +84,7 @@ export function IndexabilityFunnel({
                 />
               ) : (
                 <span className="audit-funnel__missing">
-                  keine Daten — benötigt GSC-Abdeckung
+                  noch nicht geprüft
                 </span>
               )}
             </div>

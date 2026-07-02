@@ -329,19 +329,33 @@ class SQLiteContentStore implements ContentStore {
 
   async listRefreshCandidates(projectId: string, siteId: string, options: { limit?: number } = {}): Promise<RefreshCandidate[]> {
     await this.assertSiteScope(projectId, siteId);
-    // Decay is derived deterministically from the clicks time-series: trend = latest - earliest.
-    // One grouped query collapses each URL's history to its earliest/latest clicks (only URLs with
-    // >= 2 points qualify) instead of pulling the full history and aggregating in app code.
+    // Decay is derived from a clicks time-series per URL. Primary source is the real GSC
+    // `search_performance_rows` (each sync round writes a fresh set of (query, page) rows stamped with
+    // its captured_at); `page_metrics` is unioned in as an optional manual override. We sum clicks per
+    // URL within each round, then take the earliest/latest round per URL (only URLs seen in >= 2 rounds
+    // qualify for a trend). trend = latest - earliest.
     const trendRows = await this.db.prepare(
-      `SELECT url,
-              (array_agg(value ORDER BY captured_at ASC))[1]  AS earliest,
-              (array_agg(value ORDER BY captured_at DESC))[1] AS latest
-         FROM page_metrics
-        WHERE project_id = ? AND site_id = ? AND metric = 'clicks'
+      `WITH points AS (
+         SELECT page_url AS url, captured_at, SUM(clicks) AS clicks
+           FROM search_performance_rows
+          WHERE project_id = ? AND site_id = ?
+          GROUP BY page_url, captured_at
+         UNION ALL
+         SELECT url, captured_at, value AS clicks
+           FROM page_metrics
+          WHERE project_id = ? AND site_id = ? AND metric = 'clicks'
+       ),
+       per_round AS (
+         SELECT url, captured_at, SUM(clicks) AS clicks FROM points GROUP BY url, captured_at
+       )
+       SELECT url,
+              (array_agg(clicks ORDER BY captured_at ASC))[1]  AS earliest,
+              (array_agg(clicks ORDER BY captured_at DESC))[1] AS latest
+         FROM per_round
         GROUP BY url
        HAVING COUNT(*) >= 2
         ORDER BY url ASC`
-    ).all(projectId, siteId) as Array<{ url: string; earliest: number; latest: number }>;
+    ).all(projectId, siteId, projectId, siteId) as Array<{ url: string; earliest: number; latest: number }>;
 
     // One grouped query for all open-issue counts, keyed by URL (default 0 when absent).
     const issueRows = await this.db.prepare(
@@ -483,9 +497,24 @@ class SQLiteContentStore implements ContentStore {
   }
 
   private async clicksTrendForUrl(projectId: string, siteId: string, url: string): Promise<number> {
-    const rows = await this.db.prepare(`SELECT value FROM page_metrics WHERE project_id = ? AND site_id = ? AND url = ? AND metric = 'clicks' ORDER BY captured_at ASC`).all(projectId, siteId, url) as Array<{ value: number }>;
+    // Clicks trend from the real GSC search-performance rows (with page_metrics as optional manual
+    // override): sum clicks per sync round for this URL, then trend = latest round - earliest round
+    // (needs >= 2 rounds).
+    const rows = await this.db.prepare(
+      `WITH points AS (
+         SELECT captured_at, SUM(clicks) AS clicks
+           FROM search_performance_rows
+          WHERE project_id = ? AND site_id = ? AND page_url = ?
+          GROUP BY captured_at
+         UNION ALL
+         SELECT captured_at, value AS clicks
+           FROM page_metrics
+          WHERE project_id = ? AND site_id = ? AND url = ? AND metric = 'clicks'
+       )
+       SELECT SUM(clicks) AS clicks FROM points GROUP BY captured_at ORDER BY captured_at ASC`
+    ).all(projectId, siteId, url, projectId, siteId, url) as Array<{ clicks: number }>;
     if (rows.length < 2) return 0;
-    return Math.round(Number(rows[rows.length - 1].value) - Number(rows[0].value));
+    return Math.round(Number(rows[rows.length - 1].clicks) - Number(rows[0].clicks));
   }
 
   private mapRecommendation(row: Record<string, unknown>): ContentRecommendation {

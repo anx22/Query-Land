@@ -5,7 +5,7 @@ import { ConnectionBadge } from "../../components/connection-badge";
 import { SubmitButton } from "../../components/submit-button";
 import { StatusList } from "../../components/status-list";
 import { loadFoundationDashboardData } from "../../lib/foundation-api";
-import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckAction, scheduleConnectorSyncAction } from "./actions";
+import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckAction, scheduleConnectorSyncAction, syncConnectorNowAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +143,13 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
           ) : (
             <p className="muted">Noch keine Datenquelle verbunden.</p>
           )}
+          {selectedProject && data.integrations.some((integration) => integration.provider === "gsc" && integration.status === "connected") ? (
+            <form action={syncConnectorNowAction} className="stack">
+              <input type="hidden" name="projectId" value={selectedProject.id} />
+              <SubmitButton pendingLabel="synchronisiert …">Jetzt synchronisieren</SubmitButton>
+              <p className="muted">Holt sofort aktuelle Rankings, Klicks, Sichtbarkeit und Index-Status — statt auf den täglichen Abgleich zu warten.</p>
+            </form>
+          ) : null}
         </div>
       </section>
 
@@ -312,5 +319,8 @@ function feedbackMessage(params: Record<string, string | string[] | undefined> |
   if (createdValue) return { kind: "success", message: `${providerLabel(createdValue)} wurde verbunden.` };
   const scheduledValue = single(params?.scheduled);
   if (scheduledValue) return { kind: "success", message: `Datenabgleich für ${providerLabel(scheduledValue)} wurde geplant.` };
+  const syncedValue = single(params?.synced);
+  if (syncedValue === "empty") return { kind: "success", message: "Abgleich abgeschlossen — Google hat für dieses Projekt noch keine Daten geliefert (bei neu verifizierten Properties dauert das oft ein paar Tage)." };
+  if (syncedValue) return { kind: "success", message: "Datenabgleich abgeschlossen — Rankings, Klicks, Sichtbarkeit und Index-Status sind aktualisiert." };
   return null;
 }

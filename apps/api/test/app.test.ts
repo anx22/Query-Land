@@ -13,7 +13,7 @@ async function testApp() {
 }
 
 test("migrations are versioned and idempotent", async () => {
-  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql", "015_report_webhook_channel.sql", "016_crawl_frontier.sql", "017_crawl_page_signals.sql"];
+  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql", "015_report_webhook_channel.sql", "016_crawl_frontier.sql", "017_crawl_page_signals.sql", "018_url_index_status.sql"];
   const db = await createDatabase("sqlite::memory:");
   try {
     const first = await runMigrations(db);
@@ -39,7 +39,8 @@ test("migrations are versioned and idempotent", async () => {
       { version: 14, name: "content_workspace" },
       { version: 15, name: "report_webhook_channel" },
       { version: 16, name: "crawl_frontier" },
-      { version: 17, name: "crawl_page_signals" }
+      { version: 17, name: "crawl_page_signals" },
+      { version: 18, name: "url_index_status" }
     ]);
 
     const second = await runMigrations(db);

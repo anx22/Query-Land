@@ -25,6 +25,8 @@ export interface LatestKeywordPosition {
 
 export interface RankStore {
   recordRankSnapshot(projectId: string, keywordId: string, options?: RecordRankOptions): Promise<RankSnapshotResult>;
+  /** Record a fresh rank/SERP snapshot for every tracked keyword of the project (one refresh round). */
+  refreshRankSnapshots(projectId: string, options?: RecordRankOptions): Promise<{ recorded: number; failed: number }>;
   listRankSnapshots(projectId: string, keywordId: string): Promise<RankSnapshot[]>;
   /** Latest rank snapshot per keyword for a project (one query, no per-keyword fan-out). */
   latestKeywordPositions(projectId: string, market?: string): Promise<LatestKeywordPosition[]>;
@@ -81,6 +83,26 @@ class SQLiteRankStore implements RankStore {
       serpSnapshot: { id: serpSnapshotId, projectId, keywordId, market, device, capturedAt: now, results: fetched.results, serpFeatures: fetched.serpFeatures, ownPosition: fetched.ownPosition, sourceConfidence: provider.sourceConfidence },
       rankSnapshot: { id: rankSnapshotId, projectId, keywordId, serpSnapshotId, market, device, position: fetched.ownPosition, url: ownResult?.url ?? null, capturedAt: now, sourceConfidence: provider.sourceConfidence }
     };
+  }
+
+  async refreshRankSnapshots(projectId: string, options: RecordRankOptions = {}): Promise<{ recorded: number; failed: number }> {
+    if (!await this.db.prepare(`SELECT 1 FROM projects WHERE id = ?`).get(projectId)) {
+      throw new RequestError(404, "unknown_project", "Project not found");
+    }
+    // One snapshot per tracked keyword, reusing the single-keyword path (which resolves the SERP
+    // provider = live GSC position when connected). A single keyword failing must not abort the round.
+    const keywords = await this.db.prepare(`SELECT id FROM keywords WHERE project_id = ?`).all(projectId) as Array<{ id: string }>;
+    let recorded = 0;
+    let failed = 0;
+    for (const keyword of keywords) {
+      try {
+        await this.recordRankSnapshot(projectId, String(keyword.id), options);
+        recorded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    return { recorded, failed };
   }
 
   async listRankSnapshots(projectId: string, keywordId: string): Promise<RankSnapshot[]> {

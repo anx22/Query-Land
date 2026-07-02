@@ -19,6 +19,7 @@ import { createRankStore, type RankStore } from "./stores/rank-store.js";
 import { createReportStore, type ReportStore } from "./stores/report-store.js";
 import { createSearchPerformanceStore, type SearchPerformanceStore } from "./stores/search-performance-store.js";
 import { createSourceMapStore, type SourceMapStore } from "./stores/source-map-store.js";
+import { createUrlIndexStore, type UrlIndexStore } from "./stores/url-index-store.js";
 import { RequestError } from "./stores/store-errors.js";
 import { seedFoundation } from "./seed.js";
 
@@ -26,7 +27,7 @@ export interface HealthStore {
   health(): HealthSnapshot;
 }
 
-export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore & ContentStore & {
+export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore & JobStore & SourceMapStore & LinkGraphStore & OpportunityStore & KeywordStore & RankStore & SearchPerformanceStore & UrlIndexStore & BacklinkStore & ReportStore & AlertStore & AiStore & ProposalStore & ContentStore & {
   close(): Promise<void>;
 };
 
@@ -34,7 +35,7 @@ export type BackendStore = HealthStore & AuthStore & ProjectStore & CrawlStore &
 export type Store = BackendStore;
 
 export { RequestError };
-export type { AiStore, AlertStore, AuthStore, BacklinkStore, ContentStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, ProposalStore, RankStore, RecordAuditIssuesScope, RegisterInput, ReportStore, SearchPerformanceStore, SourceMapStore };
+export type { AiStore, AlertStore, AuthStore, BacklinkStore, ContentStore, CrawlStore, JobStore, KeywordStore, LinkGraphStore, LoginResult, OpportunityStore, ProjectStore, ProposalStore, RankStore, RecordAuditIssuesScope, RegisterInput, ReportStore, SearchPerformanceStore, SourceMapStore, UrlIndexStore };
 
 /** Create the Postgres-backed store (Neon prod / PGlite local). */
 export async function createStore(databaseUrl = apiDefaults.databaseUrl): Promise<BackendStore> {
@@ -67,6 +68,7 @@ export async function createStoreWithDatabase(databaseUrl = apiDefaults.database
     createKeywordStore(db, audit),
     createRankStore(db, audit),
     createSearchPerformanceStore(db, audit),
+    createUrlIndexStore(db, audit),
     createBacklinkStore(db, audit),
     createReportStore(db, audit),
     createAlertStore(db, audit),
