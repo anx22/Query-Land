@@ -144,6 +144,12 @@ class SQLiteProjectStore implements ProjectStore {
     return site;
   }
 
+  /**
+   * Alle Integrationen projektübergreifend (bewusst NICHT projekt-gescoped) — nur für den
+   * vertrauenswürdigen, projektübergreifenden Connector-Sync-Drain (Cron) gedacht. Enthält keine
+   * Tokens (mapIntegration lässt auth_config weg). Für nutzer-/UI-seitigen Zugriff eine projekt-
+   * gescopte Variante ergänzen, statt diese zu scopen (sonst bricht der Cron-Drain).
+   */
   async listIntegrations(): Promise<IntegrationStatusView[]> {
     const rows = await this.db.prepare(`SELECT * FROM integration_accounts ORDER BY created_at ASC`).all();
     // One grouped query for the latest evidence timestamp per account, instead of a per-row lookup.

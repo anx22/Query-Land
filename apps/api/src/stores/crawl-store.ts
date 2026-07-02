@@ -55,12 +55,16 @@ export interface CrawlStore {
   computeHealthScore(projectId: string, siteId: string): Promise<CrawlHealthScore>;
   listAuditIssues(projectId: string, siteId: string): Promise<AuditIssueRecord[]>;
   listAuditIssuesPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: AuditIssueListFilters): Promise<ListPage<AuditIssueRecord>>;
+  /** Project-wide top-N open audit issues, severity-ranked in SQL (critical→low). One query across all sites. */
+  listTopOpenAuditIssuesByProject(projectId: string, limit: number): Promise<AuditIssueRecord[]>;
   recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): Promise<{ issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number }>;
   resolveAuditIssue(projectId: string, siteId: string, issueId: string, actor?: string): Promise<AuditIssueRecord>;
   dismissAuditIssue(projectId: string, siteId: string, issueId: string, reason?: string | null, actor?: string): Promise<AuditIssueRecord>;
   reopenAuditIssue(projectId: string, siteId: string, issueId: string, actor?: string): Promise<AuditIssueRecord>;
   listAuditIssueHistory(projectId: string, siteId: string, issueId: string): Promise<AuditIssueHistoryEntry[]>;
   listDiscoveredUrls(projectId: string, siteId?: string): Promise<DiscoveredUrl[]>;
+  /** Resolve one discovered URL in a project by url OR normalized_url (optionally site-scoped), in a single indexed query. */
+  findDiscoveredUrlInProject(projectId: string, url: string, siteId?: string): Promise<DiscoveredUrl | null>;
   listDiscoveredUrlsPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): Promise<ListPage<DiscoveredUrl>>;
   listUrlExplorerRows(projectId: string, siteId: string, options?: ListPageOptions, filters?: DiscoveredUrlListFilters): Promise<ListPage<UrlExplorerRow>>;
   recordDiscoveredUrls(projectId: string, siteId: string, urls: DiscoveredUrl[]): Promise<{ urls: DiscoveredUrl[]; inserted: number; updated: number }>;
@@ -328,17 +332,46 @@ class SQLiteCrawlStore implements CrawlStore {
     return createListPage(data, limit, offset, total);
   }
 
+  async listTopOpenAuditIssuesByProject(projectId: string, limit: number): Promise<AuditIssueRecord[]> {
+    // One query across all sites in the project, severity-ranked in SQL so the MCP
+    // summary no longer over-fetches up to 200 issues per site just to keep the top few.
+    return (await this.db.prepare(`
+      SELECT * FROM audit_issues
+      WHERE project_id = ? AND resolved_at IS NULL AND dismissed_at IS NULL
+      ORDER BY
+        CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END ASC,
+        detected_at DESC, id ASC
+      LIMIT ?
+    `).all(projectId, limit)).map(mapAuditIssueRecord);
+  }
+
   async recordAuditIssues(projectId: string, siteId: string, issues: AuditIssueRecord[], scope: RecordAuditIssuesScope): Promise<{ issues: AuditIssueRecord[]; inserted: number; updated: number; resolved: number }> {
     await this.assertSiteScope(projectId, siteId);
     const checkedDiscoveredUrlIds = [...new Set(scope.checkedDiscoveredUrlIds)];
-    for (const discoveredUrlId of checkedDiscoveredUrlIds) {
-      await this.assertDiscoveredUrlScope(projectId, siteId, discoveredUrlId);
-    }
-
     const checkedDiscoveredUrlIdSet = new Set(checkedDiscoveredUrlIds);
-    const checkedUrlRows = await Promise.all(checkedDiscoveredUrlIds.map((discoveredUrlId) =>
-      this.db.prepare(`SELECT url, normalized_url FROM discovered_urls WHERE id = ? AND project_id = ? AND site_id = ?`).get(discoveredUrlId, projectId, siteId)
-    ));
+
+    // One batched fetch replaces both the per-id scope-assert loop and the per-id url
+    // lookup (previously 2 Postgres round-trips per checked URL). Each `?` is translated
+    // positionally to $N (db/sql-translate.ts), so a dynamic IN-list binds correctly on
+    // both Neon and PGlite.
+    const checkedUrlRowById = new Map<string, { url: string; normalized_url: string }>();
+    if (checkedDiscoveredUrlIds.length > 0) {
+      const placeholders = checkedDiscoveredUrlIds.map(() => "?").join(", ");
+      const rows = await this.db.prepare(
+        `SELECT id, url, normalized_url FROM discovered_urls WHERE id IN (${placeholders}) AND project_id = ? AND site_id = ?`
+      ).all(...checkedDiscoveredUrlIds, projectId, siteId);
+      for (const row of rows) {
+        checkedUrlRowById.set(String(row.id), { url: String(row.url), normalized_url: String(row.normalized_url) });
+      }
+      // Preserve the scope assert: every checked id must exist in this project/site scope.
+      for (const discoveredUrlId of checkedDiscoveredUrlIds) {
+        if (!checkedUrlRowById.has(discoveredUrlId)) {
+          throw new RequestError(404, "unknown_discovered_url", "Referenced discovered URL does not exist", { projectId, siteId, discoveredUrlId });
+        }
+      }
+    }
+    // Index-aligned to checkedDiscoveredUrlIds for the stale-issue query below.
+    const checkedUrlRows = checkedDiscoveredUrlIds.map((id) => checkedUrlRowById.get(id) ?? null);
     const checkedUrlSet = new Set(checkedUrlRows.flatMap((row) => (row ? [String(row.url), String(row.normalized_url)] : [])));
 
     for (const issue of issues) {
@@ -346,8 +379,12 @@ class SQLiteCrawlStore implements CrawlStore {
         throw new RequestError(400, "issue_scope_mismatch", "Audit issue projectId/siteId must match the route scope", { issueId: issue.id });
       }
       if (issue.discoveredUrlId) {
-        await this.assertDiscoveredUrlScope(projectId, siteId, issue.discoveredUrlId);
+        // Checked ids were already proven to exist via the batched fetch above, so skip
+        // the per-issue DB assert for them. Ids outside the checked set keep the exact
+        // prior behavior: assert existence first (may throw unknown_discovered_url), then
+        // reject as out-of-scope.
         if (!checkedDiscoveredUrlIdSet.has(issue.discoveredUrlId)) {
+          await this.assertDiscoveredUrlScope(projectId, siteId, issue.discoveredUrlId);
           throw new RequestError(400, "issue_scope_mismatch", "Audit issue discoveredUrlId must be included in checkedDiscoveredUrlIds", { issueId: issue.id, discoveredUrlId: issue.discoveredUrlId });
         }
       } else if (checkedDiscoveredUrlIds.length > 0 && !checkedUrlSet.has(issue.url)) {
@@ -377,8 +414,18 @@ class SQLiteCrawlStore implements CrawlStore {
       }
     }
 
+    // One batched existence check replaces the per-issue SELECT that only fed the
+    // inserted-vs-updated counter (the ON CONFLICT below already upserts correctly).
+    const existingIssueIds = new Set<string>();
+    if (issues.length > 0) {
+      const ids = issues.map((issue) => issue.id);
+      const placeholders = ids.map(() => "?").join(", ");
+      const existingRows = await this.db.prepare(`SELECT id FROM audit_issues WHERE id IN (${placeholders})`).all(...ids);
+      for (const row of existingRows) existingIssueIds.add(String(row.id));
+    }
+
     for (const issue of issues) {
-      const existing = await this.db.prepare(`SELECT id FROM audit_issues WHERE id = ?`).get(issue.id);
+      const existing = existingIssueIds.has(issue.id);
       await this.db.prepare(`
         INSERT INTO audit_issues (id, project_id, site_id, discovered_url_id, url, rule, severity, message, detected_at, resolved_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -392,7 +439,14 @@ class SQLiteCrawlStore implements CrawlStore {
           resolved_at = excluded.resolved_at,
           updated_at = excluded.updated_at
       `).run(issue.id, projectId, siteId, issue.discoveredUrlId, issue.url, issue.rule, issue.severity, issue.message, issue.detectedAt, issue.resolvedAt, now);
-      existing ? updated += 1 : inserted += 1;
+      // Keep the counter exact even if `issues` repeats an id within one call: a freshly
+      // inserted id counts as updated on its next occurrence (matches the old per-row SELECT).
+      if (existing) {
+        updated += 1;
+      } else {
+        inserted += 1;
+        existingIssueIds.add(issue.id);
+      }
     }
     const stored = await this.listAuditIssues(projectId, siteId);
     await this.audit("system", "crawl.issues.record", "site", siteId, { projectId, checkedDiscoveredUrlIds, inserted, updated, resolved, total: stored.length });
@@ -478,6 +532,14 @@ class SQLiteCrawlStore implements CrawlStore {
       ? await this.db.prepare(sql).all(projectId, siteId)
       : await this.db.prepare(sql).all(projectId);
     return rows.map(mapDiscoveredUrl);
+  }
+
+  async findDiscoveredUrlInProject(projectId: string, url: string, siteId?: string): Promise<DiscoveredUrl | null> {
+    // Single indexed lookup by url OR normalized_url, replacing an O(sites × pages) scan.
+    const row = siteId
+      ? await this.db.prepare(`SELECT * FROM discovered_urls WHERE project_id = ? AND site_id = ? AND (url = ? OR normalized_url = ?) LIMIT 1`).get(projectId, siteId, url, url)
+      : await this.db.prepare(`SELECT * FROM discovered_urls WHERE project_id = ? AND (url = ? OR normalized_url = ?) LIMIT 1`).get(projectId, url, url);
+    return row ? mapDiscoveredUrl(row) : null;
   }
 
   async listDiscoveredUrlsPage(projectId: string, siteId: string, options: ListPageOptions = {}, filters: DiscoveredUrlListFilters = {}): Promise<ListPage<DiscoveredUrl>> {

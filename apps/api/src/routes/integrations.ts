@@ -34,6 +34,12 @@ export const routeIntegrations: ResourceRoute = async (store, method, pathname, 
   }
 
   if (pathname !== "/integrations") return null;
+  // Bewusst NICHT projekt-gescoped: der tägliche Connector-Sync-Drain
+  // (apps/web/src/lib/connector-sync-cron.ts) braucht die projektübergreifende
+  // Liste aller Integrationen. Trusted internal caller (Cron). Die id-adressierten
+  // Endpoints oben (getIntegration/runConnectorSync/scheduleConnectorSync) prüfen
+  // jeweils Existenz (404) und leiten projectId aus der Integration selbst ab.
+  // Nicht auf project-scoped umstellen, ohne den Cron-Contract mitzuziehen.
   if (method === "GET") return json(200, { data: await store.listIntegrations() });
   if (method === "POST") {
     const input = createIntegrationRequest(body);

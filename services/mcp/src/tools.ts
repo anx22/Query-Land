@@ -160,35 +160,15 @@ async function buildProjectSummary(store: BackendStore, projectId: string) {
 
   const openOpportunities = await store.listOpportunitiesPage(projectId, { limit: 1, offset: 0 }, { status: "open" });
 
-  // Top open audit issues across every site, severity-ranked (critical first).
-  const topIssues: AuditIssueRecord[] = [];
-  for (const site of sites) {
-    const page = await store.listAuditIssuesPage(projectId, site.id, { limit: MAX_PAGE, offset: 0 }, { status: "open" });
-    topIssues.push(...page.data);
-  }
-  topIssues.sort((left, right) => severityRank(left.severity) - severityRank(right.severity));
+  // Project-wide top open audit issues, severity-ranked in one SQL query (critical first).
+  const topOpenAuditIssues = await store.listTopOpenAuditIssuesByProject(projectId, 10);
 
   return {
     project,
     sites: siteHealth,
     openOpportunityCount: openOpportunities.total,
-    topOpenAuditIssues: topIssues.slice(0, 10)
+    topOpenAuditIssues
   };
-}
-
-function severityRank(severity: AuditIssueSeverity): number {
-  switch (severity) {
-    case "critical":
-      return 0;
-    case "high":
-      return 1;
-    case "medium":
-      return 2;
-    case "low":
-      return 3;
-    default:
-      return 4;
-  }
 }
 
 interface ResolvedUrlRow {
@@ -201,22 +181,17 @@ interface ResolvedUrlRow {
  * is omitted we scan all sites in the project. Matches url OR normalizedUrl.
  */
 async function resolveDiscoveredUrl(store: BackendStore, projectId: string, siteId: string | undefined, url: string): Promise<ResolvedUrlRow> {
-  const sites = siteId ? [await findSite(store, projectId, siteId)] : await store.listSites(projectId);
-  for (const site of sites) {
-    let offset = 0;
-    for (;;) {
-      const page = await store.listUrlExplorerRows(projectId, site.id, { limit: MAX_PAGE, offset });
-      const match = page.data.find(
-        (row) => row.discoveredUrl.url === url || row.discoveredUrl.normalizedUrl === url
-      );
-      if (match) {
-        return { site, discoveredUrl: match.discoveredUrl };
-      }
-      if (page.nextCursor === null || page.data.length === 0) break;
-      offset += page.data.length;
-    }
+  // Validate an explicit site up-front to preserve the prior unknown-site error path.
+  const explicitSite = siteId ? await findSite(store, projectId, siteId) : undefined;
+  const discoveredUrl = await store.findDiscoveredUrlInProject(projectId, url, siteId);
+  if (!discoveredUrl) {
+    throw new ToolError("unknown_url", `No discovered URL matching ${url} was found in project ${projectId}`);
   }
-  throw new ToolError("unknown_url", `No discovered URL matching ${url} was found in project ${projectId}`);
+  const site = explicitSite ?? (await store.listSites(projectId)).find((candidate) => candidate.id === discoveredUrl.siteId);
+  if (!site) {
+    throw new ToolError("unknown_url", `No discovered URL matching ${url} was found in project ${projectId}`);
+  }
+  return { site, discoveredUrl };
 }
 
 async function buildUrlDossier(store: BackendStore, projectId: string, siteId: string | undefined, url: string) {
