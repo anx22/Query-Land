@@ -370,6 +370,17 @@ async function TechnicalAuditBody({
   const indexableValue = indexableStage && indexableStage.value !== null ? indexableStage.value : null;
   const fmt = (n: number) => n.toLocaleString("de-DE");
 
+  // Work-area tab (Schicht 2): Bereiche / Issues / URLs. Derived from the active filters so that
+  // filtering issues/URLs (server-nav that drops other params) never resets the tab — an active
+  // issue/url filter implies its own tab; otherwise the explicit ?atab; otherwise Bereiche.
+  const atabParam = Array.isArray(params?.atab) ? params?.atab[0] : params?.atab;
+  const bellyTab: "bereiche" | "issues" | "urls" =
+    !isDefaultIssueFilter(data.activeIssueFilter) ? "issues"
+    : !isDefaultUrlExplorerFilter(data.activeUrlFilter) ? "urls"
+    : atabParam === "issues" ? "issues"
+    : atabParam === "urls" ? "urls"
+    : "bereiche";
+
   return (
     <>
       {actionBanner ? (
@@ -520,7 +531,25 @@ async function TechnicalAuditBody({
         </div>
       </div>
 
-      {/* Section treemap */}
+      {/* Schicht 2: work-area card-tabs — Bereiche / Issues / URLs. Server-rendered links; the active
+          tab is derived from the active filters (bellyTab), so filtering never resets the tab. */}
+      <div className="card-tabs">
+        <div className="card-tabs__bar" role="tablist" aria-label="Ansicht wählen">
+          <a href="/technical-audit" role="tab" aria-selected={bellyTab === "bereiche"} className={`card-tab${bellyTab === "bereiche" ? " card-tab--active" : ""}`}>
+            <span className="card-tab__row"><span className="card-tab__label">Bereiche</span><span className="card-tab__kpi">{fmt(data.sections.length)}</span></span>
+            <span className="card-tab__hint">Gesundheit je Website-Bereich</span>
+          </a>
+          <a href="/technical-audit?atab=issues" role="tab" aria-selected={bellyTab === "issues"} className={`card-tab${bellyTab === "issues" ? " card-tab--active" : ""}`}>
+            <span className="card-tab__row"><span className="card-tab__label">Issues</span><span className={`card-tab__kpi${data.openIssueTotal > 0 ? " card-tab__kpi--warn" : ""}`}>{fmt(data.openIssueTotal)} offen</span></span>
+            <span className="card-tab__hint">nach Regel &amp; Schweregrad</span>
+          </a>
+          <a href="/technical-audit?atab=urls" role="tab" aria-selected={bellyTab === "urls"} className={`card-tab${bellyTab === "urls" ? " card-tab--active" : ""}`}>
+            <span className="card-tab__row"><span className="card-tab__label">URLs</span><span className="card-tab__kpi">{fmt(data.urlExplorerMeta.total)}</span></span>
+            <span className="card-tab__hint">Status &amp; Indexierbarkeit je URL</span>
+          </a>
+        </div>
+        <div className="card-tabs__panel" role="tabpanel">
+      {bellyTab === "bereiche" ? (
       <section className="card">
         <p className="kicker">Gesundheit nach Website-Bereich</p>
         <p className="muted">
@@ -545,8 +574,7 @@ async function TechnicalAuditBody({
           Zeigt auf einen Blick, welche Bereiche der Website die meisten Probleme tragen.
         </WhyItMatters>
       </section>
-
-      {/* Issue groups */}
+      ) : bellyTab === "issues" ? (
       <section className="card">
         <p className="kicker">Issue-Gruppen</p>
         <p className="muted">
@@ -559,8 +587,7 @@ async function TechnicalAuditBody({
         <IssueFilterBar active={data.activeIssueFilter} />
         <IssueGroups groups={data.issueGroups} />
       </section>
-
-      {/* URL-Explorer */}
+      ) : (
       <section className="card">
         <p className="kicker">URL-Explorer</p>
         <p className="muted">
@@ -628,6 +655,9 @@ async function TechnicalAuditBody({
         <UrlExplorerTable rows={data.urlExplorerRows} />
         <Pagination page={urlPage} currentParams={currentParams} param="urlOffset" />
       </section>
+      )}
+        </div>
+      </div>
 
       {/* Secondary: run comparison, history & next steps — collapsed by default */}
       <details className="advanced-section">
