@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Führt die "Required checks before a sprint PR" aus
+      # (DOCS/MONOREPO_CONVENTIONS.md): typecheck + check:boundaries +
+      # check:css-classes + validate:openapi + test. Tests nutzen PGlite
+      # in-memory (sqlite::memory:), daher keine Secrets/DB nötig. Das
+      # NODE_ENV=test-Präfix im test-Skript ist POSIX und läuft auf Linux-CI.
+      - name: Run checks
+        run: npm run check
+
+  # Non-blocking: lint + format are informational until warnings are worked down.
+  # A red lint job must NOT block a merge (continue-on-error), unlike the `check` job.
+  lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check

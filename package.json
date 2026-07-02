@@ -17,14 +17,21 @@
     "check:css-classes": "npm --workspace @seo-tool/web run check:css-classes",
     "validate:openapi": "node scripts/validate-openapi.mjs",
     "check": "npm run typecheck && npm run check:boundaries && npm run check:css-classes && npm run validate:openapi && npm test",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
     "migrate:sqlite": "npm --workspace @seo-tool/api run build && node apps/api/dist/src/migrate-legacy.js",
     "smoke:crawl": "npm run build && node services/crawler/dist/src/smoke.js",
     "audit:crawl": "npm run build && NODE_ENV=test node services/crawler/dist/src/audit-harness.js",
     "build:web": "npm --workspace @seo-tool/web run build"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.19.11",
-    "typescript": "^5.9.2"
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.4",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.62.1"
   },
   "dependencies": {
     "next": "^15.3.3",

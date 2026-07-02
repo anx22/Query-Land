@@ -1,0 +1,7 @@
+**/dist/**
+**/.next/**
+**/node_modules/**
+.devdb/**
+**/coverage/**
+package-lock.json
+*.md
