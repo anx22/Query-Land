@@ -40,7 +40,14 @@ export const routeOpportunities: ResourceRoute = async (store, method, pathname,
     if (typeof status !== "string" || !STATUSES.includes(status as OpportunityStatus)) {
       throw new RequestError(400, "invalid_field", `status must be one of ${STATUSES.join(", ")}`);
     }
-    return json(200, { data: await store.transitionOpportunity(transitionMatch[1], status as OpportunityStatus) });
+    const transitioned = await store.transitionOpportunity(transitionMatch[1], status as OpportunityStatus);
+    // §6.5: reaching `implemented` schedules an asynchronous re-check. The daily cron drains
+    // opportunity_revalidate jobs and flips each to validated/reopened once fresh evidence lands.
+    if (transitioned.status === "implemented") {
+      const day = new Date().toISOString().slice(0, 10);
+      await store.createJob(transitioned.projectId, "opportunity_revalidate", `${transitioned.id}:${day}`, { opportunityId: transitioned.id });
+    }
+    return json(200, { data: transitioned });
   }
 
   const revalidateMatch = pathname.match(/^\/opportunities\/([^/]+)\/revalidate$/);

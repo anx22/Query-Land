@@ -6,7 +6,9 @@
  *   - "email":   send via Resend's REST API (https://api.resend.com/emails) using native fetch — no
  *                npm dependency, just RESEND_API_KEY + a sender. Falls back to an honest "skipped"
  *                when the key is absent (no fake "sent").
- *   - "slack" / unknown: no integration yet → honest "skipped".
+ *   - "slack":    POST a compact mrkdwn summary to a Slack Incoming Webhook URL (the target). No
+ *                external SDK, no secret beyond the webhook URL the user configures per schedule.
+ *   - unknown:    no integration → honest "skipped".
  *
  * The HTTP call and the env config are injectable so tests exercise the real branches without
  * touching the network (mirrors the connector `fetchImpl` test-seam used elsewhere).
@@ -63,18 +65,24 @@ export async function sendReportDelivery(
   }
 
   if (channel === "webhook") {
-    try {
-      const res = await fetchImpl(cleanTarget, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+    // A Slack Incoming Webhook expects a `{ text }` body, not arbitrary JSON — so when the target IS
+    // a Slack webhook (the documented "paste your Slack URL as the Webhook channel" path), send the
+    // mrkdwn summary instead of the raw report payload. Any other webhook receives the full report.
+    const body = isSlackWebhook(cleanTarget)
+      ? JSON.stringify({ text: slackReportText(report) })
+      : JSON.stringify({
           reportId: report.id,
           projectId: report.projectId,
           type: report.type,
           title: report.title,
           generatedAt: report.generatedAt,
           sections: report.sections,
-        }),
+        });
+    try {
+      const res = await fetchImpl(cleanTarget, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
       });
       return res.ok ? { status: "sent" } : { status: "failed", detail: `webhook responded ${res.status}` };
     } catch {
@@ -99,6 +107,41 @@ export async function sendReportDelivery(
     }
   }
 
-  // slack or any other channel: no integration wired yet — be honest, never fake "sent".
+  if (channel === "slack") {
+    // The target is a Slack Incoming Webhook URL; Slack expects a JSON body with a `text` field.
+    try {
+      const res = await fetchImpl(cleanTarget, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: slackReportText(report) }),
+      });
+      return res.ok ? { status: "sent" } : { status: "failed", detail: `slack responded ${res.status}` };
+    } catch {
+      return { status: "failed", detail: "slack request failed" };
+    }
+  }
+
+  // Any other channel: no integration wired yet — be honest, never fake "sent".
   return { status: "skipped", detail: `${channel} delivery not configured` };
+}
+
+/** True when a URL points at a Slack Incoming Webhook (which requires a `{ text }` body). */
+function isSlackWebhook(target: string): boolean {
+  try {
+    return new URL(target).hostname === "hooks.slack.com";
+  } catch {
+    return false;
+  }
+}
+
+/** Compact Slack mrkdwn summary of a report: title, timestamp, then each section's rows. */
+function slackReportText(report: Report): string {
+  const lines: string[] = [`*${report.title}*`, `_${report.type} · ${report.generatedAt}_`];
+  for (const section of report.sections) {
+    lines.push("", `*${section.title}*`);
+    for (const row of section.rows) {
+      lines.push(`• ${row.label}: ${row.value}`);
+    }
+  }
+  return lines.join("\n");
 }

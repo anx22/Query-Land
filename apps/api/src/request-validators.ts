@@ -27,7 +27,7 @@ const auditIssueRules = new Set<AuditIssueRecord["rule"]>(AUDIT_ISSUE_RULES);
 const crawlRunTriggers = new Set<CrawlRun["trigger"]>(["manual", "scheduled", "deploy"]);
 const crawlRunCompletionStatuses = new Set<CompleteCrawlRunRequest["status"]>(["succeeded", "failed"]);
 const integrationProviders = new Set<IntegrationProvider>(["gsc", "ga4", "matomo", "pagespeed", "lighthouse", "serverlogs", "sitemap", "robots", "crawler", "cms", "serp", "backlink", "keyword"]);
-const jobTypes = new Set<FoundationJob["type"]>(["connector_sync", "crawl_seed", "source_map_refresh", "health_check"]);
+const jobTypes = new Set<FoundationJob["type"]>(["connector_sync", "crawl_seed", "source_map_refresh", "health_check", "opportunity_revalidate"]);
 
 export function authRequest(body: unknown, allowName: boolean): AuthRequest {
   const input = objectBody(body);

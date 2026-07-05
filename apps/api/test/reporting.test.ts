@@ -137,6 +137,33 @@ test("webhook delivery POSTs the report to the target URL", async () => {
   }
 });
 
+test("slack delivery POSTs a text summary to the Slack webhook URL", async () => {
+  const { app, store } = await testApp();
+  const calls: Array<{ url: string; body: string }> = [];
+  __setReportDeliveryHooksForTests({
+    fetchImpl: async (url, init) => {
+      calls.push({ url, body: String(init?.body ?? "") });
+      return { ok: true, status: 200 };
+    }
+  });
+  try {
+    const projectId = await seedProject(app, "slack");
+    const report = data<Report>(await app("POST", `/projects/${projectId}/reports`, { type: "weekly_summary" }));
+    const delivery = data<{ status: string; channel: string }>(await app("POST", `/reports/${report.id}/deliver`, { channel: "slack", target: "https://hooks.slack.com/services/T/B/xxx" }));
+    assert.equal(delivery.status, "sent");
+    assert.equal(delivery.channel, "slack");
+    assert.equal(calls[0].url, "https://hooks.slack.com/services/T/B/xxx");
+    assert.ok(JSON.parse(calls[0].body).text.includes(report.title), "slack payload carries a text summary with the report title");
+
+    // Documented path: the generic "webhook" channel with a Slack URL also sends a {text} body.
+    await app("POST", `/reports/${report.id}/deliver`, { channel: "webhook", target: "https://hooks.slack.com/services/T/B/yyy" });
+    assert.ok(JSON.parse(calls[1].body).text, "webhook channel targeting a Slack URL sends a Slack {text} body");
+  } finally {
+    __resetReportDeliveryHooksForTests();
+    await store.close();
+  }
+});
+
 test("email delivery is honestly skipped when no provider is configured", async () => {
   const { app, store } = await testApp();
   __resetReportDeliveryHooksForTests(); // real env config; RESEND_API_KEY is unset under test

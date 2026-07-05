@@ -138,3 +138,38 @@ test("status transitions follow the §6.5 lifecycle and reject illegal jumps", a
     await store.close();
   }
 });
+
+test("reaching 'implemented' schedules an async revalidation job (§6.5 loop)", async () => {
+  const { app, store } = await testApp();
+  try {
+    const projectId = await freshProject(app, "reval-schedule");
+    const opp = data<{ id: string }>(await app("POST", `/projects/${projectId}/opportunities`, baseInput));
+    await app("POST", `/opportunities/${opp.id}/transition`, { status: "in_progress" });
+    await app("POST", `/opportunities/${opp.id}/transition`, { status: "implemented" });
+
+    // The transition enqueued an opportunity_revalidate job the cron drains.
+    const claimed = data<{ id: string; type: string; payload: Record<string, unknown> } | null>(await app("POST", "/jobs/claim", { type: "opportunity_revalidate" }));
+    assert.ok(claimed, "an opportunity_revalidate job was enqueued");
+    assert.equal(claimed!.type, "opportunity_revalidate");
+    assert.equal(claimed!.payload.opportunityId, opp.id);
+  } finally {
+    await store.close();
+  }
+});
+
+test("revalidating with no fresh evidence keeps the opportunity 'implemented' (pending, no error)", async () => {
+  const { app, store } = await testApp();
+  try {
+    const projectId = await freshProject(app, "reval-pending");
+    const opp = data<{ id: string }>(await app("POST", `/projects/${projectId}/opportunities`, baseInput));
+    await app("POST", `/opportunities/${opp.id}/transition`, { status: "in_progress" });
+    await app("POST", `/opportunities/${opp.id}/transition`, { status: "implemented" });
+
+    // No crawl/indexability evidence exists for the URL yet → stays implemented, no error (async latency §2.10).
+    const revalidated = await app("POST", `/opportunities/${opp.id}/revalidate`);
+    assert.equal(revalidated.status, 200);
+    assert.equal(data<{ status: string }>(revalidated).status, "implemented");
+  } finally {
+    await store.close();
+  }
+});

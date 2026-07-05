@@ -6,6 +6,12 @@ import type { AsyncDatabase } from "../db/index.js";
 
 export type OpportunityType = Opportunity["type"];
 
+/** Compare two URLs ignoring a trailing slash (GSC page URLs vs crawl URLs differ only there). */
+function sameUrl(a: string, b: string): boolean {
+  const strip = (u: string) => u.replace(/\/+$/, "");
+  return strip(a) === strip(b);
+}
+
 export interface CreateOpportunityInput {
   type: OpportunityType;
   affectedUrls?: string[];
@@ -309,28 +315,114 @@ class SQLiteOpportunityStore implements OpportunityStore {
     return { created: created.length, opportunities: created };
   }
 
+  /**
+   * Async validation loop (§6.5/§2.10): re-measure an implemented opportunity's validation metric
+   * from the LATEST first-party evidence and flip it to `validated` or `reopened`. Generalized over
+   * all six opportunity classes by re-running the SAME analyzer/threshold that generated it, so the
+   * verdict is correct-by-construction. When no fresh evidence exists yet (e.g. GSC latency, no new
+   * crawl), the opportunity stays `implemented` and the scheduled re-check simply retries next cycle.
+   */
   async revalidateOpportunity(opportunityId: string): Promise<Opportunity> {
     const opportunity = await this.getOpportunity(opportunityId);
-    if (opportunity.type !== "technical_fix" || opportunity.validationMetric !== "indexable") {
-      throw new RequestError(400, "not_revalidatable", "Only indexability technical_fix opportunities can be revalidated");
-    }
     if (opportunity.status !== "implemented") {
       throw new RequestError(409, "invalid_state", "Opportunity must be 'implemented' before it can be revalidated");
     }
-    const url = opportunity.affectedUrls[0];
-    if (!url) {
-      throw new RequestError(400, "no_affected_url", "Opportunity has no affected URL to revalidate");
+    const outcome = await this.measureRevalidation(opportunity);
+    if (outcome === "pending") {
+      // No fresh evidence to judge yet — keep it implemented; the scheduled job re-checks later.
+      return opportunity;
     }
-    // Asynchrone, binäre Validierung (§2.10/§6.5): neueste Indexierbarkeit der URL erneut messen.
-    const row = await this.db.prepare(`
-      SELECT a.is_indexable AS is_indexable FROM discovered_urls du
-      JOIN url_indexability_assessments a ON a.discovered_url_id = du.id
-      WHERE du.project_id = ? AND (du.url = ? OR du.normalized_url = ?)
-      ORDER BY a.assessed_at DESC, a.id DESC LIMIT 1
-    `).get(opportunity.projectId, url, url) as { is_indexable?: number } | undefined;
-    const indexable = !!row && Number(row.is_indexable) === 1;
-    await this.db.prepare(`UPDATE opportunity_evidence SET current_value = ? WHERE opportunity_id = ? AND metric = 'indexable'`).run(JSON.stringify(indexable ? "true" : "false"), opportunityId);
-    return this.transitionOpportunity(opportunityId, indexable ? "validated" : "reopened");
+    return this.transitionOpportunity(opportunityId, outcome);
+  }
+
+  /** Re-measure the opportunity's validation metric → "validated" | "reopened" | "pending". */
+  private async measureRevalidation(o: Opportunity): Promise<"validated" | "reopened" | "pending"> {
+    const url = o.affectedUrls[0] ?? null;
+    const keyword = o.affectedKeywords[0] ?? null;
+    const setEvidence = (metric: string, value: string | number) =>
+      this.db.prepare(`UPDATE opportunity_evidence SET current_value = ? WHERE opportunity_id = ? AND metric = ?`).run(JSON.stringify(value), o.id, metric);
+
+    switch (o.validationMetric) {
+      case "indexable": {
+        if (!url) return "pending";
+        const row = await this.db.prepare(`
+          SELECT a.is_indexable AS is_indexable FROM discovered_urls du
+          JOIN url_indexability_assessments a ON a.discovered_url_id = du.id
+          WHERE du.project_id = ? AND (du.url = ? OR du.normalized_url = ?)
+          ORDER BY a.assessed_at DESC, a.id DESC LIMIT 1
+        `).get(o.projectId, url, url) as { is_indexable?: number } | undefined;
+        if (!row) return "pending";
+        const indexable = Number(row.is_indexable) === 1;
+        await setEvidence("indexable", indexable ? "true" : "false");
+        return indexable ? "validated" : "reopened";
+      }
+      case "position_top10": {
+        if (!url || !keyword) return "pending";
+        const row = await this.searchRowFor(o.projectId, url, keyword);
+        if (!row) return "pending";
+        await setEvidence("position", row.position);
+        return row.position <= 10 ? "validated" : "reopened";
+      }
+      case "ctr": {
+        if (!url || !keyword) return "pending";
+        const rows = await this.searchRowsForUrl(o.projectId, url);
+        if (rows.length === 0) return "pending";
+        const stillGap = analyzeCtrGap(rows).some((item) => item.query === keyword && sameUrl(item.pageUrl, url));
+        const row = rows.find((r) => r.query === keyword && sameUrl(r.pageUrl, url));
+        if (row) await setEvidence("ctr", row.ctr);
+        return stillGap ? "reopened" : "validated";
+      }
+      case "single_dominant_page": {
+        if (!keyword) return "pending";
+        const rows = await this.searchRowsForUrl(o.projectId, url ?? "");
+        if (rows.length === 0) return "pending";
+        const stillCannibalized = analyzeCannibalization(rows).some((item) => item.query === keyword);
+        await setEvidence("single_dominant_page", stillCannibalized ? "false" : "true");
+        return stillCannibalized ? "reopened" : "validated";
+      }
+      case "inlink_count": {
+        if (!url) return "pending";
+        const count = Number((await this.db.prepare(`
+          SELECT COUNT(*) AS c FROM internal_link_edges e
+          JOIN sites s ON s.id = e.site_id
+          WHERE s.project_id = ? AND e.to_url = ?
+        `).get(o.projectId, url) as { c: number }).c);
+        await setEvidence("inlink_count", count);
+        return count > 0 ? "validated" : "reopened";
+      }
+      case "aeo_score": {
+        if (!url) return "pending";
+        const row = await this.db.prepare(`
+          SELECT score FROM aeo_assessments WHERE project_id = ? AND url = ? ORDER BY assessed_at DESC, id DESC LIMIT 1
+        `).get(o.projectId, url) as { score?: number } | undefined;
+        if (!row || row.score === undefined || row.score === null) return "pending";
+        await setEvidence("aeo_score", Number(row.score));
+        return Number(row.score) >= 60 ? "validated" : "reopened";
+      }
+      default:
+        return "pending";
+    }
+  }
+
+  /** Resolve the site that owns a URL (crawled), else the project's first site (search-only URLs). */
+  private async resolveSiteIdForUrl(projectId: string, url: string): Promise<string | null> {
+    const owned = await this.db.prepare(`SELECT site_id FROM discovered_urls WHERE project_id = ? AND (url = ? OR normalized_url = ?) ORDER BY id ASC LIMIT 1`).get(projectId, url, url) as { site_id?: string } | undefined;
+    if (owned?.site_id) return String(owned.site_id);
+    const first = await this.db.prepare(`SELECT id FROM sites WHERE project_id = ? ORDER BY created_at ASC, id ASC LIMIT 1`).get(projectId) as { id?: string } | undefined;
+    return first?.id ? String(first.id) : null;
+  }
+
+  /** Latest search rows for the site owning `url`. */
+  private async searchRowsForUrl(projectId: string, url: string): Promise<SearchPerformanceMetricRow[]> {
+    const siteId = await this.resolveSiteIdForUrl(projectId, url);
+    if (!siteId) return [];
+    return (await this.latestSearchRows(siteId)).rows;
+  }
+
+  /** Latest search row matching a (query, url) pair, or null. */
+  private async searchRowFor(projectId: string, url: string, keyword: string): Promise<SearchPerformanceMetricRow | null> {
+    const rows = await this.searchRowsForUrl(projectId, url);
+    return rows.find((r) => r.query === keyword && sameUrl(r.pageUrl, url)) ?? null;
   }
 
   async generateSearchOpportunities(projectId: string, siteId: string): Promise<GenerateOpportunitiesResult> {

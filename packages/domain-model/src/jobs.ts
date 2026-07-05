@@ -5,7 +5,7 @@ export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "cancell
 export interface FoundationJob {
   id: string;
   projectId: string;
-  type: "connector_sync" | "crawl_seed" | "source_map_refresh" | "health_check";
+  type: "connector_sync" | "crawl_seed" | "source_map_refresh" | "health_check" | "opportunity_revalidate";
   status: JobStatus;
   idempotencyKey: string;
   subject: string;

@@ -553,6 +553,23 @@ export function createSeoMcpTools(store: BackendStore): McpTool[] {
         const opportunityId = optionalString(args, "opportunityId");
         return store.createProposal(projectId, { kind: "fix_pr", title, body, opportunityId, source: "mcp" });
       }
+    },
+    {
+      name: "validate_implemented_fix",
+      description:
+        "Re-check an opportunity that is currently `implemented` and record the OBJECTIVE result (§6.5). Re-measures the opportunity's validation metric from the latest first-party evidence (crawl indexability, GSC position/CTR, cannibalization, internal inlinks, or AEO score) and transitions it to `validated` (problem resolved) or `reopened` (still present). If no fresh evidence has landed yet, it stays `implemented`. Evidence-driven measurement, not an arbitrary write — safe for the agent to call.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          opportunityId: { type: "string", description: "Identifier of the opportunity to revalidate (must be in status 'implemented')." }
+        },
+        required: ["opportunityId"],
+        additionalProperties: false
+      },
+      async handler(args): Promise<Opportunity> {
+        const opportunityId = requireString(args, "opportunityId");
+        return store.revalidateOpportunity(opportunityId);
+      }
     }
   ];
 }
