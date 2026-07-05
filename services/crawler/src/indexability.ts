@@ -1,7 +1,7 @@
 import type { IndexabilityAssessment } from "@seo-tool/domain-model";
 import { parsePage } from "./html-parse.js";
 import type { AuditPageInput } from "./types.js";
-import { normalizeCrawlUrl } from "./url-normalization.js";
+import { canonicalKey } from "./url-normalization.js";
 
 export function assessIndexability(input: AuditPageInput): IndexabilityAssessment {
   const headers = lowercaseHeaders(input.headers ?? {});
@@ -23,7 +23,7 @@ export function assessIndexability(input: AuditPageInput): IndexabilityAssessmen
     return assessment(input.url, "blocked_by_meta", false, ["robots meta contains noindex"], canonicalUrl);
   }
 
-  if (canonicalUrl && normalizeCrawlUrl(canonicalUrl, finalUrl) !== normalizeCrawlUrl(finalUrl, finalUrl)) {
+  if (canonicalUrl && canonicalKey(canonicalUrl, finalUrl) !== canonicalKey(finalUrl, finalUrl)) {
     return assessment(input.url, "canonicalized", false, [`Canonical points to ${canonicalUrl}`], canonicalUrl);
   }
 

@@ -445,7 +445,8 @@ test("maps minimum issue rules and health-score penalties", () => {
     { url: "https://example.com/a", statusCode: 200, html: "<title>Same</title>", outgoingLinks: [{ url: "https://example.com/missing", statusCode: 404 }] },
     { url: "https://example.com/b", statusCode: 200, html: "<title>Same</title>" },
     { url: "https://example.com/c", statusCode: 500, html: "" },
-    { url: "https://example.com/d", statusCode: 302, html: '<link rel="canonical" href="https://example.com/canonical">' }
+    { url: "https://example.com/d", statusCode: 302, html: "" },
+    { url: "https://example.com/e", finalUrl: "https://example.com/e", statusCode: 200, html: '<title>E</title><link rel="canonical" href="https://example.com/other">' }
   ]);
 
   assert(issues.some((issue) => issue.rule === "broken_link" && issue.severity === "high"));
@@ -455,6 +456,24 @@ test("maps minimum issue rules and health-score penalties", () => {
   assert(issues.some((issue) => issue.rule === "canonical_mismatch" && issue.severity === "medium"));
   assert(calculateHealthScore(issues) < 100);
   assert.equal(calculateHealthScore([]), 100);
+});
+
+test("on-page rules skip non-2xx pages and www/apex self-canonicals are not mismatches", () => {
+  // A 503 (bot-block / transient) must NOT be flagged as a missing title — only the HTTP error.
+  const blocked = evaluateAuditIssues([{ url: "https://example.com/x", statusCode: 503, html: "" }]);
+  assert(blocked.some((i) => i.rule === "http_error"));
+  assert(!blocked.some((i) => i.rule === "missing_title"), "503 must not produce a missing_title false positive");
+
+  // A page served at www whose canonical points to the apex (a normal, correct host strategy)
+  // must NOT be flagged as a canonical mismatch, and stays indexable.
+  const selfCanonical = evaluateAuditIssues([
+    { url: "https://www.example.com/p", finalUrl: "https://www.example.com/p", statusCode: 200, html: '<title>P</title><link rel="canonical" href="https://example.com/p">' }
+  ]);
+  assert(!selfCanonical.some((i) => i.rule === "canonical_mismatch"), "www→apex self-canonical is not a mismatch");
+  assert.equal(
+    assessIndexability({ url: "https://www.example.com/p", finalUrl: "https://www.example.com/p", statusCode: 200, html: '<link rel="canonical" href="https://example.com/p">' }).state,
+    "indexable"
+  );
 });
 
 import { createApp, createStore, type Store } from "@seo-tool/api";

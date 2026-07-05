@@ -58,9 +58,18 @@ test("project models markets and validates business value range", () => {
   assert.throws(() => validateBusinessValue(101), /businessValue/);
 });
 
-test("crawl health score applies severity penalties with a lower bound", () => {
+test("crawl health score: distinct problems sum, same-kind issues get diminishing returns", () => {
+  // Distinct severities/rules each contribute their full weight (18+10+2 = 30 → 70).
   assert.equal(calculateHealthScore([{ severity: "critical" }, { severity: "high" }, { severity: "low" }]), 70);
-  assert.equal(calculateHealthScore(Array.from({ length: 10 }, () => ({ severity: "critical" as const }))), 0);
+  // Diminishing returns: 10 issues of the SAME kind no longer floor a healthy site to 0
+  // (18 × (1 + log2(10)) ≈ 77.8 → 22), so a single noisy rule can't dominate the score.
+  assert.equal(
+    calculateHealthScore(Array.from({ length: 10 }, () => ({ severity: "critical" as const, rule: "http_error" as const }))),
+    22
+  );
+  // But a spread of DISTINCT severe problems still reaches the 0 lower bound (6 × 18 = 108 → 0).
+  const distinctRules = ["http_error", "redirect_chain", "missing_title", "duplicate_title", "canonical_mismatch", "broken_link"] as const;
+  assert.equal(calculateHealthScore(distinctRules.map((rule) => ({ severity: "critical" as const, rule }))), 0);
 });
 
 test("jobs create stable idempotency keys and typed crawl seed inputs", () => {

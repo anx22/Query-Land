@@ -38,6 +38,27 @@ function stripAndSortQuery(url: URL): void {
 }
 
 /**
+ * Canonical-equivalence key. Like {@link normalizeCrawlUrl}, but ALSO folds the host
+ * (`www.` ≡ apex) and the scheme (`http:` ≡ `https:`). Used ONLY to compare a page's
+ * `<link rel="canonical">` against its own URL: a page served at
+ * `https://www.example.com/p` whose canonical points to `https://example.com/p` is a normal,
+ * correct SELF-canonical (the site's chosen host strategy) — NOT a mismatch, and NOT a reason
+ * to mark the page non-indexable.
+ *
+ * Kept deliberately separate from `normalizeCrawlUrl` (which is the crawl frontier / dedupe key
+ * and must preserve host + scheme so the crawl scope stays precise). Returns a stable string key.
+ */
+export function canonicalKey(rawUrl: string, baseUrl: string): string {
+  const url = new URL(normalizeCrawlUrl(rawUrl, baseUrl));
+  // Fold scheme (sites routinely canonicalise across http↔https) …
+  url.protocol = "https:";
+  if (url.port === "80" || url.port === "443") url.port = "";
+  // … and host (www ≡ apex).
+  url.hostname = stripWww(url.hostname.toLowerCase());
+  return url.toString();
+}
+
+/**
  * Spider-trap signal: a path with the same segment repeated more than `maxRepeats`
  * times consecutively (e.g. `/a/a/a`, common with mis-resolved relative links).
  */

@@ -266,7 +266,30 @@ const issueSeverityWeights: Record<AuditIssueSeverity, number> = {
   low: 2
 };
 
-export function calculateHealthScore(issues: Array<Pick<AuditIssue, "severity">>): number {
-  const penalty = issues.reduce((sum, issue) => sum + issueSeverityWeights[issue.severity], 0);
-  return Math.max(0, Math.min(100, 100 - penalty));
+/**
+ * Health score (0–100) from open issues, with per-kind diminishing returns.
+ *
+ * Issues are grouped by `rule` (or by severity when no rule is given). Within a group the FIRST
+ * issue costs its full severity weight; each further issue of the SAME kind costs progressively
+ * less — the group penalty is `maxWeight × (1 + log2(n))`. This keeps the score trustworthy: a
+ * single noisy rule (e.g. 40 low-severity duplicate titles, or a site-wide www→apex canonical
+ * strategy) can no longer floor an otherwise healthy site to 0, while a spread of DISTINCT, severe
+ * problems still lowers the score sharply (distinct rules each contribute their full weight).
+ */
+export function calculateHealthScore(
+  issues: Array<Pick<AuditIssue, "severity"> & Partial<Pick<AuditIssue, "rule">>>
+): number {
+  const groups = new Map<string, number[]>();
+  for (const issue of issues) {
+    const key = issue.rule ?? `severity:${issue.severity}`;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(issueSeverityWeights[issue.severity]);
+    else groups.set(key, [issueSeverityWeights[issue.severity]]);
+  }
+  let penalty = 0;
+  for (const weights of groups.values()) {
+    const representative = Math.max(...weights);
+    penalty += representative * (1 + Math.log2(weights.length));
+  }
+  return Math.max(0, Math.min(100, Math.round(100 - penalty)));
 }
