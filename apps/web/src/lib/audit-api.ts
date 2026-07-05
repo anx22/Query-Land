@@ -20,6 +20,7 @@
  * and unit-tested in audit-api.test.ts.
  */
 
+import { AUDIT_ISSUE_RULES } from "@seo-tool/domain-model";
 import type {
   AuditIssueRecord,
   AuditIssueSeverity,
@@ -362,15 +363,7 @@ export interface IssueFilter {
 
 export const ISSUE_STATUS_FILTERS: IssueStatusFilter[] = ["open", "resolved", "all"];
 export const ISSUE_SEVERITY_FILTERS: IssueSeverityFilter[] = ["all", "critical", "high", "medium", "low"];
-export const ISSUE_RULE_FILTERS: IssueRuleFilter[] = [
-  "all",
-  "http_error",
-  "redirect_chain",
-  "missing_title",
-  "duplicate_title",
-  "canonical_mismatch",
-  "broken_link",
-];
+export const ISSUE_RULE_FILTERS: IssueRuleFilter[] = ["all", ...AUDIT_ISSUE_RULES];
 
 /** Normalize raw query input into a valid filter, defaulting to open / all / all rules. */
 export function resolveIssueFilter(

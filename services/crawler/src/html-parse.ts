@@ -11,6 +11,7 @@
  * more than necessary.
  */
 import { parse, type HTMLElement } from "node-html-parser";
+import type { OnPageSignals } from "@seo-tool/domain-model";
 import { normalizeCrawlUrl } from "./url-normalization.js";
 
 export interface ParsedLink {
@@ -33,7 +34,11 @@ export interface ParsedPage {
   robotsMeta: string;
   /** Fetchable links in document order, deduped by normalized URL. */
   links: ParsedLink[];
+  /** On-page SEO signals (Master-Spec §5 M2). Durable across the resumable crawl path. */
+  onPage: OnPageSignals;
 }
+
+export type { OnPageSignals };
 
 /**
  * Parse a page once. `pageUrl` is the URL the body was fetched from (the final
@@ -43,11 +48,25 @@ export interface ParsedPage {
 export function parsePage(html: string, pageUrl: string): ParsedPage {
   const root = parse(html ?? "", { comment: false });
   const base = resolveBase(root, pageUrl);
+  // Signals that must be read BEFORE script/style nodes are stripped for the word count.
+  const hasJsonLd = Boolean(root.querySelector('script[type="application/ld+json"]'));
+  const mixedContentCount = countMixedContent(root, pageUrl);
   return {
     title: extractTitle(root),
     canonicalUrl: extractCanonical(root),
     robotsMeta: extractRobotsMeta(root),
-    links: extractLinks(root, base)
+    links: extractLinks(root, base),
+    onPage: {
+      metaDescription: extractMetaDescription(root),
+      h1Count: root.querySelectorAll("h1").length,
+      wordCount: countWords(root),
+      imagesMissingAlt: countImagesMissingAlt(root),
+      hasViewport: hasViewportMeta(root),
+      htmlLang: extractHtmlLang(root),
+      hreflangInvalid: hasInvalidHreflang(root, base),
+      hasJsonLd,
+      mixedContentCount
+    }
   };
 }
 
@@ -89,6 +108,92 @@ function extractRobotsMeta(root: HTMLElement): string {
     }
   }
   return "";
+}
+
+/** Content of the first <meta name="description">, whitespace-collapsed, or null when absent/empty. */
+function extractMetaDescription(root: HTMLElement): string | null {
+  for (const meta of root.querySelectorAll("meta[name]")) {
+    if ((meta.getAttribute("name") ?? "").trim().toLowerCase() === "description") {
+      const content = (meta.getAttribute("content") ?? "").replace(/\s+/g, " ").trim();
+      return content.length > 0 ? content : null;
+    }
+  }
+  return null;
+}
+
+/** Visible word count of the body — script/style/noscript/template text excluded. */
+function countWords(root: HTMLElement): number {
+  for (const node of root.querySelectorAll("script, style, noscript, template")) {
+    node.remove();
+  }
+  const text = (root.querySelector("body") ?? root).text ?? "";
+  const tokens = text.replace(/\s+/g, " ").trim();
+  return tokens.length === 0 ? 0 : tokens.split(" ").length;
+}
+
+/** Count of <img> elements with NO alt attribute at all (decorative alt="" is valid and NOT counted). */
+function countImagesMissingAlt(root: HTMLElement): number {
+  let missing = 0;
+  for (const img of root.querySelectorAll("img")) {
+    if (img.getAttribute("alt") === undefined) missing += 1;
+  }
+  return missing;
+}
+
+/** True when a non-empty <meta name="viewport"> is present (mobile-friendliness signal). */
+function hasViewportMeta(root: HTMLElement): boolean {
+  for (const meta of root.querySelectorAll("meta[name]")) {
+    if ((meta.getAttribute("name") ?? "").trim().toLowerCase() === "viewport") {
+      return (meta.getAttribute("content") ?? "").trim().length > 0;
+    }
+  }
+  return false;
+}
+
+/** Trimmed <html lang="…"> attribute, or null when absent/empty. */
+function extractHtmlLang(root: HTMLElement): string | null {
+  const lang = (root.querySelector("html")?.getAttribute("lang") ?? "").trim();
+  return lang.length > 0 ? lang : null;
+}
+
+/** BCP-47-ish language tag (or x-default) — a deliberately lenient check for hreflang validity. */
+const HREFLANG_PATTERN = /^(x-default|[a-z]{2,3}(-[a-z0-9]{2,8})*)$/i;
+
+/**
+ * True when at least one hreflang alternate is malformed: an invalid language code or a missing/
+ * unresolvable href. Absence of hreflang is NOT invalid (single-language sites are fine).
+ */
+function hasInvalidHreflang(root: HTMLElement, base: string): boolean {
+  for (const link of root.querySelectorAll("link[hreflang]")) {
+    if (!relTokens(link).includes("alternate")) continue;
+    const code = (link.getAttribute("hreflang") ?? "").trim();
+    if (!HREFLANG_PATTERN.test(code)) return true;
+    const href = (link.getAttribute("href") ?? "").trim();
+    if (!href) return true;
+    try {
+      new URL(href, base);
+    } catch {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Non-empty src/href subresources that pull http:// content into an https page (mixed content). */
+function countMixedContent(root: HTMLElement, pageUrl: string): number {
+  let pageIsHttps = false;
+  try {
+    pageIsHttps = new URL(pageUrl).protocol === "https:";
+  } catch {
+    return 0;
+  }
+  if (!pageIsHttps) return 0;
+  let count = 0;
+  for (const el of root.querySelectorAll("img[src], script[src], iframe[src], source[src], video[src], audio[src], embed[src]")) {
+    const src = (el.getAttribute("src") ?? "").trim();
+    if (/^http:\/\//i.test(src)) count += 1;
+  }
+  return count;
 }
 
 function extractLinks(root: HTMLElement, base: string): ParsedLink[] {

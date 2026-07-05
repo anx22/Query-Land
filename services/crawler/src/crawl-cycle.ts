@@ -379,7 +379,7 @@ async function runResumableCrawlWorkerCycle(options: CrawlWorkerCycleOptions): P
           fetchedThisRun += 1;
 
           const inScopeLinks = parsed.links.filter((l) => isInCrawlScope(l.url, effectiveBase, scopeType));
-          await api.recordCrawlPageSignals!(projectId, siteId, crawlRunId, [{ normalizedUrl: url, finalUrl: fetchResult.finalUrl, statusCode: fetchResult.statusCode, title: parsed.title, canonicalUrl: parsed.canonicalUrl, outgoingLinks: inScopeLinks.map((l) => ({ url: l.url, statusCode: null })) }]);
+          await api.recordCrawlPageSignals!(projectId, siteId, crawlRunId, [{ normalizedUrl: url, finalUrl: fetchResult.finalUrl, statusCode: fetchResult.statusCode, title: parsed.title, canonicalUrl: parsed.canonicalUrl, outgoingLinks: inScopeLinks.map((l) => ({ url: l.url, statusCode: null })), onPage: parsed.onPage }]);
 
           // Persist same-site internal link edges (GAP-LINK-001), bundled per page.
           if (api.recordInternalLinks) {
@@ -424,7 +424,7 @@ async function runResumableCrawlWorkerCycle(options: CrawlWorkerCycleOptions): P
       url: s.normalizedUrl,
       finalUrl: s.finalUrl,
       statusCode: s.statusCode,
-      parsed: { title: s.title, canonicalUrl: s.canonicalUrl, robotsMeta: "", links: [] },
+      parsed: { title: s.title, canonicalUrl: s.canonicalUrl, robotsMeta: "", links: [], onPage: s.onPage },
       // Only outgoing links we actually crawled carry a known status (broken-link check);
       // uncrawled/out-of-scope links are omitted rather than falsely flagged.
       outgoingLinks: s.outgoingLinks

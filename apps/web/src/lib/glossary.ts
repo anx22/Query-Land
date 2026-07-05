@@ -33,6 +33,46 @@ export const glossaryEntries: GlossaryEntry[] = [
       "Aggregierter technischer Gesundheitswert einer Site aus offenen Issues und deren Schwere.",
   },
   {
+    term: "Meta-Description",
+    definition:
+      "Kurzbeschreibung einer Seite im <head>, die als Snippet-Vorschlag in den Suchergebnissen dienen kann (ideal ~50–160 Zeichen).",
+  },
+  {
+    term: "H1",
+    definition:
+      "Die Hauptüberschrift einer Seite; eine Seite sollte genau eine H1 haben, die ihr Thema klar benennt.",
+  },
+  {
+    term: "Thin Content",
+    definition:
+      "Seiten mit sehr wenig eigenständigem Inhalt, die für Suchende kaum Mehrwert bieten und selten ranken.",
+  },
+  {
+    term: "Canonical",
+    definition:
+      "Verweis auf die maßgebliche URL eines Inhalts, um Duplikate zu bündeln; www/apex und http/https gelten dabei als gleichwertig.",
+  },
+  {
+    term: "Mixed Content",
+    definition:
+      "Unsichere http-Ressourcen, die in eine https-Seite geladen werden — ein Sicherheits- und Qualitätsproblem, das Browser blockieren können.",
+  },
+  {
+    term: "hreflang",
+    definition:
+      "Auszeichnung sprach-/länderspezifischer Alternativversionen einer Seite; fehlerhafte Codes oder Ziele führen zu Fehlinterpretation.",
+  },
+  {
+    term: "Structured Data",
+    definition:
+      "Maschinenlesbare Auszeichnung (meist JSON-LD/Schema.org), die Suchmaschinen Inhalte präzise erklärt und Rich Results ermöglicht.",
+  },
+  {
+    term: "Viewport",
+    definition:
+      "Meta-Tag, das die mobile Darstellung steuert; ohne ihn wirkt eine Seite auf Smartphones oft unbrauchbar (Mobile-Signal).",
+  },
+  {
     term: "Visibility-Index",
     definition:
       "Positionsgewichteter Sichtbarkeitswert über die getrackten Keywords (0–100).",

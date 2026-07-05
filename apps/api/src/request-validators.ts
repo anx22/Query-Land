@@ -1,4 +1,4 @@
-import type { AuditIssueRecord, AuditIssueSeverity, CrawlRun, CrawlRunStatus, DiscoveredUrl, FetchStatusClass, FoundationJob, IndexabilityRecord, IndexabilityState, IntegrationProvider, ProjectStatus, SiteScopeType, UrlDiscoverySource, UrlFetchRecord } from "@seo-tool/domain-model";
+import { AUDIT_ISSUE_RULES, type AuditIssueRecord, type AuditIssueSeverity, type CrawlPageSignal, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type FoundationJob, type IndexabilityRecord, type IndexabilityState, type IntegrationProvider, type OnPageSignals, type ProjectStatus, type SiteScopeType, type UrlDiscoverySource, type UrlFetchRecord } from "@seo-tool/domain-model";
 import { RequestError } from "./stores/store-errors.js";
 
 type MarketInput = { country: string; language: string; device: "desktop" | "mobile"; searchEngine: "google" | "bing" };
@@ -23,7 +23,7 @@ const urlDiscoverySources = new Set<UrlDiscoverySource>(["seed", "sitemap", "lin
 const fetchStatusClasses = new Set<FetchStatusClass>(["success", "redirect", "client_error", "server_error", "network_error"]);
 const indexabilityStates = new Set<IndexabilityState>(["indexable", "blocked_by_status", "blocked_by_meta", "blocked_by_x_robots", "blocked_by_robots", "canonicalized"]);
 const auditIssueSeverities = new Set<AuditIssueSeverity>(["critical", "high", "medium", "low"]);
-const auditIssueRules = new Set<AuditIssueRecord["rule"]>(["http_error", "redirect_chain", "missing_title", "duplicate_title", "canonical_mismatch", "broken_link"]);
+const auditIssueRules = new Set<AuditIssueRecord["rule"]>(AUDIT_ISSUE_RULES);
 const crawlRunTriggers = new Set<CrawlRun["trigger"]>(["manual", "scheduled", "deploy"]);
 const crawlRunCompletionStatuses = new Set<CompleteCrawlRunRequest["status"]>(["succeeded", "failed"]);
 const integrationProviders = new Set<IntegrationProvider>(["gsc", "ga4", "matomo", "pagespeed", "lighthouse", "serverlogs", "sitemap", "robots", "crawler", "cms", "serp", "backlink", "keyword"]);
@@ -126,7 +126,7 @@ export function completeCrawlFrontierRequest(body: unknown): { normalizedUrls: s
   };
 }
 
-export function recordCrawlPageSignalsRequest(body: unknown): { signals: Array<{ normalizedUrl: string; finalUrl: string; statusCode: number | null; title: string | null; canonicalUrl: string | null; outgoingLinks: Array<{ url: string; statusCode: number | null }> }> } {
+export function recordCrawlPageSignalsRequest(body: unknown): { signals: Array<Omit<CrawlPageSignal, "crawlRunId">> } {
   const input = objectBody(body);
   if (!Array.isArray(input.signals)) {
     throw new RequestError(400, "missing_field", "signals is required", { field: "signals" });
@@ -150,9 +150,28 @@ export function recordCrawlPageSignalsRequest(body: unknown): { signals: Array<{
             url: typeof entry.url === "string" ? entry.url : "",
             statusCode: entry.statusCode === null || entry.statusCode === undefined ? null : Number(entry.statusCode)
           };
-        }).filter((link) => link.url !== "")
+        }).filter((link) => link.url !== ""),
+        onPage: onPageSignalsField(signal.onPage)
       };
     })
+  };
+}
+
+/** Coerce an incoming on-page signal object to a complete OnPageSignals, filling neutral defaults. */
+function onPageSignalsField(raw: unknown): OnPageSignals {
+  const src = (raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  const num = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? value : 0);
+  const str = (value: unknown): string | null => (typeof value === "string" && value.length > 0 ? value : null);
+  return {
+    metaDescription: str(src.metaDescription),
+    h1Count: num(src.h1Count),
+    wordCount: num(src.wordCount),
+    imagesMissingAlt: num(src.imagesMissingAlt),
+    hasViewport: src.hasViewport === true,
+    htmlLang: str(src.htmlLang),
+    hreflangInvalid: src.hreflangInvalid === true,
+    hasJsonLd: src.hasJsonLd === true,
+    mixedContentCount: num(src.mixedContentCount)
   };
 }
 

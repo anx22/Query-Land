@@ -52,10 +52,50 @@ export interface IndexabilityRecord extends IndexabilityAssessment {
   assessedAt: string;
 }
 
+/**
+ * The closed set of on-page / technical audit rules (Master-Spec §5 M2), grouped: HTTP & links,
+ * title, canonical, meta description, headings/content, and page-level technical/i18n signals.
+ * This array is the SINGLE SOURCE OF TRUTH — the `AuditIssueRule` type, the API validator, the route
+ * filter and the web UI labels all derive from it, so adding a rule here is the only edit needed in
+ * the domain layer (the compiler then flags each downstream place that must be updated).
+ */
+export const AUDIT_ISSUE_RULES = [
+  // HTTP status & links
+  "http_error",
+  "redirect_chain",
+  "broken_link",
+  // Title
+  "missing_title",
+  "duplicate_title",
+  "title_too_long",
+  "title_too_short",
+  // Canonical
+  "canonical_mismatch",
+  "missing_canonical",
+  // Meta description
+  "missing_meta_description",
+  "duplicate_meta_description",
+  "meta_description_too_long",
+  "meta_description_too_short",
+  // Headings & content
+  "missing_h1",
+  "multiple_h1",
+  "thin_content",
+  // Media, mobile & i18n / structured data
+  "image_missing_alt",
+  "missing_viewport",
+  "missing_html_lang",
+  "mixed_content",
+  "hreflang_invalid",
+  "structured_data_missing"
+] as const;
+
+export type AuditIssueRule = (typeof AUDIT_ISSUE_RULES)[number];
+
 export interface AuditIssue {
   id: string;
   url: string;
-  rule: "http_error" | "redirect_chain" | "missing_title" | "duplicate_title" | "canonical_mismatch" | "broken_link";
+  rule: AuditIssueRule;
   severity: AuditIssueSeverity;
   message: string;
 }
@@ -126,7 +166,38 @@ export interface CrawlFrontierEntry {
 }
 
 /**
- * Durable per-page audit signals for a crawl run (migration 017). Captures
+ * On-page SEO signals extracted from a page's DOM — exactly what the standard on-page audit rules
+ * need (meta description, headings, thin content, alt text, viewport, lang, hreflang, structured
+ * data, mixed content). A flat, JSON-serializable shape so it can be persisted on the durable crawl
+ * page signal (migration 019) and reconstructed when a resumable crawl is finalized from storage.
+ */
+export interface OnPageSignals {
+  metaDescription: string | null;
+  h1Count: number;
+  wordCount: number;
+  imagesMissingAlt: number;
+  hasViewport: boolean;
+  htmlLang: string | null;
+  hreflangInvalid: boolean;
+  hasJsonLd: boolean;
+  mixedContentCount: number;
+}
+
+/** Neutral on-page signals for a page that could not be parsed (non-2xx / empty body). */
+export const EMPTY_ON_PAGE_SIGNALS: OnPageSignals = {
+  metaDescription: null,
+  h1Count: 0,
+  wordCount: 0,
+  imagesMissingAlt: 0,
+  hasViewport: false,
+  htmlLang: null,
+  hreflangInvalid: false,
+  hasJsonLd: false,
+  mixedContentCount: 0
+};
+
+/**
+ * Durable per-page audit signals for a crawl run (migration 017 + 019). Captures
  * exactly what the audit rules need so a resumable crawl can be finalized from
  * storage after the frontier drains (no in-memory page set required).
  */
@@ -138,6 +209,7 @@ export interface CrawlPageSignal {
   title: string | null;
   canonicalUrl: string | null;
   outgoingLinks: Array<{ url: string; statusCode: number | null }>;
+  onPage: OnPageSignals;
 }
 
 /** Lightweight projection of an audit issue as it appears in a crawl-diff result. */

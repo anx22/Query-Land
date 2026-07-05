@@ -3059,7 +3059,7 @@ components:
         siteId: { type: string }
         discoveredUrlId: { type: string, nullable: true }
         url: { type: string, format: uri }
-        rule: { type: string, enum: [http_error, redirect_chain, missing_title, duplicate_title, canonical_mismatch, broken_link] }
+        rule: { type: string, enum: [http_error, redirect_chain, broken_link, missing_title, duplicate_title, title_too_long, title_too_short, canonical_mismatch, missing_canonical, missing_meta_description, duplicate_meta_description, meta_description_too_long, meta_description_too_short, missing_h1, multiple_h1, thin_content, image_missing_alt, missing_viewport, missing_html_lang, mixed_content, hreflang_invalid, structured_data_missing] }
         severity: { type: string, enum: [critical, high, medium, low] }
         message: { type: string }
         detectedAt: { type: string, format: date-time }
@@ -3085,7 +3085,7 @@ components:
       properties:
         id: { type: string }
         url: { type: string, format: uri }
-        rule: { type: string, enum: [http_error, redirect_chain, missing_title, duplicate_title, canonical_mismatch, broken_link] }
+        rule: { type: string, enum: [http_error, redirect_chain, broken_link, missing_title, duplicate_title, title_too_long, title_too_short, canonical_mismatch, missing_canonical, missing_meta_description, duplicate_meta_description, meta_description_too_long, meta_description_too_short, missing_h1, multiple_h1, thin_content, image_missing_alt, missing_viewport, missing_html_lang, mixed_content, hreflang_invalid, structured_data_missing] }
         severity: { type: string, enum: [critical, high, medium, low] }
         message: { type: string }
     CrawlRunDiff:

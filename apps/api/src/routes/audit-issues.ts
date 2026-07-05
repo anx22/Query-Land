@@ -1,3 +1,4 @@
+import { AUDIT_ISSUE_RULES } from "@seo-tool/domain-model";
 import { json } from "../http.js";
 import { dismissAuditIssueRequest, recordAuditIssuesRequest } from "../request-validators.js";
 import { actorId, enumQuery, pageMeta, paginationOptions, type ResourceRoute } from "./shared.js";
@@ -9,7 +10,7 @@ export const routeAuditIssues: ResourceRoute = async (store, method, pathname, s
       const page = await store.listAuditIssuesPage(listMatch[1], listMatch[2], paginationOptions(searchParams), {
         status: enumQuery(searchParams, "status", ["open", "resolved", "all"]),
         severity: enumQuery(searchParams, "severity", ["critical", "high", "medium", "low"]),
-        rule: enumQuery(searchParams, "rule", ["http_error", "redirect_chain", "missing_title", "duplicate_title", "canonical_mismatch", "broken_link"])
+        rule: enumQuery(searchParams, "rule", AUDIT_ISSUE_RULES)
       });
       return json(200, { data: page.data, meta: pageMeta(page) });
     }

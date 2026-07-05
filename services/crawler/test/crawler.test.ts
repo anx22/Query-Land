@@ -476,6 +476,40 @@ test("on-page rules skip non-2xx pages and www/apex self-canonicals are not mism
   );
 });
 
+test("full on-page SEO rule set: silent on a complete page, fires the standard battery on a bare page", () => {
+  const body = Array.from({ length: 160 }, () => "wort").join(" ");
+  const complete = `<html lang="de"><head>`
+    + `<title>Eine gut gewählte, ausreichend lange Seitenüberschrift</title>`
+    + `<meta name="description" content="Eine ausreichend lange und aussagekräftige Meta-Description, die klar über fünfzig Zeichen liegt und damit die Untergrenze passt.">`
+    + `<meta name="viewport" content="width=device-width, initial-scale=1">`
+    + `<link rel="canonical" href="https://example.com/p">`
+    + `<script type="application/ld+json">{"@context":"https://schema.org"}</script>`
+    + `</head><body><h1>Titel</h1><p>${body}</p><img src="https://example.com/x.png" alt="Beschreibung"></body></html>`;
+  const clean = evaluateAuditIssues([{ url: "https://example.com/p", finalUrl: "https://example.com/p", statusCode: 200, html: complete }]);
+  assert.equal(clean.length, 0, `complete page should have zero on-page issues, got ${JSON.stringify(clean.map((i) => i.rule))}`);
+
+  // Bare page served over https: missing everything, plus an insecure image and a malformed hreflang.
+  const bare = '<html><head><title>Hi</title></head><body>'
+    + '<img src="http://insecure.example/x.png">'
+    + '<link rel="alternate" hreflang="zz9" href="/de">'
+    + '</body></html>';
+  const rules = new Set(evaluateAuditIssues([{ url: "https://example.com/bare", finalUrl: "https://example.com/bare", statusCode: 200, html: bare }]).map((i) => i.rule));
+  for (const expected of ["missing_meta_description", "missing_h1", "thin_content", "missing_viewport", "missing_html_lang", "missing_canonical", "structured_data_missing", "title_too_short", "image_missing_alt", "mixed_content", "hreflang_invalid"] as const) {
+    assert.ok(rules.has(expected), `expected ${expected} on the bare page`);
+  }
+});
+
+test("duplicate meta description is flagged across pages", () => {
+  const html = (path: string) => `<html lang="de"><head><title>Titel ${path}</title>`
+    + `<meta name="description" content="Exakt die gleiche Meta-Description auf beiden Seiten, lang genug für den Längen-Check hier.">`
+    + `</head><body><h1>H</h1></body></html>`;
+  const issues = evaluateAuditIssues([
+    { url: "https://example.com/a", finalUrl: "https://example.com/a", statusCode: 200, html: html("a") },
+    { url: "https://example.com/b", finalUrl: "https://example.com/b", statusCode: 200, html: html("b") }
+  ]);
+  assert.equal(issues.filter((i) => i.rule === "duplicate_meta_description").length, 2, "both pages flagged for the shared description");
+});
+
 import { createApp, createStore, type Store } from "@seo-tool/api";
 import type { CrawlWorkerApiClient } from "../src/index.js";
 import { runCrawlWorkerCycle } from "../src/index.js";

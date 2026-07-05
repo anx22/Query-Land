@@ -12,10 +12,26 @@ import type { IssueGroup } from "../../lib/audit-api";
 export const RULE_LABEL: Record<IssueGroup["rule"], string> = {
   http_error: "HTTP-Fehler",
   redirect_chain: "Redirect-Kette",
+  broken_link: "Defekter Link",
   missing_title: "Fehlender Title",
   duplicate_title: "Doppelter Title",
+  title_too_long: "Title zu lang",
+  title_too_short: "Title zu kurz",
   canonical_mismatch: "Canonical-Abweichung",
-  broken_link: "Defekter Link",
+  missing_canonical: "Fehlender Canonical",
+  missing_meta_description: "Fehlende Meta-Description",
+  duplicate_meta_description: "Doppelte Meta-Description",
+  meta_description_too_long: "Meta-Description zu lang",
+  meta_description_too_short: "Meta-Description zu kurz",
+  missing_h1: "Fehlende H1",
+  multiple_h1: "Mehrere H1",
+  thin_content: "Dünner Inhalt",
+  image_missing_alt: "Bild ohne Alt-Text",
+  missing_viewport: "Kein Viewport-Tag",
+  missing_html_lang: "Kein html-lang",
+  mixed_content: "Mixed Content",
+  hreflang_invalid: "Ungültiges hreflang",
+  structured_data_missing: "Keine strukturierten Daten",
 };
 
 export function ruleLabel(rule: IssueGroup["rule"]): string {
