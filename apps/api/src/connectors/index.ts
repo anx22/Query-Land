@@ -151,6 +151,17 @@ function defaultEnv(ctx: { env?: EnvSource }): EnvSource {
   return ctx.env ?? (process.env as EnvSource);
 }
 
+/**
+ * §2.7-Firewall: synthetische Stub-Werte dürfen NIE als echte (Klasse-A/B-)Evidenz gelten.
+ * Im Produktpfad liefert ein Connector ohne real aufgelöste Credentials daher `missing_credentials`
+ * (ehrlicher Leerzustand) statt fabrizierter Rows. Die deterministischen Stub-Rows sind nur für
+ * Entwicklung/Demo/Tests gedacht und werden ausschließlich freigeschaltet, wenn
+ * `SEO_ALLOW_STUB_CONNECTORS=1` explizit gesetzt ist (Default: aus → Produktion fälscht nie).
+ */
+function stubDataAllowed(env: EnvSource): boolean {
+  return env.SEO_ALLOW_STUB_CONNECTORS === "1";
+}
+
 function metricConnector(options: {
   provider: IntegrationProvider;
   sourceType: string;
@@ -204,12 +215,25 @@ function metricConnector(options: {
         };
       }
       // Realer Adapter: nur wenn echte Provider-Credentials/Env aufgelöst werden konnten
-      // (liveFetch !== null). Sonst (Stub-Credentials wie in Produktion) Stub-Fallback.
+      // (liveFetch !== null). Sonst kein realer Call.
       if (options.liveFetch) {
         const live = options.liveFetch(ctx);
         if (live) {
           return live;
         }
+      }
+      // Kein real aufgelöster Adapter. §2.7-Firewall: ohne echte Credentials KEINE synthetischen
+      // Rows als Evidenz zurückgeben. Nur wenn Stub-Daten explizit erlaubt sind (Dev/Demo/Tests),
+      // liefert der Connector die deterministischen Rows; sonst ehrlicher `missing_credentials`.
+      if (!stubDataAllowed(defaultEnv(ctx))) {
+        return {
+          outcome: "missing_credentials",
+          payload: null,
+          quotaRemaining: null,
+          quota: null,
+          freshness: ctx.now,
+          reason: `${options.provider} has no real provider credentials (auth_config carries no usable secret); synthetic stub data is disabled`
+        };
       }
       return {
         outcome: "ok",

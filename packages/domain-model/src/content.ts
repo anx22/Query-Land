@@ -1,7 +1,8 @@
 // Content Workspace (UX-7, refresh-centric). The brief is a MANUAL, editable artifact —
-// there is NO LLM auto-generation here. Metrics are deterministic, demo-tagged stubs; real
-// GSC data flows in later via the connector contract. These types + pure helpers are
-// DB-independent so they can be unit-tested in isolation.
+// there is NO LLM auto-generation here. Metrics (click trends, refresh scores) are computed
+// from REAL Google Search Console data (search_performance_rows, confidence class B) when GSC
+// is connected, and are an honest empty state otherwise — not synthetic stubs. These types +
+// pure helpers are DB-independent so they can be unit-tested in isolation.
 
 import type { SourceConfidence } from "./integrations.js";
 

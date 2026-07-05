@@ -149,9 +149,18 @@ test("GSC fetch: 401 → expired, 429 → quota_exceeded", async () => {
   assert.equal(quota.outcome, "quota_exceeded");
 });
 
-test("GSC fetch: no token (missing key) falls back to the deterministic stub", async () => {
+test("GSC fetch: no real token + stub disabled → missing_credentials (§2.7 firewall, no fabricated evidence)", async () => {
   const connector = getConnector("gsc")!;
+  // Default (no SEO_ALLOW_STUB_CONNECTORS): a stub auth_config carries no real secret, so the
+  // connector must NOT fabricate class-A/B rows — it reports missing_credentials instead.
   const result = await connector.fetch(baseCtx({ env: {}, fetchImpl: fakeFetch(500, {}) }));
+  assert.equal(result.outcome, "missing_credentials");
+  assert.equal(result.payload, null);
+});
+
+test("GSC fetch: no real token + stub explicitly enabled → deterministic stub (dev/demo opt-in)", async () => {
+  const connector = getConnector("gsc")!;
+  const result = await connector.fetch(baseCtx({ env: { SEO_ALLOW_STUB_CONNECTORS: "1" }, fetchImpl: fakeFetch(500, {}) }));
   assert.equal(result.outcome, "ok");
   // Stub values, not live (fetchImpl must not have been used).
   const rows = (result.payload as { rows: Array<{ metric: string; value: number }> }).rows;
@@ -184,8 +193,14 @@ test("PSI fetch: real success maps web vitals; lighthouse derives from the same 
   assert.equal((lh.payload as { rows: Array<{ metric: string; value: number }> }).rows.find((r) => r.metric === "performance")!.value, 0.88);
 });
 
-test("PSI fetch: missing key → stub fallback", async () => {
+test("PSI fetch: missing key + stub disabled → missing_credentials (no fabricated web vitals)", async () => {
   const result = await getConnector("pagespeed")!.fetch(baseCtx({ siteUrl: "https://example.com", env: {} }));
+  assert.equal(result.outcome, "missing_credentials");
+  assert.equal(result.payload, null);
+});
+
+test("PSI fetch: missing key + stub enabled → deterministic stub (dev/demo opt-in)", async () => {
+  const result = await getConnector("pagespeed")!.fetch(baseCtx({ siteUrl: "https://example.com", env: { SEO_ALLOW_STUB_CONNECTORS: "1" } }));
   assert.equal(result.outcome, "ok");
   assert.equal((result.payload as { rows: Array<{ metric: string; value: number }> }).rows.find((r) => r.metric === "lcp_ms")!.value, 2410);
 });

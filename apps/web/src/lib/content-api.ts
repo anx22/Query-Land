@@ -8,9 +8,10 @@
  * filter (?status=) scopes the brief list.
  *
  * Data-source honesty: refresh candidates + page metrics + the content score
- * are deterministic, demo-tagged stubs (no GSC connector yet). The UI marks
- * these with ConfidenceBadge level "E". Briefs themselves are real, persisted
- * editorial artifacts.
+ * are computed from REAL Google Search Console data (search_performance_rows,
+ * confidence class B) once GSC is connected, and are an honest empty state
+ * otherwise — they are NOT demo stubs. The UI marks them with ConfidenceBadge
+ * level "B". Briefs themselves are real, persisted editorial artifacts (class A).
  *
  * Mirrors lib/audit-api.ts (loadTechnicalAuditOverview using
  * loadFoundationDashboardData for the active project/site).
@@ -35,7 +36,7 @@ export interface ContentWorkspaceData {
   project: FoundationProject | null;
   site: FoundationSite | null;
 
-  /** Refresh candidates (decaying URLs), demo-tagged. */
+  /** Refresh candidates (decaying URLs), derived from real GSC click trends (class B). */
   refreshCandidates: RefreshCandidate[];
 
   /** The URL currently selected (?url=), or null. */

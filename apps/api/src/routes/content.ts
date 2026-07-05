@@ -5,8 +5,9 @@ import { RequestError } from "../stores/store-errors.js";
 import type { BriefToProposalInput, CreateContentRecommendationInput, PageMetricInput, UpdateContentRecommendationInput } from "../stores/content-store.js";
 import { enumQuery, type ResourceRoute } from "./shared.js";
 
-// UX7-W1: Content Workspace. Refresh-centric, MANUAL brief (no LLM auto-generation), deterministic
-// demo-tagged metrics. Briefs bridge into the proposal/MCP rail via /create-proposal.
+// UX7-W1: Content Workspace. Refresh-centric, MANUAL brief (no LLM auto-generation). Metrics are
+// derived from real GSC search-performance data (class B) when connected, honest-empty otherwise —
+// not demo stubs. Briefs bridge into the proposal/MCP rail via /create-proposal.
 export const routeContent: ResourceRoute = async (store, method, pathname, searchParams, body) => {
   // POST /content-recommendations/:id/transition
   const transitionMatch = pathname.match(/^\/content-recommendations\/([^/]+)\/transition$/);
