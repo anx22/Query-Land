@@ -2118,6 +2118,13 @@ paths:
                   type: string
                 threshold:
                   type: number
+                channel:
+                  type: string
+                  enum: [webhook, email, slack]
+                  nullable: true
+                target:
+                  type: string
+                  nullable: true
       responses:
         '201':
           description: Alert rule created

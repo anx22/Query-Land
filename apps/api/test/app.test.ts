@@ -13,7 +13,7 @@ async function testApp() {
 }
 
 test("migrations are versioned and idempotent", async () => {
-  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql", "015_report_webhook_channel.sql", "016_crawl_frontier.sql", "017_crawl_page_signals.sql", "018_url_index_status.sql", "019_crawl_page_signal_onpage.sql", "020_audit_issue_rules_open.sql"];
+  const expectedFiles = ["001_foundation_auth.sql", "002_rebuild_indexability_state_constraint.sql", "003_internal_link_edges.sql", "004_opportunities.sql", "005_keywords.sql", "006_rank_serp.sql", "007_visibility.sql", "008_search_performance.sql", "009_pr_checks.sql", "010_backlinks.sql", "011_reporting.sql", "012_ai_aeo.sql", "013_issue_lifecycle.sql", "014_content_workspace.sql", "015_report_webhook_channel.sql", "016_crawl_frontier.sql", "017_crawl_page_signals.sql", "018_url_index_status.sql", "019_crawl_page_signal_onpage.sql", "020_audit_issue_rules_open.sql", "021_alert_rule_delivery.sql"];
   const db = await createDatabase("sqlite::memory:");
   try {
     const first = await runMigrations(db);
@@ -42,7 +42,8 @@ test("migrations are versioned and idempotent", async () => {
       { version: 17, name: "crawl_page_signals" },
       { version: 18, name: "url_index_status" },
       { version: 19, name: "crawl_page_signal_onpage" },
-      { version: 20, name: "audit_issue_rules_open" }
+      { version: 20, name: "audit_issue_rules_open" },
+      { version: 21, name: "alert_rule_delivery" }
     ]);
 
     const second = await runMigrations(db);

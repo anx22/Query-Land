@@ -52,3 +52,43 @@ jobs:
 
       - name: Format check
         run: npm run format:check
+
+  # Source-Map pre-merge gate (§4.3): POST the PR's changed repo paths to the deployed API's
+  # /pr-checks endpoint. If changed templates map to open SEO opportunities the API returns
+  # status=review_required and this check fails. Opt-in: without the SOURCE_MAP_API_URL +
+  # SOURCE_MAP_PROJECT_ID secrets the step skips cleanly (no deployed API to call).
+  source-map-gate:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Source-map pre-merge gate
+        env:
+          SOURCE_MAP_API_URL: ${{ secrets.SOURCE_MAP_API_URL }}
+          SOURCE_MAP_PROJECT_ID: ${{ secrets.SOURCE_MAP_PROJECT_ID }}
+          SOURCE_MAP_API_TOKEN: ${{ secrets.SOURCE_MAP_API_TOKEN }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -z "$SOURCE_MAP_API_URL" ] || [ -z "$SOURCE_MAP_PROJECT_ID" ]; then
+            echo "Source-map gate not configured (set SOURCE_MAP_API_URL + SOURCE_MAP_PROJECT_ID secrets) — skipping."
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | jq -R -s -c 'split("\n") | map(select(length>0))')
+          echo "Changed paths: $CHANGED"
+          RESP=$(curl -sS -X POST "$SOURCE_MAP_API_URL/projects/$SOURCE_MAP_PROJECT_ID/pr-checks" \
+            -H "content-type: application/json" \
+            ${SOURCE_MAP_API_TOKEN:+-H "authorization: Bearer $SOURCE_MAP_API_TOKEN"} \
+            -d "{\"changedPaths\": $CHANGED, \"headSha\": \"$HEAD_SHA\"}")
+          echo "Response: $RESP"
+          STATUS=$(echo "$RESP" | jq -r '.data.status // "unknown"')
+          echo "Gate status: $STATUS"
+          if [ "$STATUS" = "review_required" ]; then
+            echo "::error::Source-map pre-merge gate: changed templates map to open SEO opportunities — review required."
+            exit 1
+          fi
+          echo "Source-map gate passed ($STATUS)."

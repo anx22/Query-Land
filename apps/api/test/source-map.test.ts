@@ -82,6 +82,11 @@ test("deploy markers can be created and listed per project", async () => {
     const list = data<Array<{ commitSha: string; metadata: Record<string, unknown> }>>(await app("GET", `/projects/${projectId}/deploy-markers`));
     assert.equal(list.length, 1);
     assert.equal(list[0]?.metadata.env, "production");
+
+    // §4.3: a deploy schedules a source_map_refresh job the cron drains into a re-crawl.
+    const claimed = data<{ type: string } | null>(await app("POST", "/jobs/claim", { type: "source_map_refresh" }));
+    assert.ok(claimed, "creating a deploy marker enqueues a source_map_refresh job");
+    assert.equal(claimed!.type, "source_map_refresh");
   } finally {
     await store.close();
   }

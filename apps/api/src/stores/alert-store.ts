@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { ALERT_COMPARATORS, ALERT_METRICS, compareAlert, type AlertComparator, type AlertEvent, type AlertMetric, type AlertRule } from "@seo-tool/domain-model";
+import { ALERT_CHANNELS, ALERT_COMPARATORS, ALERT_METRICS, compareAlert, type AlertChannel, type AlertComparator, type AlertEvent, type AlertMetric, type AlertRule } from "@seo-tool/domain-model";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
+import { sendAlertDelivery } from "../reports/delivery.js";
 import type { AsyncDatabase } from "../db/index.js";
 
 export interface AlertRuleInput {
   metric: AlertMetric;
   comparator: AlertComparator;
   threshold: number;
+  channel?: AlertChannel | null;
+  target?: string | null;
 }
 
 export interface AlertStore {
@@ -42,16 +45,26 @@ class SQLiteAlertStore implements AlertStore {
     if (typeof input.threshold !== "number" || Number.isNaN(input.threshold)) {
       throw new RequestError(400, "invalid_field", "threshold must be a number");
     }
+    const channel = input.channel ?? null;
+    if (channel !== null && !ALERT_CHANNELS.includes(channel)) {
+      throw new RequestError(400, "invalid_field", `channel must be one of ${ALERT_CHANNELS.join(", ")}`);
+    }
+    const target = input.target && input.target.trim() !== "" ? input.target.trim() : null;
+    if (channel !== null && !target) {
+      throw new RequestError(400, "invalid_field", "target is required when a delivery channel is set");
+    }
     const rule: AlertRule = {
       id: `alert-${randomUUID()}`,
       projectId,
       metric: input.metric,
       comparator: input.comparator,
       threshold: input.threshold,
+      channel,
+      target,
       createdAt: new Date().toISOString()
     };
-    await this.db.prepare(`INSERT INTO alert_rules (id, project_id, metric, comparator, threshold, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
-      rule.id, rule.projectId, rule.metric, rule.comparator, rule.threshold, rule.createdAt
+    await this.db.prepare(`INSERT INTO alert_rules (id, project_id, metric, comparator, threshold, channel, target, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      rule.id, rule.projectId, rule.metric, rule.comparator, rule.threshold, rule.channel, rule.target, rule.createdAt
     );
     await this.audit("system", "alert_rule.create", "alert_rule", rule.id, { projectId, metric: rule.metric });
     return rule;
@@ -88,6 +101,18 @@ class SQLiteAlertStore implements AlertStore {
       case "referring_domains": {
         const row = await this.db.prepare(`SELECT referring_domains FROM backlink_snapshots WHERE project_id = ? ORDER BY captured_at DESC, seq DESC LIMIT 1`).get(projectId) as { referring_domains?: number } | undefined;
         return row && typeof row.referring_domains === "number" ? row.referring_domains : 0;
+      }
+      case "search_clicks": {
+        // Total GSC clicks at the latest snapshot across the project's sites (traffic-drop signal).
+        const row = await this.db.prepare(`
+          SELECT COALESCE(SUM(spr.clicks), 0) AS c FROM search_performance_rows spr
+          JOIN sites s ON s.id = spr.site_id
+          WHERE s.project_id = ? AND spr.captured_at = (
+            SELECT MAX(spr2.captured_at) FROM search_performance_rows spr2
+            JOIN sites s2 ON s2.id = spr2.site_id WHERE s2.project_id = ?
+          )
+        `).get(projectId, projectId) as { c?: number } | undefined;
+        return row && typeof row.c === "number" ? row.c : 0;
       }
       default:
         return 0;
@@ -127,6 +152,19 @@ class SQLiteAlertStore implements AlertStore {
       }
     });
     await this.audit("system", "alerts.evaluate", "project", projectId, { rules: rules.length, triggered: events.filter((event) => event.triggered).length });
+
+    // Deliver each TRIGGERED alert whose rule names a channel + target (§M6). Delivery is best-effort
+    // and never aborts evaluation — a failed send is recorded in the audit log, not thrown.
+    const rulesById = new Map(rules.map((rule) => [rule.id, rule]));
+    for (const event of events) {
+      if (!event.triggered) continue;
+      const rule = rulesById.get(event.ruleId);
+      if (!rule?.channel || !rule.target) continue;
+      const result = await sendAlertDelivery(rule.channel, rule.target, {
+        projectId, metric: event.metric, comparator: event.comparator, threshold: event.threshold, observedValue: event.observedValue, evaluatedAt: event.evaluatedAt
+      });
+      await this.audit("system", "alert.deliver", "alert_rule", rule.id, { channel: rule.channel, status: result.status, detail: result.detail });
+    }
     return events;
   }
 
@@ -142,6 +180,8 @@ class SQLiteAlertStore implements AlertStore {
       metric: String(row.metric) as AlertMetric,
       comparator: String(row.comparator) as AlertComparator,
       threshold: Number(row.threshold),
+      channel: row.channel === null || row.channel === undefined ? null : (String(row.channel) as AlertChannel),
+      target: row.target === null || row.target === undefined ? null : String(row.target),
       createdAt: String(row.created_at)
     };
   }

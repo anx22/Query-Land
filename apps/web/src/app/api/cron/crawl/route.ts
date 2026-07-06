@@ -5,6 +5,8 @@ import { drainConnectorSyncJobs, enqueueDueConnectorSyncs } from "../../../../li
 import { runGscRefreshAll } from "../../../../lib/gsc-refresh";
 import { runDueReportSchedules } from "../../../../lib/reports-cron";
 import { drainOpportunityRevalidations, enqueueDueOpportunityRevalidations } from "../../../../lib/opportunity-revalidate-cron";
+import { evaluateAllAlerts } from "../../../../lib/alerts-cron";
+import { drainMaintenanceJobs, enqueueDueHealthChecks } from "../../../../lib/maintenance-cron";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -55,8 +57,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // opportunity, then drain the revalidation jobs (flip to validated/reopened once evidence lands).
   const revalEnqueued = await enqueueDueOpportunityRevalidations(call);
   const revalidations = await drainOpportunityRevalidations({ call });
+  // Evaluate alert rules for every project (record events + deliver triggered alerts).
+  const alerts = await evaluateAllAlerts(call);
+  // Maintenance jobs: enqueue a daily per-site health recompute, then drain health_check +
+  // source_map_refresh (the latter re-crawls sites after a deploy marker lands).
+  const maintenanceEnqueued = await enqueueDueHealthChecks(call);
+  const maintenance = await drainMaintenanceJobs({ call });
   // Generate + deliver any report schedules that have fallen due.
   const reports = await runDueReportSchedules(call);
 
-  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued }, gsc, revalidations: { ...revalidations, enqueued: revalEnqueued }, reports });
+  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued }, gsc, revalidations: { ...revalidations, enqueued: revalEnqueued }, alerts, maintenance: { ...maintenance, enqueued: maintenanceEnqueued }, reports });
 }

@@ -30,7 +30,11 @@ export const routeSourceMap: ResourceRoute = async (store, method, pathname, sea
       return json(200, { data: await store.listDeployMarkers(deployMatch[1]) });
     }
     if (method === "POST") {
-      return json(201, { data: await store.createDeployMarker(deployMatch[1], asObject(body) as unknown as DeployMarkerInput) });
+      const marker = await store.createDeployMarker(deployMatch[1], asObject(body) as unknown as DeployMarkerInput);
+      // §4.3: a deploy schedules a source-map refresh; the cron drains it into a re-crawl of the
+      // project's sites so the audit reflects the freshly deployed templates.
+      await store.createJob(deployMatch[1], "source_map_refresh", `deploy-${marker.id}`, { deployMarkerId: marker.id });
+      return json(201, { data: marker });
     }
     return null;
   }

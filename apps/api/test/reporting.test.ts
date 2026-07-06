@@ -215,6 +215,47 @@ test("alert rule evaluation records triggered events against current metrics", a
   }
 });
 
+test("a triggered alert with a channel + target is delivered (M6)", async () => {
+  const { app, store } = await testApp();
+  const calls: Array<{ url: string; body: string }> = [];
+  __setReportDeliveryHooksForTests({
+    fetchImpl: async (url, init) => {
+      calls.push({ url, body: String(init?.body ?? "") });
+      return { ok: true, status: 200 };
+    }
+  });
+  try {
+    const projectId = await seedProject(app, "alert-delivery");
+    await seedOpportunity(app, projectId);
+    // A rule that triggers (1 open opportunity >= 1) AND names a Slack webhook target.
+    await app("POST", `/projects/${projectId}/alert-rules`, { metric: "open_opportunities", comparator: "gte", threshold: 1, channel: "slack", target: "https://hooks.slack.com/services/T/B/zzz" });
+    await app("POST", `/projects/${projectId}/alerts/evaluate`, {});
+
+    assert.equal(calls.length, 1, "the triggered alert was delivered once");
+    assert.equal(calls[0].url, "https://hooks.slack.com/services/T/B/zzz");
+    assert.ok(JSON.parse(calls[0].body).text.includes("open_opportunities"), "alert payload names the metric");
+  } finally {
+    __resetReportDeliveryHooksForTests();
+    await store.close();
+  }
+});
+
+test("search_clicks alert metric is accepted and observed", async () => {
+  const { app, store } = await testApp();
+  try {
+    const projectId = await seedProject(app, "alert-clicks");
+    // No GSC data yet → observed clicks 0; `lt 100` triggers a traffic-drop alert.
+    await app("POST", `/projects/${projectId}/alert-rules`, { metric: "search_clicks", comparator: "lt", threshold: 100 });
+    const events = data<Array<{ metric: string; triggered: boolean; observedValue: number }>>(await app("POST", `/projects/${projectId}/alerts/evaluate`, {}));
+    const clicks = events.find((event) => event.metric === "search_clicks");
+    assert.ok(clicks, "search_clicks metric is evaluated");
+    assert.equal(clicks!.observedValue, 0);
+    assert.ok(clicks!.triggered, "0 clicks < 100 triggers the traffic-drop alert");
+  } finally {
+    await store.close();
+  }
+});
+
 test("report generation rejects unknown project and invalid type", async () => {
   const { app, store } = await testApp();
   try {

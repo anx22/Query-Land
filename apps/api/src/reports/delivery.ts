@@ -125,6 +125,60 @@ export async function sendReportDelivery(
   return { status: "skipped", detail: `${channel} delivery not configured` };
 }
 
+export interface AlertNotification {
+  projectId: string;
+  metric: string;
+  comparator: string;
+  threshold: number;
+  observedValue: number;
+  evaluatedAt: string;
+}
+
+/** Deliver a triggered alert over the same channels as reports (webhook/email/slack). */
+export async function sendAlertDelivery(channel: string, target: string | null | undefined, alert: AlertNotification): Promise<DeliveryResult> {
+  const cleanTarget = target && target.trim() !== "" ? target.trim() : null;
+  if (!cleanTarget) {
+    return { status: "skipped", detail: "no recipient configured" };
+  }
+  const subject = `Alert: ${alert.metric} ${alert.comparator} ${alert.threshold}`;
+  const text = `⚠️ ${subject}\nProject ${alert.projectId} — observed ${alert.observedValue} at ${alert.evaluatedAt}`;
+
+  if (channel === "webhook") {
+    const body = isSlackWebhook(cleanTarget) ? JSON.stringify({ text }) : JSON.stringify({ type: "alert", ...alert });
+    try {
+      const res = await fetchImpl(cleanTarget, { method: "POST", headers: { "content-type": "application/json" }, body });
+      return res.ok ? { status: "sent" } : { status: "failed", detail: `webhook responded ${res.status}` };
+    } catch {
+      return { status: "failed", detail: "webhook request failed" };
+    }
+  }
+  if (channel === "slack") {
+    try {
+      const res = await fetchImpl(cleanTarget, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
+      return res.ok ? { status: "sent" } : { status: "failed", detail: `slack responded ${res.status}` };
+    } catch {
+      return { status: "failed", detail: "slack request failed" };
+    }
+  }
+  if (channel === "email") {
+    const { resendApiKey, from } = readConfig();
+    if (!resendApiKey) {
+      return { status: "skipped", detail: "email provider not configured (set RESEND_API_KEY)" };
+    }
+    try {
+      const res = await fetchImpl("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${resendApiKey}` },
+        body: JSON.stringify({ from, to: cleanTarget, subject, html: `<p>${text.replace(/\n/g, "<br>")}</p>` }),
+      });
+      return res.ok ? { status: "sent" } : { status: "failed", detail: `email provider responded ${res.status}` };
+    } catch {
+      return { status: "failed", detail: "email request failed" };
+    }
+  }
+  return { status: "skipped", detail: `${channel} delivery not configured` };
+}
+
 /** True when a URL points at a Slack Incoming Webhook (which requires a `{ text }` body). */
 function isSlackWebhook(target: string): boolean {
   try {
