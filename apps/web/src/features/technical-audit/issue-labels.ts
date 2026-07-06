@@ -32,6 +32,10 @@ export const RULE_LABEL: Record<IssueGroup["rule"], string> = {
   mixed_content: "Mixed Content",
   hreflang_invalid: "Ungültiges hreflang",
   structured_data_missing: "Keine strukturierten Daten",
+  lcp_slow: "LCP zu langsam",
+  cls_high: "CLS zu hoch",
+  inp_slow: "INP zu langsam",
+  ttfb_slow: "TTFB zu langsam",
 };
 
 export function ruleLabel(rule: IssueGroup["rule"]): string {

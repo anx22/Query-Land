@@ -17,3 +17,4 @@ export * from "./rank.js";
 export * from "./reports.js";
 export * from "./search-performance.js";
 export * from "./visibility.js";
+export * from "./web-vitals.js";

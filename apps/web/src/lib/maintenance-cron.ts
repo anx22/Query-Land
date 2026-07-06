@@ -48,6 +48,32 @@ export async function enqueueDueHealthChecks(call: ApiCaller, options: { today?:
   return { scheduled, alreadyQueued, sites };
 }
 
+export interface EvaluateAllWebVitalsResult {
+  sites: number;
+  issuesCreated: number;
+  issuesResolved: number;
+}
+
+/** Evaluate Core Web Vitals into audit issues for every site (run after PSI syncs populate metrics). */
+export async function evaluateAllWebVitals(call: ApiCaller): Promise<EvaluateAllWebVitalsResult> {
+  const projects = unwrap<Array<{ id: string }>>(await call("GET", "/projects")) ?? [];
+  let sites = 0;
+  let issuesCreated = 0;
+  let issuesResolved = 0;
+  for (const project of projects) {
+    const projectSites = unwrap<Array<{ id: string }>>(await call("GET", `/projects/${project.id}/sites`)) ?? [];
+    for (const site of projectSites) {
+      const res = await call("POST", `/projects/${project.id}/sites/${site.id}/web-vitals/evaluate`);
+      if (res.status >= 400) continue;
+      sites += 1;
+      const result = unwrap<{ created?: number; resolved?: number }>(res);
+      issuesCreated += result?.created ?? 0;
+      issuesResolved += result?.resolved ?? 0;
+    }
+  }
+  return { sites, issuesCreated, issuesResolved };
+}
+
 export interface DrainMaintenanceJobsResult {
   healthChecks: number;
   sourceMapRefreshes: number;

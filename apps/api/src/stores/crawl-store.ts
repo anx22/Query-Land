@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { calculateHealthScore, EMPTY_ON_PAGE_SIGNALS, type AuditIssueHistoryEntry, type AuditIssueRecord, type AuditIssueSeverity, type CrawlFrontierEntry, type CrawlHealthScore, type CrawlPageSignal, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type IndexabilityRecord, type OnPageSignals, type UrlFetchRecord } from "@seo-tool/domain-model";
+import { calculateHealthScore, EMPTY_ON_PAGE_SIGNALS, evaluateWebVitalIssues, WEB_VITAL_THRESHOLDS, type AuditIssueHistoryEntry, type AuditIssueRecord, type AuditIssueSeverity, type CrawlFrontierEntry, type CrawlHealthScore, type CrawlPageSignal, type CrawlRun, type CrawlRunStatus, type DiscoveredUrl, type FetchStatusClass, type IndexabilityRecord, type OnPageSignals, type UrlFetchRecord } from "@seo-tool/domain-model";
 import { countIssueSeverities, emptyCrawlRunSummary, mapAuditIssueHistoryEntry, mapAuditIssueRecord, mapCrawlHealthScore, mapCrawlRun, mapDiscoveredUrl, mapIndexabilityRecord, mapUrlFetchRecord } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError } from "./store-errors.js";
@@ -53,6 +53,7 @@ export interface CrawlStore {
   completeCrawlRun(projectId: string, siteId: string, runId: string, status: Extract<CrawlRun["status"], "succeeded" | "failed">, errorMessage?: string): Promise<CrawlRun>;
   listHealthScores(projectId: string, siteId: string): Promise<CrawlHealthScore[]>;
   computeHealthScore(projectId: string, siteId: string): Promise<CrawlHealthScore>;
+  evaluateWebVitalIssues(projectId: string, siteId: string): Promise<{ created: number; resolved: number }>;
   listAuditIssues(projectId: string, siteId: string): Promise<AuditIssueRecord[]>;
   listAuditIssuesPage(projectId: string, siteId: string, options?: ListPageOptions, filters?: AuditIssueListFilters): Promise<ListPage<AuditIssueRecord>>;
   /** Project-wide top-N open audit issues, severity-ranked in SQL (critical→low). One query across all sites. */
@@ -306,6 +307,58 @@ class SQLiteCrawlStore implements CrawlStore {
     `).run(score.id, projectId, siteId, score.score, score.totalIssues, JSON.stringify(score.issueCounts), score.generatedAt);
     await this.audit("system", "crawl.health.compute", "site", siteId, { projectId, score: score.score, totalIssues: score.totalIssues });
     return score;
+  }
+
+  /**
+   * Turn the site's latest Core Web Vitals (PSI metrics in normalized_metrics) into audit issues
+   * (lcp_slow/cls_high/inp_slow/ttfb_slow), attached to the site's home URL, then recompute health.
+   * Reconciles ONLY the vitals rules — a metric that improved back to "good" resolves its issue and
+   * crawl issues are left untouched. Idempotent: one issue per (site, vital) via a deterministic id.
+   */
+  async evaluateWebVitalIssues(projectId: string, siteId: string): Promise<{ created: number; resolved: number }> {
+    await this.assertSiteScope(projectId, siteId);
+    const site = await this.db.prepare(`SELECT base_url FROM sites WHERE id = ? AND project_id = ?`).get(siteId, projectId) as { base_url?: string } | undefined;
+    const homeUrl = site?.base_url ? String(site.base_url) : null;
+    if (!homeUrl) return { created: 0, resolved: 0 };
+
+    const rows = await this.db.prepare(`SELECT metric, value FROM normalized_metrics WHERE project_id = ? AND entity_type = 'site' AND entity_id = ? AND metric LIKE 'psi\\_%' ESCAPE '\\' ORDER BY measured_at DESC`).all(projectId, siteId);
+    const latest: Record<string, number> = {};
+    for (const row of rows) {
+      const metric = String(row.metric);
+      if (!(metric in latest)) latest[metric] = Number(row.value);
+    }
+
+    const issues = evaluateWebVitalIssues(latest);
+    const newById = new Map(issues.map((issue) => [`wv-${siteId}-${issue.rule}`, issue]));
+    const vitalRules = WEB_VITAL_THRESHOLDS.map((threshold) => threshold.rule);
+    const home = await this.db.prepare(`SELECT id FROM discovered_urls WHERE project_id = ? AND site_id = ? AND (url = ? OR normalized_url = ?) LIMIT 1`).get(projectId, siteId, homeUrl, homeUrl) as { id?: string } | undefined;
+    const discoveredUrlId = home?.id ? String(home.id) : null;
+    const now = new Date().toISOString();
+
+    let created = 0;
+    let resolved = 0;
+    await this.db.transaction(async (tx) => {
+      const placeholders = vitalRules.map(() => "?").join(", ");
+      const open = await tx.prepare(`SELECT id FROM audit_issues WHERE project_id = ? AND site_id = ? AND resolved_at IS NULL AND dismissed_at IS NULL AND rule IN (${placeholders})`).all(projectId, siteId, ...vitalRules);
+      for (const row of open) {
+        const id = String(row.id);
+        if (newById.has(id)) continue; // still flagged → keep open
+        const result = await tx.prepare(`UPDATE audit_issues SET resolved_at = ?, updated_at = ? WHERE id = ?`).run(now, now, id);
+        resolved += Number(result.changes ?? 0);
+      }
+      for (const [id, issue] of newById) {
+        const existing = await tx.prepare(`SELECT 1 FROM audit_issues WHERE id = ?`).get(id);
+        await tx.prepare(`
+          INSERT INTO audit_issues (id, project_id, site_id, discovered_url_id, url, rule, severity, message, detected_at, resolved_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+          ON CONFLICT(id) DO UPDATE SET severity = excluded.severity, message = excluded.message, resolved_at = NULL, updated_at = excluded.updated_at
+        `).run(id, projectId, siteId, discoveredUrlId, homeUrl, issue.rule, issue.severity, issue.message, now, now);
+        if (!existing) created += 1;
+      }
+    });
+    await this.computeHealthScore(projectId, siteId);
+    await this.audit("system", "web_vitals.evaluate", "site", siteId, { projectId, created, resolved });
+    return { created, resolved };
   }
 
   async listAuditIssues(projectId: string, siteId: string): Promise<AuditIssueRecord[]> {

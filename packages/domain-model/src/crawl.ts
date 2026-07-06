@@ -87,7 +87,12 @@ export const AUDIT_ISSUE_RULES = [
   "missing_html_lang",
   "mixed_content",
   "hreflang_invalid",
-  "structured_data_missing"
+  "structured_data_missing",
+  // Core Web Vitals (from PageSpeed Insights; see web-vitals.ts thresholds)
+  "lcp_slow",
+  "cls_high",
+  "inp_slow",
+  "ttfb_slow"
 ] as const;
 
 export type AuditIssueRule = (typeof AUDIT_ISSUE_RULES)[number];

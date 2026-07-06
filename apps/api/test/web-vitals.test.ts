@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { evaluateWebVitalIssues } from "@seo-tool/domain-model";
 import { createApp } from "../src/app.js";
 import { createStore } from "../src/store.js";
 
@@ -58,6 +59,31 @@ test("repeated sync keeps one latest value per web-vital metric", async () => {
     await app("POST", `/integrations/${integrationId}/sync`, { siteId });
     const vitals = data<WebVital[]>(await app("GET", `/projects/${projectId}/sites/${siteId}/web-vitals`));
     assert.equal(vitals.length, 4, "latest-per-metric, not duplicated across runs");
+  } finally {
+    await store.close();
+  }
+});
+
+test("evaluateWebVitalIssues (pure): poor → high, needs-improvement → medium, good → none", () => {
+  const issues = evaluateWebVitalIssues({ psi_lcp_ms: 4500, psi_ttfb_ms: 1200, psi_cls: 0.05, psi_inp_ms: 180 });
+  const byRule = new Map(issues.map((i) => [i.rule, i]));
+  assert.equal(byRule.get("lcp_slow")?.severity, "high", "LCP 4500ms is poor → high");
+  assert.equal(byRule.get("ttfb_slow")?.severity, "medium", "TTFB 1200ms is needs-improvement → medium");
+  assert.ok(!byRule.has("cls_high"), "CLS 0.05 is good → no issue");
+  assert.ok(!byRule.has("inp_slow"), "INP 180ms is good → no issue");
+});
+
+test("web-vitals evaluate turns poor vitals into audit issues and clears them when good", async () => {
+  const { app, store } = await testApp();
+  try {
+    const { projectId, siteId, integrationId } = await seed(app, "evaluate");
+    // Stub PSI values are all within the "good" band → evaluation creates no vitals issues.
+    await app("POST", `/integrations/${integrationId}/sync`, { siteId });
+    const result = data<{ created: number; resolved: number }>(await app("POST", `/projects/${projectId}/sites/${siteId}/web-vitals/evaluate`));
+    assert.equal(result.created, 0, "good vitals produce no issues (no false positives)");
+
+    const issues = data<Array<{ rule: string }>>(await app("GET", `/projects/${projectId}/sites/${siteId}/audit-issues`));
+    assert.ok(!issues.some((i) => ["lcp_slow", "cls_high", "inp_slow", "ttfb_slow"].includes(i.rule)), "no vitals issues on a healthy site");
   } finally {
     await store.close();
   }

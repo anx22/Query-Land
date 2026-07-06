@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sourceConfidenceForProvider, validateBusinessValue, type IntegrationAccount, type IntegrationProvider, type Project, type Site } from "@seo-tool/domain-model";
 import { getConnector, type ConnectorContract } from "../connectors/index.js";
 import { encryptJson, decryptJson } from "../oauth/token-crypto.js";
+import { resolveGscAdapterContext } from "../oauth/gsc-credentials.js";
 import { mapIntegration, mapProject, mapSite } from "../row-mappers.js";
 import type { AuditLog } from "./audit-log.js";
 import { RequestError, sqliteConstraintError } from "./store-errors.js";
@@ -321,7 +322,15 @@ class SQLiteProjectStore implements ProjectStore {
     const hasCredentials = this.hasCredentials(row as Record<string, unknown>);
     // Real-adapter inputs: decrypted auth_config (may carry tokens/keys) + the site URL to query.
     // The site-scoped entity wins; otherwise the project's primary site base_url.
-    const authConfig = this.decodeAuthConfig((row as Record<string, unknown>).auth_config);
+    let authConfig = this.decodeAuthConfig((row as Record<string, unknown>).auth_config);
+    // WS5: generalize OAuth token refresh to the connector-sync path. For GSC, refresh + persist the
+    // access token (like the search-performance path) BEFORE the live call, so an aggregate metric
+    // sync no longer degrades to `expired` once the ~1h access token lapses. resolveGscAdapterContext
+    // returns fresh, persisted creds (or null → fall through to the stored config / honest degraded).
+    if (integration.provider === "gsc") {
+      const gscContext = await resolveGscAdapterContext(this.db, integration.projectId);
+      if (gscContext) authConfig = gscContext.creds;
+    }
     const siteUrl = options.siteId
       ? String((await this.db.prepare(`SELECT base_url FROM sites WHERE id = ?`).get(options.siteId) as Record<string, unknown> | undefined)?.base_url ?? "") || null
       : await this.primarySiteUrl(integration.projectId);

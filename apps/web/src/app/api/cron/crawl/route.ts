@@ -6,7 +6,7 @@ import { runGscRefreshAll } from "../../../../lib/gsc-refresh";
 import { runDueReportSchedules } from "../../../../lib/reports-cron";
 import { drainOpportunityRevalidations, enqueueDueOpportunityRevalidations } from "../../../../lib/opportunity-revalidate-cron";
 import { evaluateAllAlerts } from "../../../../lib/alerts-cron";
-import { drainMaintenanceJobs, enqueueDueHealthChecks } from "../../../../lib/maintenance-cron";
+import { drainMaintenanceJobs, enqueueDueHealthChecks, evaluateAllWebVitals } from "../../../../lib/maintenance-cron";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,6 +53,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Pull the rest of the GSC data paths (search-performance, rank/visibility, index status) for every
   // connected project. skipConnectorSync: the drain above already ran the aggregate connector sync.
   const gsc = await runGscRefreshAll(call, { skipConnectorSync: true });
+  // Turn freshly-synced Core Web Vitals into audit issues + fold them into the health score.
+  const webVitals = await evaluateAllWebVitals(call);
   // Drive the async opportunity-validation loop (§6.5): re-enqueue a re-check for every implemented
   // opportunity, then drain the revalidation jobs (flip to validated/reopened once evidence lands).
   const revalEnqueued = await enqueueDueOpportunityRevalidations(call);
@@ -66,5 +68,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Generate + deliver any report schedules that have fallen due.
   const reports = await runDueReportSchedules(call);
 
-  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued }, gsc, revalidations: { ...revalidations, enqueued: revalEnqueued }, alerts, maintenance: { ...maintenance, enqueued: maintenanceEnqueued }, reports });
+  return NextResponse.json({ ok: true, crawl, connectors: { ...connectors, enqueued }, gsc, webVitals, revalidations: { ...revalidations, enqueued: revalEnqueued }, alerts, maintenance: { ...maintenance, enqueued: maintenanceEnqueued }, reports });
 }
