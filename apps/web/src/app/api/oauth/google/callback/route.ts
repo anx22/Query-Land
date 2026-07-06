@@ -41,6 +41,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return fail("Kein dauerhafter Zugriff erhalten. Bitte den App-Zugriff im Google-Konto entfernen und erneut verbinden.");
     }
 
+    // GA4: the numeric property id is chosen by the user up front (GA4 has no host to auto-match),
+    // so store the credentials with that property and let the connector sync fetch analytics data.
+    if (state.provider === "ga4") {
+      if (!state.propertyId) return fail("Keine GA4-Property-ID im Anmelde-Vorgang. Bitte erneut verbinden.");
+      const upsert = await callInternalApi("POST", "/integrations/credentials", {
+        projectId: state.projectId,
+        provider: "ga4",
+        property: state.propertyId,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+      });
+      if (upsert.status >= 400) return fail("Die GA4-Verbindung konnte nicht gespeichert werden.");
+      settings.searchParams.set("connected", "ga4");
+      return NextResponse.redirect(settings);
+    }
+
     const sites = await client.listSites(tokens.accessToken);
     const sitesResponse = await callInternalApi("GET", `/projects/${state.projectId}/sites`);
     const projectSites = ((sitesResponse.body as { data?: Array<{ baseUrl?: string }> } | undefined)?.data) ?? [];

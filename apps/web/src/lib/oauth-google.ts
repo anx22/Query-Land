@@ -10,6 +10,8 @@ export const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 export interface OAuthState {
   projectId: string;
   provider: string;
+  /** GA4 numeric property id carried through the flow (null for GSC, which auto-matches by host). */
+  propertyId: string | null;
   ts: number;
 }
 
@@ -26,7 +28,7 @@ export function verifyOAuthState(stateRaw: string | null, now: number = Date.now
   const s = decoded as Record<string, unknown>;
   if (typeof s.projectId !== "string" || typeof s.provider !== "string" || typeof s.ts !== "number") return null;
   if (now - s.ts > OAUTH_STATE_TTL_MS || s.ts > now + 60_000) return null;
-  return { projectId: s.projectId, provider: s.provider, ts: s.ts };
+  return { projectId: s.projectId, provider: s.provider, propertyId: typeof s.propertyId === "string" ? s.propertyId : null, ts: s.ts };
 }
 
 export function hostOf(url: string | null | undefined): string | null {

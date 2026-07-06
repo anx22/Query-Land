@@ -10,7 +10,7 @@ describe("verifyOAuthState", () => {
   it("accepts a fresh, well-formed state", () => {
     const now = 1_000_000;
     const state = encryptJson({ projectId: "proj-x", provider: "gsc", ts: now });
-    expect(verifyOAuthState(state, now)).toEqual({ projectId: "proj-x", provider: "gsc", ts: now });
+    expect(verifyOAuthState(state, now)).toEqual({ projectId: "proj-x", provider: "gsc", propertyId: null, ts: now });
   });
 
   it("rejects an expired state", () => {

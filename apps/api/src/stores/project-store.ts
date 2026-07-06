@@ -327,9 +327,9 @@ class SQLiteProjectStore implements ProjectStore {
     // access token (like the search-performance path) BEFORE the live call, so an aggregate metric
     // sync no longer degrades to `expired` once the ~1h access token lapses. resolveGscAdapterContext
     // returns fresh, persisted creds (or null → fall through to the stored config / honest degraded).
-    if (integration.provider === "gsc") {
-      const gscContext = await resolveGscAdapterContext(this.db, integration.projectId);
-      if (gscContext) authConfig = gscContext.creds;
+    if (integration.provider === "gsc" || integration.provider === "ga4") {
+      const oauthContext = await resolveGscAdapterContext(this.db, integration.projectId, integration.provider);
+      if (oauthContext) authConfig = oauthContext.creds;
     }
     const siteUrl = options.siteId
       ? String((await this.db.prepare(`SELECT base_url FROM sites WHERE id = ?`).get(options.siteId) as Record<string, unknown> | undefined)?.base_url ?? "") || null

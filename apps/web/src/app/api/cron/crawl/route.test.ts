@@ -9,6 +9,16 @@ vi.mock("../../../../lib/connector-sync-cron", () => ({
 }));
 vi.mock("../../../../lib/reports-cron", () => ({ runDueReportSchedules: vi.fn(async () => ({ delivered: 0 })) }));
 vi.mock("../../../../lib/gsc-refresh", () => ({ runGscRefreshAll: vi.fn(async () => ({ refreshed: 0 })) }));
+vi.mock("../../../../lib/opportunity-revalidate-cron", () => ({
+  enqueueDueOpportunityRevalidations: vi.fn(async () => ({ scheduled: 0, alreadyQueued: 0, implemented: 0 })),
+  drainOpportunityRevalidations: vi.fn(async () => ({ processed: 0, validated: 0, reopened: 0, pending: 0, stoppedReason: "empty" })),
+}));
+vi.mock("../../../../lib/alerts-cron", () => ({ evaluateAllAlerts: vi.fn(async () => ({ projects: 0, evaluated: 0, triggered: 0 })) }));
+vi.mock("../../../../lib/maintenance-cron", () => ({
+  enqueueDueHealthChecks: vi.fn(async () => ({ scheduled: 0, alreadyQueued: 0, sites: 0 })),
+  drainMaintenanceJobs: vi.fn(async () => ({ healthChecks: 0, sourceMapRefreshes: 0, recrawlsScheduled: 0, stoppedReason: "empty" })),
+  evaluateAllWebVitals: vi.fn(async () => ({ sites: 0, issuesCreated: 0, issuesResolved: 0 })),
+}));
 
 import { NextRequest } from "next/server";
 import { GET } from "./route";

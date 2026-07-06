@@ -1,11 +1,12 @@
 import type { IntegrationProvider, SourceConfidence } from "@seo-tool/domain-model";
 import {
   resolveGscCredentials,
+  resolveGa4Credentials,
   resolvePsiCredentials,
   hasRealCredentials,
   type EnvSource
 } from "./credential-resolution.js";
-import { fetchGscLive, fetchPsiLive, type FetchImpl } from "./adapters.js";
+import { fetchGscLive, fetchGa4Live, fetchPsiLive, type FetchImpl } from "./adapters.js";
 
 // Connector-Vertrag gemäß specs/integrations.md (§4.2): source_type, auth_config (am
 // integration_account), fetch, validate, normalize sowie quota_status/freshness (pro Lauf
@@ -299,7 +300,12 @@ const ga4Connector = metricConnector({
     { metric: "sessions", value: 3120 },
     { metric: "users", value: 2480 },
     { metric: "engagement_rate", value: 0.612 }
-  ]
+  ],
+  liveFetch(ctx) {
+    const creds = resolveGa4Credentials(ctx.authConfig, ctx.env ?? (process.env as EnvSource));
+    if (!creds) return null;
+    return fetchGa4Live(creds, { now: ctx.now, fetchImpl: ctx.fetchImpl ?? fetch });
+  }
 });
 
 const pagespeedConnector = metricConnector({

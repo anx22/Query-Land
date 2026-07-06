@@ -13,7 +13,7 @@
  * Never log token/key values.
  */
 import type { ConnectorFetchResult } from "./index.js";
-import type { ResolvedGscCredentials, ResolvedPsiCredentials } from "./credential-resolution.js";
+import type { ResolvedGa4Credentials, ResolvedGscCredentials, ResolvedPsiCredentials } from "./credential-resolution.js";
 
 export type FetchImpl = typeof fetch;
 
@@ -24,6 +24,7 @@ interface MetricRow {
 
 const GSC_SEARCH_ANALYTICS_BASE = "https://www.googleapis.com/webmasters/v3/sites";
 const PSI_ENDPOINT = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
+const GA4_DATA_API_BASE = "https://analyticsdata.googleapis.com/v1beta";
 
 function num(value: unknown, fallback = 0): number {
   const n = Number(value);
@@ -166,5 +167,63 @@ export async function fetchPsiLive(
     return okResult(rows, opts.now);
   } catch (error) {
     return failureResult(opts.variant, null, error instanceof Error ? error.message : String(error), opts.now);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GA4 (Google Analytics 4) — Data API runReport
+// ---------------------------------------------------------------------------
+
+/** Pure mapper: a GA4 runReport response (metric totals, no dimensions) → ga4 connector metric rows. */
+export function mapGa4Rows(json: Record<string, unknown>): MetricRow[] {
+  const headers = (Array.isArray(json.metricHeaders) ? json.metricHeaders : []) as Array<{ name?: unknown }>;
+  const rows = (Array.isArray(json.rows) ? json.rows : []) as Array<{ metricValues?: Array<{ value?: unknown }> }>;
+  const values = rows[0]?.metricValues ?? [];
+  const byName = new Map<string, number>();
+  headers.forEach((header, index) => {
+    const name = typeof header.name === "string" ? header.name : "";
+    if (name) byName.set(name, num(values[index]?.value));
+  });
+  return [
+    { metric: "sessions", value: byName.get("sessions") ?? 0 },
+    { metric: "users", value: byName.get("totalUsers") ?? 0 },
+    { metric: "engagement_rate", value: byName.get("engagementRate") ?? 0 },
+  ];
+}
+
+/** Normalise a GA4 property id to the API path form `properties/<numeric>`. */
+function ga4PropertyPath(propertyId: string): string {
+  const trimmed = propertyId.trim();
+  return trimmed.startsWith("properties/") ? trimmed : `properties/${trimmed.replace(/^properties\//, "")}`;
+}
+
+export async function fetchGa4Live(
+  creds: ResolvedGa4Credentials,
+  opts: { now: string; fetchImpl: FetchImpl }
+): Promise<ConnectorFetchResult> {
+  // 28-day window ending yesterday (deterministic relative to ctx.now), mirroring the GSC adapter.
+  const end = new Date(opts.now);
+  end.setUTCDate(end.getUTCDate() - 1);
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 27);
+  const body = {
+    dateRanges: [{ startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) }],
+    metrics: [{ name: "sessions" }, { name: "totalUsers" }, { name: "engagementRate" }],
+  };
+  const url = `${GA4_DATA_API_BASE}/${ga4PropertyPath(creds.propertyId)}:runReport`;
+  try {
+    const res = await opts.fetchImpl(url, {
+      method: "POST",
+      headers: { authorization: `Bearer ${creds.accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const msg = typeof json.error === "object" && json.error ? String((json.error as Record<string, unknown>).message ?? res.statusText) : res.statusText;
+      return failureResult("ga4", res.status, msg, opts.now);
+    }
+    return okResult(mapGa4Rows(json), opts.now);
+  } catch (error) {
+    return failureResult("ga4", null, error instanceof Error ? error.message : String(error), opts.now);
   }
 }

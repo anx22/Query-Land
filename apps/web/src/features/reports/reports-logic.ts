@@ -57,6 +57,8 @@ export function labelForMetric(metric: AlertMetric): string {
       return "Offene Chancen";
     case "referring_domains":
       return "Verweisende Domains";
+    case "search_clicks":
+      return "Klicks (Suche)";
     default:
       return metric;
   }

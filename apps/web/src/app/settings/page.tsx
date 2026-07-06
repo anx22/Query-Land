@@ -43,7 +43,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
   // it is presented as a not-yet-set-up source, exactly like GA4 — never a live button that errors.
   const providers: ConnectorProvider[] = [
     { provider: "gsc", label: "Google Search Console", available: gscOAuthConfigured(), description: "Klicks, Impressionen, Positionen und Index-Status direkt aus Google." },
-    { provider: "ga4", label: "Google Analytics 4", available: false, description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." },
+    { provider: "ga4", label: "Google Analytics 4", available: gscOAuthConfigured(), description: "Nutzungs-, Landingpage- und Conversion-Daten für den Geschäftswert." },
+    { provider: "pagespeed", label: "PageSpeed Insights", available: true, description: "Core Web Vitals (LCP/CLS/INP/TTFB) je Site — fließen als Findings in den Health-Score. Nutzt den PAGESPEED_API_KEY." },
   ];
   // The status pill renders its `status` string verbatim, so it must already be German — the raw
   // enum ("connected"/"queued"/"empty") must never reach the UI. The label carries the name only;
@@ -106,9 +107,8 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                     <div className="locked-action">
                       <span className="badge">Noch nicht verfügbar</span>
                       <span className="locked-action__reason">
-                        {connector.provider === "gsc"
-                          ? "Die Google-Search-Console-Anbindung ist auf diesem Server noch nicht eingerichtet. Sie wird aktiv, sobald die Google-OAuth-Zugangsdaten hinterlegt sind."
-                          : "Diese Datenquelle wird bald anschließbar — Google Analytics 4 folgt in einer der nächsten Wellen."}
+                        Die Google-Anbindung ist auf diesem Server noch nicht eingerichtet. Sie wird
+                        aktiv, sobald die Google-OAuth-Zugangsdaten hinterlegt sind.
                       </span>
                     </div>
                   ) : connector.provider === "gsc" ? (
@@ -122,6 +122,17 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                         Mit Google verbinden
                       </button>
                     )
+                  ) : connector.provider === "ga4" ? (
+                    // GA4 shares the Google OAuth flow but needs the numeric property id up front
+                    // (there is no host to auto-match). A GET form appends it to the authorize URL.
+                    <form method="get" action="/api/oauth/google/authorize">
+                      <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
+                      <input type="hidden" name="provider" value="ga4" />
+                      <input type="text" name="propertyId" inputMode="numeric" placeholder="GA4-Property-ID (z. B. 123456789)" aria-label="GA4-Property-ID" required />
+                      <button className="button" type="submit" disabled={!data.connected || !selectedProject}>
+                        {isConnected ? "GA4 neu verbinden" : "Mit GA4 verbinden"}
+                      </button>
+                    </form>
                   ) : (
                     <form action={createConnectorAction}>
                       <input type="hidden" name="projectId" value={selectedProject?.id ?? ""} />
@@ -280,6 +291,7 @@ function providerLabel(provider: string): string {
   const key = provider.toLowerCase();
   if (key === "gsc") return "Google Search Console";
   if (key === "ga4") return "Google Analytics 4";
+  if (key === "pagespeed") return "PageSpeed Insights";
   return provider.toUpperCase();
 }
 

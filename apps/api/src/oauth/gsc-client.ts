@@ -15,6 +15,8 @@ const SEARCH_ANALYTICS_BASE = "https://www.googleapis.com/webmasters/v3/sites";
 const URL_INSPECTION_ENDPOINT = "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect";
 
 export const GSC_OAUTH_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+/** GA4 shares the same Google OAuth client/endpoints; only the scope + data API differ. */
+export const GA4_OAUTH_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 export const GSC_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 
 export type FetchImpl = typeof fetch;

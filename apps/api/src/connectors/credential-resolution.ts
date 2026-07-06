@@ -31,9 +31,16 @@ export interface ResolvedPsiCredentials {
   apiKey: string;
 }
 
-export type ResolvedCredentials = ResolvedGscCredentials | ResolvedPsiCredentials;
+export interface ResolvedGa4Credentials {
+  kind: "ga4";
+  accessToken: string;
+  /** GA4 numeric property id (e.g. "properties/123456789" or "123456789"). */
+  propertyId: string;
+}
 
-/** Shape of a decrypted GSC auth_config (best-effort; fields optional). */
+export type ResolvedCredentials = ResolvedGscCredentials | ResolvedPsiCredentials | ResolvedGa4Credentials;
+
+/** Shape of a decrypted GSC/GA4 auth_config (best-effort; fields optional). */
 interface AuthConfigShape {
   accessToken?: unknown;
   property?: unknown;
@@ -68,6 +75,19 @@ export function resolvePsiCredentials(authConfig: unknown, env: EnvSource): Reso
 }
 
 /**
+ * Resolve real GA4 credentials: an OAuth access token (from the integration's decrypted auth_config,
+ * or the GA4_ACCESS_TOKEN env) plus a GA4 property id (auth_config.property or GA4_PROPERTY_ID).
+ * Returns null when either is missing (=> honest empty / stub-disabled).
+ */
+export function resolveGa4Credentials(authConfig: unknown, env: EnvSource): ResolvedGa4Credentials | null {
+  const cfg = (authConfig && typeof authConfig === "object" ? authConfig : {}) as AuthConfigShape;
+  const accessToken = asString(cfg.accessToken) ?? asString(env.GA4_ACCESS_TOKEN);
+  const propertyId = asString(cfg.property) ?? asString(env.GA4_PROPERTY_ID);
+  if (!accessToken || !propertyId) return null;
+  return { kind: "ga4", accessToken, propertyId };
+}
+
+/**
  * Whether REAL credentials are configured for a provider (drives the live path + a more
  * accurate authStatus). Falls back to false for providers without a real adapter.
  */
@@ -75,6 +95,8 @@ export function hasRealCredentials(provider: IntegrationProvider, authConfig: un
   switch (provider) {
     case "gsc":
       return resolveGscCredentials(authConfig, env) !== null;
+    case "ga4":
+      return resolveGa4Credentials(authConfig, env) !== null;
     case "pagespeed":
     case "lighthouse":
       // Lighthouse is derived from the PSI response, so it shares PSI's key.

@@ -47,12 +47,16 @@ function isUsableAuthConfig(value: unknown): value is GscAuthConfig {
   return typeof c.accessToken === "string" && typeof c.refreshToken === "string" && typeof c.property === "string" && typeof c.expiresAt === "string";
 }
 
-/** Load the decrypted, connected GSC credentials for a project, or null when not connectable. */
-export async function loadActiveGscCredentials(db: AsyncDatabase, projectId: string): Promise<GscAuthConfig | null> {
+/**
+ * Load the decrypted, connected Google OAuth credentials for a project + provider, or null when not
+ * connectable. GA4 shares the exact auth_config shape (access/refresh token + expiry + property),
+ * so the same loader/refresher serve both — only the provider row differs.
+ */
+export async function loadActiveGscCredentials(db: AsyncDatabase, projectId: string, provider: "gsc" | "ga4" = "gsc"): Promise<GscAuthConfig | null> {
   if (!oauthEncryptionConfigured()) return null;
   const row = (await db
-    .prepare(`SELECT auth_config, status FROM integration_accounts WHERE project_id = ? AND provider = 'gsc'`)
-    .get(projectId)) as { auth_config?: string; status?: string } | undefined;
+    .prepare(`SELECT auth_config, status FROM integration_accounts WHERE project_id = ? AND provider = ?`)
+    .get(projectId, provider)) as { auth_config?: string; status?: string } | undefined;
   if (!row || row.status !== "connected" || !row.auth_config) return null;
   try {
     const decrypted = decryptJson<unknown>(row.auth_config);
@@ -71,6 +75,7 @@ export async function ensureFreshToken(
   projectId: string,
   client: GscClient,
   creds: GscAuthConfig,
+  provider: "gsc" | "ga4" = "gsc",
 ): Promise<GscAuthConfig | null> {
   const expired = Date.parse(creds.expiresAt) - EXPIRY_SKEW_MS <= Date.now();
   if (!expired) return creds;
@@ -83,14 +88,14 @@ export async function ensureFreshToken(
       property: creds.property,
     };
     await db
-      .prepare(`UPDATE integration_accounts SET auth_config = ?, status = 'connected', updated_at = ? WHERE project_id = ? AND provider = 'gsc'`)
-      .run(encryptJson(next), new Date().toISOString(), projectId);
+      .prepare(`UPDATE integration_accounts SET auth_config = ?, status = 'connected', updated_at = ? WHERE project_id = ? AND provider = ?`)
+      .run(encryptJson(next), new Date().toISOString(), projectId, provider);
     return next;
   } catch (error) {
     if (error instanceof GscApiError && error.isAuthError) {
       await db
-        .prepare(`UPDATE integration_accounts SET status = 'error', updated_at = ? WHERE project_id = ? AND provider = 'gsc'`)
-        .run(new Date().toISOString(), projectId);
+        .prepare(`UPDATE integration_accounts SET status = 'error', updated_at = ? WHERE project_id = ? AND provider = ?`)
+        .run(new Date().toISOString(), projectId, provider);
     }
     return null;
   }
@@ -101,13 +106,16 @@ export interface GscAdapterContext {
   creds: GscAuthConfig;
 }
 
-/** Resolve a ready-to-query GSC context (client + fresh creds) for a project, or null to fall back. */
-export async function resolveGscAdapterContext(db: AsyncDatabase, projectId: string): Promise<GscAdapterContext | null> {
+/**
+ * Resolve a ready-to-query Google adapter context (client + fresh, persisted creds) for a project +
+ * provider, or null to fall back to the honest empty state. Works for both GSC and GA4 (same client).
+ */
+export async function resolveGscAdapterContext(db: AsyncDatabase, projectId: string, provider: "gsc" | "ga4" = "gsc"): Promise<GscAdapterContext | null> {
   const client = buildClient();
   if (!client) return null;
-  const creds = await loadActiveGscCredentials(db, projectId);
+  const creds = await loadActiveGscCredentials(db, projectId, provider);
   if (!creds) return null;
-  const fresh = await ensureFreshToken(db, projectId, client, creds);
+  const fresh = await ensureFreshToken(db, projectId, client, creds, provider);
   if (!fresh) return null;
   return { client, creds: fresh };
 }

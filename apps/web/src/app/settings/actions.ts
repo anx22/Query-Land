@@ -8,7 +8,7 @@ import { createFoundationIntegration } from "../../lib/foundation-api";
 import { callInternalApi } from "../../lib/server-api";
 import { runGscRefreshForProject } from "../../lib/gsc-refresh";
 
-const allowedProviders = ["gsc", "ga4"] as const;
+const allowedProviders = ["gsc", "ga4", "pagespeed"] as const;
 
 type ConnectorProvider = typeof allowedProviders[number];
 

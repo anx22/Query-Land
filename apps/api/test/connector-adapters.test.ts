@@ -6,7 +6,7 @@ import {
   resolvePsiCredentials,
   hasRealCredentials
 } from "../src/connectors/credential-resolution.js";
-import { mapGscRows, mapPsiRows, mapLighthouseRows } from "../src/connectors/adapters.js";
+import { mapGscRows, mapPsiRows, mapLighthouseRows, mapGa4Rows } from "../src/connectors/adapters.js";
 import { createStore } from "../src/store.js";
 import { createApp } from "../src/app.js";
 
@@ -191,6 +191,34 @@ test("PSI fetch: real success maps web vitals; lighthouse derives from the same 
   );
   assert.equal(lh.outcome, "ok");
   assert.equal((lh.payload as { rows: Array<{ metric: string; value: number }> }).rows.find((r) => r.metric === "performance")!.value, 0.88);
+});
+
+test("mapGa4Rows maps runReport metric totals to sessions/users/engagement_rate", () => {
+  const json = {
+    metricHeaders: [{ name: "sessions" }, { name: "totalUsers" }, { name: "engagementRate" }],
+    rows: [{ metricValues: [{ value: "3120" }, { value: "2480" }, { value: "0.61" }] }],
+  };
+  const byMetric = Object.fromEntries(mapGa4Rows(json).map((r) => [r.metric, r.value]));
+  assert.equal(byMetric.sessions, 3120);
+  assert.equal(byMetric.users, 2480);
+  assert.equal(byMetric.engagement_rate, 0.61);
+});
+
+test("GA4 fetch: real success maps live rows when a token + property are present", async () => {
+  const connector = getConnector("ga4")!;
+  let calledUrl = "";
+  const json = { metricHeaders: [{ name: "sessions" }], rows: [{ metricValues: [{ value: "42" }] }] };
+  const result = await connector.fetch(baseCtx({ env: { GA4_ACCESS_TOKEN: "tok", GA4_PROPERTY_ID: "123456789" }, fetchImpl: fakeFetch(200, json, (u) => (calledUrl = u)) }));
+  assert.equal(result.outcome, "ok");
+  assert.match(calledUrl, /properties\/123456789:runReport/);
+  const rows = (result.payload as { rows: Array<{ metric: string; value: number }> }).rows;
+  assert.equal(rows.find((r) => r.metric === "sessions")!.value, 42);
+});
+
+test("GA4 fetch: no real credentials + stub disabled → missing_credentials (no fabricated analytics)", async () => {
+  const result = await getConnector("ga4")!.fetch(baseCtx({ env: {} }));
+  assert.equal(result.outcome, "missing_credentials");
+  assert.equal(result.payload, null);
 });
 
 test("PSI fetch: missing key + stub disabled → missing_credentials (no fabricated web vitals)", async () => {
