@@ -8,6 +8,7 @@
  */
 
 import type { AuditIssueSeverity, CrawlRun, CrawlRunDiffIssue } from "@seo-tool/domain-model";
+import { ruleLabel } from "./issue-labels";
 
 // ---------------------------------------------------------------------------
 // Delta formatting (sign + tone, null-safe)
@@ -79,15 +80,6 @@ const SEVERITY_BADGE: Record<AuditIssueSeverity, string> = {
   low: "",
 };
 
-const RULE_LABEL: Record<CrawlRunDiffIssue["rule"], string> = {
-  http_error: "HTTP-Fehler",
-  redirect_chain: "Redirect-Kette",
-  missing_title: "Fehlender Title",
-  duplicate_title: "Doppelter Title",
-  canonical_mismatch: "Canonical-Abweichung",
-  broken_link: "Defekter Link",
-};
-
 /** Human-readable label for an audit-issue severity (German). */
 export function severityLabel(severity: AuditIssueSeverity): string {
   return SEVERITY_LABEL[severity] ?? severity;
@@ -98,9 +90,9 @@ export function severityBadgeTone(severity: AuditIssueSeverity): string {
   return SEVERITY_BADGE[severity] ?? "";
 }
 
-/** Human-readable label for an audit-issue rule (German). */
+/** Human-readable label for an audit-issue rule (German). Reuses the single RULE_LABEL source. */
 export function diffRuleLabel(rule: CrawlRunDiffIssue["rule"]): string {
-  return RULE_LABEL[rule] ?? rule;
+  return ruleLabel(rule);
 }
 
 // ---------------------------------------------------------------------------

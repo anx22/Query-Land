@@ -72,8 +72,11 @@ export async function resolveSearchAnalyticsProvider(
           rowLimit: 1000,
         });
         return mapSearchAnalyticsRows(rows);
-      } catch {
-        // Transient/auth errors degrade to an empty batch rather than crashing the sync.
+      } catch (error) {
+        // Transient/auth errors degrade to an empty batch rather than crashing the sync — but SURFACE
+        // the reason in the logs so "the fetch failed" is distinguishable from "no data yet" (§WS5),
+        // instead of silently vanishing into an empty result.
+        console.error(JSON.stringify({ service: "api", event: "search_performance_fetch_failed", projectId, property: ctx.creds.property, message: error instanceof Error ? error.message : String(error) }));
         return [];
       }
     },

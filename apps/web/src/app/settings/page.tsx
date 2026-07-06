@@ -10,7 +10,7 @@ import { createConnectorAction, createSourceMapEntryAction, evaluatePrCheckActio
 export const dynamic = "force-dynamic";
 
 type ConnectorProvider = {
-  provider: "gsc" | "ga4";
+  provider: "gsc" | "ga4" | "pagespeed";
   label: string;
   available: boolean;
   description: string;
