@@ -180,6 +180,43 @@ export function scheduleStatusBadge(status: ScheduleStatus): string {
 }
 
 // ---------------------------------------------------------------------------
+// Delivery status (per-send outcome, free-form string from the sender).
+// ---------------------------------------------------------------------------
+
+/** Human label for a report-delivery status. Falls back to the raw value for unknowns. */
+export function deliveryStatusLabel(status: string): string {
+  switch (status) {
+    case "sent":
+    case "delivered":
+      return "Zugestellt";
+    case "skipped":
+      return "Übersprungen";
+    case "failed":
+      return "Fehlgeschlagen";
+    case "pending":
+      return "Ausstehend";
+    default:
+      return status;
+  }
+}
+
+/** Badge class for a report-delivery status — success/warning/danger, honest about non-deliveries. */
+export function deliveryStatusBadge(status: string): string {
+  switch (status) {
+    case "sent":
+    case "delivered":
+      return "badge success";
+    case "skipped":
+    case "pending":
+      return "badge warning";
+    case "failed":
+      return "badge danger";
+    default:
+      return "badge";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Alert severity (factual; "triggered" is the only hard signal we have).
 // ---------------------------------------------------------------------------
 

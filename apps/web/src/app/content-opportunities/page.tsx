@@ -155,14 +155,27 @@ export default async function Page({
 
 function feedbackMessage(
   params: Record<string, string | string[] | undefined> | undefined
-): { kind: "success" | "danger"; message: string } | null {
+): { kind: "success" | "danger" | "warning"; message: string } | null {
   const error = singleParam(params?.error);
   if (error) return { kind: "danger", message: error };
-  if (singleParam(params?.generated)) {
-    return { kind: "success", message: "Optimierungschancen erzeugt." };
+  const generated = singleParam(params?.generated);
+  if (generated !== undefined) {
+    const count = Number(generated);
+    if (count > 0) return { kind: "success", message: `${count} Optimierungschance(n) erzeugt.` };
+    return {
+      kind: "warning",
+      message: "Keine neuen Chancen erzeugt — seit der letzten Analyse gibt es keine neuen Signale. Starten Sie zuerst eine frische Analyse.",
+    };
   }
-  if (singleParam(params?.synced)) {
-    return { kind: "success", message: "Such-Performance aus der Google Search Console abgeglichen. Neue Klick- und Ranking-Daten fließen in die Optimierungschancen ein." };
+  const synced = singleParam(params?.synced);
+  if (synced !== undefined) {
+    if (synced === "empty") {
+      return {
+        kind: "warning",
+        message: "Abgleich abgeschlossen, aber keine neuen Daten erhalten. Die Google Search Console liefert erst nach ein paar Tagen erste Werte für eine frisch verbundene Property.",
+      };
+    }
+    return { kind: "success", message: `Such-Performance abgeglichen — ${synced} neue Zeile(n) aus der Google Search Console. Neue Klick- und Ranking-Daten fließen in die Optimierungschancen ein.` };
   }
   if (singleParam(params?.revalidated)) {
     return { kind: "success", message: "Chance erneut geprüft (validiert oder wieder geöffnet)." };

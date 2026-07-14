@@ -55,23 +55,30 @@ export async function revalidateOpportunityAction(formData: FormData) {
 }
 
 export async function generateOpportunitiesAction(formData: FormData) {
+  let created = 0;
   try {
-    await generateAllOpportunities(requiredString(formData, "projectId"), requiredString(formData, "siteId"));
+    const result = await generateAllOpportunities(requiredString(formData, "projectId"), requiredString(formData, "siteId"));
+    created = result.created;
   } catch (error) {
     redirect(`/content-opportunities?error=${encodeURIComponent(messageFor(error))}`);
   }
   revalidateOpportunityViews();
-  redirect("/content-opportunities?generated=1");
+  // Honest feedback: don't claim "erzeugt" when nothing was created (no fresh
+  // signals since the last run). Report the real count instead.
+  redirect(`/content-opportunities?generated=${created}`);
 }
 
 export async function syncSearchPerformanceAction(formData: FormData) {
+  let inserted = 0;
   try {
-    await syncSearchPerformance(requiredString(formData, "projectId"), requiredString(formData, "siteId"));
+    const result = await syncSearchPerformance(requiredString(formData, "projectId"), requiredString(formData, "siteId"));
+    inserted = result.inserted;
   } catch (error) {
     redirect(`/content-opportunities?error=${encodeURIComponent(messageFor(error))}`);
   }
   revalidateOpportunityViews();
-  redirect("/content-opportunities?synced=1");
+  // Honest feedback: a sync that inserted nothing must not look like a data refresh.
+  redirect(`/content-opportunities?synced=${inserted > 0 ? inserted : "empty"}`);
 }
 
 function revalidateOpportunityViews(): void {

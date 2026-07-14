@@ -404,7 +404,7 @@ export default async function Page({
                   ))}
                 </div>
               ) : (
-                <EmptyLine>Keine Web-Vitals-Messung vorhanden. Hinweis: Werte sind site-skopiert, nicht je URL.</EmptyLine>
+                <EmptyLine>Noch keine Web-Vitals-Messung. Diese Ladewerte (LCP/CLS/INP/TTFB) stammen aus einer PageSpeed-Messung, die für diese Website noch nicht läuft — sie gelten dann für die gesamte Website, nicht je einzelne URL.</EmptyLine>
               )}
             </SectionCard>
 
