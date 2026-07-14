@@ -1,6 +1,6 @@
 # Roadmap — Stand & Nächstes
 
-> Stand: 2026-07-02 · **Was war, was ist, was kommt.**
+> Stand: 2026-07-14 · **Was war, was ist, was kommt.**
 > Produkt/Scope: [`PRODUCT_MASTER_SPEC.md`](./PRODUCT_MASTER_SPEC.md) · Architektur-Nahtstellen:
 > [`ARCHITECTURE.md`](./ARCHITECTURE.md) · Entscheidungen: [`DECISIONS.md`](./DECISIONS.md).
 
@@ -24,7 +24,10 @@ Alle sieben Produkt-Wellen sind implementiert; das Fundament ist in der Vercel-P
 | Härtung | ✅ app-weiter Bug-Audit + Fixes; Empty≠Error-Surfacing (alle Modul-Loader honest, im /improve-Audit verifiziert) |
 | Interner Linkgraph | ✅ Crawler befüllt `internal_link_edges` (from/to/anchor/rel), beide Crawl-Pfade — GAP-LINK-001 geschlossen |
 | Google-OAuth-Flow (GSC) | ✅ Web-Flow vorhanden; wird live, sobald die 4 OAuth-Env-Vars gesetzt sind |
-| Tests | ✅ Node (241) + Web (376) grün; Route-Handler-Tests (Cron/OAuth/Export) ergänzt |
+| GSC end-to-end | ✅ Sofort-Sync im Callback + „Jetzt synchronisieren" + Cron (`lib/gsc-refresh.ts`); rank-snapshots-Producer; Content-Workspace an `search_performance_rows`; echte URL-Inspection (Migration 018, Funnel „Indexiert") |
+| Ehrliches Feedback | ✅ Erfolgs-Copy an Ist-Count gekoppelt (Chancen erzeugen/synchronisieren); Report-Versand-Verlauf sichtbar (`report_deliveries`); Web-Vitals-Leerzustand erklärt Ursache |
+| Nahtstellen-Guard | ✅ `no-dead-loaders`-Guard: keine toten Feature-Loader, kein Erfolgs-Param ohne Page-Handler |
+| Tests | ✅ Node (241) + Web (388) grün; Route-Handler-Tests (Cron/OAuth/Export) + Nahtstellen-Guard |
 | CI & Tooling | ✅ GitHub Actions führt `npm run check` (push/PR); ESLint 9 + Prettier (nicht-blockierend, warn-level); `CLAUDE.md` Agent-Guide |
 
 ## Was fehlt zum Scharfschalten (Momentanes)
@@ -53,6 +56,7 @@ Das Produkt läuft; „live-echt" wird es mit **Credentials**, nicht mit Umbau:
 | GAP-AUTH-002/-003 | Authority | offen — Drittanbieter-Backlinks (Lizenz), Competitor-Gap |
 | DEC-008 | Mandanten/GSC-Ownership | offen — User-/Rollen-Isolation vor Öffnung für externe Nutzer |
 | GAP-SEC-001 | Security | `postcss` (moderate, transitiv via `next`) — build-time, akzeptiertes Restrisiko bis zum nächsten Next-Upgrade |
+| GAP-UI-TIER2 | Backend-fertig, ohne UI-Auslöser | offen — `map-url` (Keyword→URL), `orphan-urls`-Anzeige, `deploy-markers`, `pr-checks`-Historie, Report-Detailansicht, `generate-indexability`, manuelles `createOpportunity`. Serverseitig + getestet, warten auf einen UI-Ort (bewusst Roadmap statt Backend-Leiche; ARCHITECTURE §7) |
 
 ## Do-not-break
 
