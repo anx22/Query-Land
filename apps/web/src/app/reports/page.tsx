@@ -22,6 +22,8 @@ import { AlertMetricChart } from "../../features/reports/alert-metric-chart";
 import {
   buildAlertChartModel,
   countTriggered,
+  deliveryStatusBadge,
+  deliveryStatusLabel,
   eventSeverity,
   formatMetricValue,
   formatTimestamp,
@@ -278,6 +280,24 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
               eingerichtet wurde — bis dahin wird eine E-Mail-Lieferung ehrlich als „übersprungen“ vermerkt.
               Für Slack, Discord oder Zapier tragen Sie einfach deren Webhook-URL als Kanal „Webhook“ ein.
             </p>
+
+            {/* Delivery history — turns the previously write-only report_deliveries into a visible trail. */}
+            <p className="kicker">Versand-Verlauf</p>
+            {data.latestReportDeliveries.length > 0 ? (
+              <div className="table-list">
+                {data.latestReportDeliveries.map((delivery) => (
+                  <article key={delivery.id} className="reports-row">
+                    <span className="badge">{labelForChannel(delivery.channel)}</span>
+                    {delivery.target ? <span className="reports-row__meta">{delivery.target}</span> : null}
+                    <span className="reports-row__spacer" />
+                    <span className={deliveryStatusBadge(delivery.status)}>{deliveryStatusLabel(delivery.status)}</span>
+                    <span className="reports-row__meta">{formatTimestamp(delivery.deliveredAt)}</span>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">Noch kein Versand für diesen Bericht. Nutzen Sie oben „Versenden“ oder planen Sie eine automatische Lieferung.</p>
+            )}
           </section>
         ) : null}
 

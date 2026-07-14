@@ -478,6 +478,12 @@ code, kbd, samp,
   color: var(--danger);
 }
 
+.badge.warning {
+  border-color: rgba(176, 122, 0, 0.24);
+  background: #fbf0d8;
+  color: var(--warning, #8a6100);
+}
+
 .status-list {
   display: grid;
   gap: 0.8rem;

@@ -21,6 +21,7 @@ import type {
   AlertEvent,
   AlertRule,
   Report,
+  ReportDelivery,
   ReportSchedule,
 } from "@seo-tool/domain-model";
 import { apiGet } from "./api-client";
@@ -32,10 +33,12 @@ export interface ReportsData extends FoundationDashboardData {
   alertRules: AlertRule[];
   alertEvents: AlertEvent[];
   latestReport: Report | null;
+  /** Delivery history (send attempts + outcome) for the latest report. */
+  latestReportDeliveries: ReportDelivery[];
 }
 
-function emptyDomainData(): Pick<ReportsData, "reports" | "schedules" | "alertRules" | "alertEvents" | "latestReport"> {
-  return { reports: [], schedules: [], alertRules: [], alertEvents: [], latestReport: null };
+function emptyDomainData(): Pick<ReportsData, "reports" | "schedules" | "alertRules" | "alertEvents" | "latestReport" | "latestReportDeliveries"> {
+  return { reports: [], schedules: [], alertRules: [], alertEvents: [], latestReport: null, latestReportDeliveries: [] };
 }
 
 export async function loadReportsData(): Promise<ReportsData> {
@@ -55,12 +58,20 @@ export async function loadReportsData(): Promise<ReportsData> {
     apiGet<AlertEvent[]>(`/projects/${projectId}/alert-events`).catch(() => [] as AlertEvent[]),
   ]);
 
+  const latestReport = reports[0] ?? null;
+  // Delivery history for the latest report only — a bounded single call that turns the
+  // previously write-only report_deliveries table into something the user can actually see.
+  const latestReportDeliveries = latestReport
+    ? await apiGet<ReportDelivery[]>(`/reports/${latestReport.id}/deliveries`).catch(() => [] as ReportDelivery[])
+    : [];
+
   return {
     ...dashboard,
     reports,
     schedules,
     alertRules,
     alertEvents,
-    latestReport: reports[0] ?? null,
+    latestReport,
+    latestReportDeliveries,
   };
 }
