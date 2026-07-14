@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import {
   createAlertRule,
   createReportSchedule,
+  deleteAlertRule,
   deliverReport,
   evaluateAlerts,
   generateReport,
@@ -100,6 +101,18 @@ export async function createAlertRuleAction(formData: FormData) {
   }
   revalidateReportViews();
   redirect("/reports?alertrule=1");
+}
+
+export async function deleteAlertRuleAction(formData: FormData) {
+  try {
+    const projectId = requiredString(formData, "projectId");
+    const ruleId = requiredString(formData, "ruleId");
+    await deleteAlertRule(projectId, ruleId);
+  } catch (error) {
+    redirect(`/reports?error=${encodeURIComponent(messageFor(error))}`);
+  }
+  revalidateReportViews();
+  redirect("/reports?alertdeleted=1");
 }
 
 export async function evaluateAlertsAction(formData: FormData) {

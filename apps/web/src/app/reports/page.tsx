@@ -41,6 +41,7 @@ import { loadReportsData } from "../../lib/reports-api";
 import {
   createAlertRuleAction,
   createScheduleAction,
+  deleteAlertRuleAction,
   deliverReportAction,
   evaluateAlertsAction,
   generateReportAction,
@@ -446,6 +447,20 @@ export default async function Page({ searchParams }: { searchParams?: Promise<Re
                       <span>Schwelle: <strong>{labelForComparator(model.comparator)} {formatMetricValue(model.threshold)}</strong></span>
                     ) : null}
                   </div>
+
+                  {rule ? (
+                    <form action={deleteAlertRuleAction} className="reports-alert-card__delete">
+                      <input type="hidden" name="projectId" value={projectId} />
+                      <input type="hidden" name="ruleId" value={rule.id} />
+                      <SubmitButton
+                        className="button secondary compact"
+                        pendingLabel="wird gelöscht …"
+                        disabled={disabled}
+                      >
+                        Regel löschen
+                      </SubmitButton>
+                    </form>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -523,6 +538,7 @@ function feedbackMessage(params: Record<string, string | string[] | undefined> |
   const due = singleParam(params?.due);
   if (due !== undefined) return { kind: "success", message: `Fällige Lieferungen ausgeführt — ${due} Bericht(e) erstellt.` };
   if (singleParam(params?.alertrule)) return { kind: "success", message: "Warn-Regel angelegt." };
+  if (singleParam(params?.alertdeleted)) return { kind: "success", message: "Warn-Regel gelöscht." };
   if (singleParam(params?.evaluated)) return { kind: "success", message: "Warnungen ausgewertet." };
   return null;
 }

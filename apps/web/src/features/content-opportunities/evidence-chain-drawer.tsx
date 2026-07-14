@@ -12,15 +12,32 @@
  */
 
 import { useRef } from "react";
-import type { Evidence, Opportunity, SourceConfidence } from "@seo-tool/domain-model";
+import { nextOpportunityStatuses, type Evidence, type Opportunity, type SourceConfidence } from "@seo-tool/domain-model";
 import { ConfidenceBadge, confidenceMeta, type ConfidenceLevel } from "../../components/confidence-badge";
 import { confidenceToLevel, opportunityTypeLabel, opportunityStatusLabel } from "../../lib/board-logic";
+import { SubmitButton } from "../../components/submit-button";
 import { useFocusTrap } from "../../lib/use-focus-trap";
+
+/** A Next.js server action used directly as a <form action={…}> handler. */
+type FormAction = (formData: FormData) => void | Promise<void>;
 
 export interface EvidenceChainDrawerProps {
   opportunity: Opportunity | null;
   onClose: () => void;
+  /** Server action: re-run validation for a single opportunity ("Chance erneut prüfen"). */
+  revalidateAction?: FormAction;
+  /** Server action: move a single opportunity to a specific next status. */
+  transitionAction?: FormAction;
 }
+
+/** German labels for the per-item status buttons offered in the drawer footer. */
+const STATUS_ACTION_LABEL: Record<string, string> = {
+  in_progress: "In Arbeit",
+  implemented: "Umgesetzt",
+  validated: "Validiert",
+  dismissed: "Verwerfen",
+  open: "Wieder öffnen",
+};
 
 /** SourceConfidence on Evidence is already an A–E letter — normalise defensively. */
 function evidenceLevel(value: SourceConfidence): ConfidenceLevel {
@@ -44,13 +61,20 @@ function workspaceDrillHref(opportunity: Opportunity): string {
   return `/content-workspace?${params.toString()}`;
 }
 
-export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawerProps) {
+export function EvidenceChainDrawer({
+  opportunity,
+  onClose,
+  revalidateAction,
+  transitionAction,
+}: EvidenceChainDrawerProps) {
   const drawerRef = useRef<HTMLElement>(null);
   useFocusTrap(drawerRef, opportunity !== null, onClose);
 
   if (!opportunity) return null;
 
   const overallLevel = confidenceToLevel(opportunity.confidence);
+  const nextStatuses = nextOpportunityStatuses(opportunity.status);
+  const hasActions = Boolean(revalidateAction) || (Boolean(transitionAction) && nextStatuses.length > 0);
 
   return (
     <div className="board-drawer-backdrop" onClick={onClose} role="presentation">
@@ -154,6 +178,33 @@ export function EvidenceChainDrawer({ opportunity, onClose }: EvidenceChainDrawe
             </div>
           </li>
         </ol>
+
+        {hasActions ? (
+          <footer className="board-drawer__actions">
+            {transitionAction && nextStatuses.length > 0 ? (
+              <div className="board-drawer__actions-group" role="group" aria-label="Status ändern">
+                <span className="board-drawer__actions-label muted">Status ändern</span>
+                {nextStatuses.map((status) => (
+                  <form key={status} action={transitionAction}>
+                    <input type="hidden" name="opportunityId" value={opportunity.id} />
+                    <input type="hidden" name="status" value={status} />
+                    <SubmitButton className="button secondary compact" pendingLabel="wird gespeichert …">
+                      {STATUS_ACTION_LABEL[status] ?? opportunityStatusLabel(status)}
+                    </SubmitButton>
+                  </form>
+                ))}
+              </div>
+            ) : null}
+            {revalidateAction ? (
+              <form action={revalidateAction} className="board-drawer__revalidate">
+                <input type="hidden" name="opportunityId" value={opportunity.id} />
+                <SubmitButton className="button secondary compact" pendingLabel="wird geprüft …">
+                  Chance erneut prüfen
+                </SubmitButton>
+              </form>
+            ) : null}
+          </footer>
+        ) : null}
       </aside>
     </div>
   );
