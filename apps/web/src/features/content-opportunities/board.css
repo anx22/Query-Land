@@ -567,3 +567,34 @@
   .board-toplist__meta { display: none; }
   .board-toplist__state { flex-basis: 100%; }
 }
+
+/* Drawer footer — per-item status transitions + "erneut prüfen". Sticks to the
+   bottom of the drawer, separated from the evidence chain by a hairline. */
+.board-drawer__actions {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.board-drawer__actions-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.board-drawer__actions-group form {
+  margin: 0;
+}
+
+.board-drawer__actions-label {
+  font-size: 0.8rem;
+  margin-right: 0.25rem;
+}
+
+.board-drawer__revalidate {
+  margin: 0;
+}

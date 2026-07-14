@@ -53,6 +53,10 @@ export interface OpportunityBoardClientProps {
     ids: string[],
     status: OpportunityStatus
   ) => Promise<{ ok: number; failed: number }>;
+  /** Server action (form): re-run validation for a single opportunity. */
+  revalidateAction?: (formData: FormData) => void | Promise<void>;
+  /** Server action (form): move a single opportunity to a specific next status. */
+  transitionAction?: (formData: FormData) => void | Promise<void>;
 }
 
 /** Status targets offered by the Bulk-Action-Bar (sensible forward moves + dismiss). */
@@ -94,6 +98,8 @@ function evidenceSparkline(op: Opportunity): number[] {
 export function OpportunityBoardClient({
   opportunities,
   onBulkTransition,
+  revalidateAction,
+  transitionAction,
 }: OpportunityBoardClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -264,7 +270,12 @@ export function OpportunityBoardClient({
         )}
       </CardTabs>
 
-      <EvidenceChainDrawer opportunity={selected} onClose={() => setSelectedId(null)} />
+      <EvidenceChainDrawer
+        opportunity={selected}
+        onClose={() => setSelectedId(null)}
+        revalidateAction={revalidateAction}
+        transitionAction={transitionAction}
+      />
 
       {onBulkTransition && (checkedInView.length > 0 || bulkMessage) ? (
         <BulkBar

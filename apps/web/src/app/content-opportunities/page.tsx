@@ -17,7 +17,9 @@ import { actionLock, type ReadinessState } from "../../lib/readiness";
 import {
   bulkTransitionOpportunitiesAction,
   generateOpportunitiesAction,
+  revalidateOpportunityAction,
   syncSearchPerformanceAction,
+  transitionOpportunityAction,
 } from "./actions";
 import type { OpportunityStatus } from "@seo-tool/domain-model";
 import { opportunityStatusLabel } from "../../lib/board-logic";
@@ -136,6 +138,8 @@ export default async function Page({
           <OpportunityBoardClient
             opportunities={opportunities}
             onBulkTransition={bulkTransitionOpportunitiesAction}
+            revalidateAction={revalidateOpportunityAction}
+            transitionAction={transitionOpportunityAction}
           />
 
           <NextStep

@@ -8,7 +8,7 @@ import type {
   ReportSchedule,
   ReportType,
 } from "@seo-tool/domain-model";
-import { apiGet, apiPost } from "../../lib/api-client";
+import { apiDelete, apiGet, apiPost } from "../../lib/api-client";
 import { loadFoundationDashboardData, type FoundationDashboardData } from "../../lib/foundation-api";
 
 export interface ReportsData extends FoundationDashboardData {
@@ -95,6 +95,10 @@ export interface CreateAlertRuleInput {
 
 export function createAlertRule(projectId: string, input: CreateAlertRuleInput): Promise<AlertRule> {
   return apiPost<AlertRule>(`/projects/${projectId}/alert-rules`, input);
+}
+
+export function deleteAlertRule(projectId: string, ruleId: string): Promise<void> {
+  return apiDelete(`/projects/${projectId}/alert-rules/${ruleId}`);
 }
 
 export function evaluateAlerts(projectId: string): Promise<AlertEvent[]> {

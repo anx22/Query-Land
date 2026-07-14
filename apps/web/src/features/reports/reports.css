@@ -152,3 +152,10 @@
     align-items: flex-start;
   }
 }
+
+/* Per-rule delete control inside an alert card — right-aligned, understated. */
+.reports-alert-card__delete {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
