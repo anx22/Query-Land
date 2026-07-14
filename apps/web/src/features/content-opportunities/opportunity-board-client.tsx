@@ -260,13 +260,7 @@ export function OpportunityBoardClient({
             onToggleAll={toggleAll}
           />
         ) : (
-          <section className="card">
-            <p className="kicker">Matrix-Ansicht</p>
-            <p className="muted">
-              Wähle eine Chance in der Matrix oben, um die Evidenz-Kette zu öffnen. Wechsle zu „Kanban" oder „Tabelle" für die
-              detaillierte Bearbeitung.
-            </p>
-          </section>
+          <TopPriorityList opportunities={opportunities} onSelect={setSelectedId} />
         )}
       </CardTabs>
 
@@ -331,6 +325,74 @@ function BulkBar({
         </button>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Matrix-default work area — compact top-priority list
+// ---------------------------------------------------------------------------
+
+/**
+ * The default (matrix) view's work area. Instead of a prose hint, it surfaces the
+ * highest-priority opportunities as a compact, clickable list — so the most
+ * valuable next actions are visible without switching to Kanban/Tabelle. Clicking
+ * a row opens the Evidence-Chain-Drawer, mirroring the matrix bubbles.
+ */
+function TopPriorityList({
+  opportunities,
+  onSelect,
+}: {
+  opportunities: Opportunity[];
+  onSelect: (id: string) => void;
+}) {
+  const top = useMemo(
+    () =>
+      [...opportunities]
+        .filter((o) => o.status !== "dismissed")
+        .sort((a, b) => b.priority - a.priority)
+        .slice(0, 6),
+    [opportunities]
+  );
+
+  if (top.length === 0) {
+    return (
+      <section className="card">
+        <p className="kicker">Top-Prioritäten</p>
+        <BoardEmpty />
+      </section>
+    );
+  }
+
+  return (
+    <section className="card">
+      <p className="kicker">Top-Prioritäten · sofort umsetzbar</p>
+      <p className="muted board-toplist__lead">
+        Die wichtigsten Chancen zuerst. Klicke eine an, um die Evidenz-Kette zu öffnen — oder wechsle oben zu „Kanban" bzw. „Tabelle".
+      </p>
+      <ol className="board-toplist">
+        {top.map((op, i) => (
+          <li key={op.id}>
+            <button
+              type="button"
+              className="board-toplist__row"
+              onClick={() => onSelect(op.id)}
+              aria-label={`${opportunityTypeLabel(op.type)} — Evidenz-Kette öffnen`}
+            >
+              <span className="board-toplist__rank" aria-hidden="true">{i + 1}</span>
+              <span className={`badge board-cat board-cat--${opportunityTypeColorKey(op.type)}`}>
+                {opportunityTypeLabel(op.type)}
+              </span>
+              <span className="board-toplist__state muted">{op.currentState || "—"}</span>
+              <span className="board-toplist__meta muted">
+                Wirkung {op.expectedImpact}/5 · Aufwand {op.effort}/5
+              </span>
+              <strong className="board-toplist__prio">Prio {op.priority}</strong>
+              <ConfidenceBadge level={confidenceToLevel(op.confidence)} showLabel={false} />
+            </button>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
