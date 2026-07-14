@@ -82,7 +82,36 @@ Aus dem app-weiten Bug-Audit; gelten für jedes neue Modul:
 - **Keine festen Entity-IDs außerhalb von Tests.** Tests provisionieren ihre Fixtures selbst und nutzen
   die zurückgegebenen IDs (der ursprüngliche Smoke-Bug: angenommenes Demo-Seed → 404).
 
-## 7. Datenhaltung
+## 7. Nahtstellen-Fehlerklasse + die drei GSC-Datenpfade
+
+Der app-weite Audit fand eine **Fehlerklasse an den Daten-Nahtstellen**: jede Funktion für sich korrekt,
+aber Writer↔Reader-Vertrag, Auslöser oder Erfolgs-Copy passen nicht zusammen (was isolierte Code-Reviews
+nicht sehen). Archetypen: **A1** falscher Speicher · **A2** kein Producer · **A3** toter Speicher (kein
+Reader) · **A4** Aktion meldet Erfolg ohne Wirkung · **A5** hartkodierter Platzhalter mit Befüllungs-
+Versprechen · **A6** echte Route ohne Auslöser.
+
+**GSC hat drei getrennte Datenpfade** — Verwechslung ist die häufigste A1-Quelle:
+1. **Connector-Sync** → `normalized_metrics` (Aggregat je Property/Site; darüber liegen u. a. die
+   PSI/Web-Vitals als `entity_type='site' + metric psi_*`).
+2. **SERP-Provider** → `rank_snapshots`/`serp_snapshots`/`visibility_scores` (Positionen, Sichtbarkeit).
+3. **Search-Performance-Sync** → `search_performance_rows` (Klicks/Impressionen je URL; speist Content-
+   Workspace + Opportunities). Zusätzlich **URL-Inspection** → `url_index_status` (Index-Abdeckung,
+   `webmasters.readonly`, Quota 2000/Tag hart gedeckelt).
+
+Wer eine dieser Tabellen liest, muss den passenden Sync-Pfad triggern (OAuth-Callback, „Jetzt
+synchronisieren", täglicher Cron via `lib/gsc-refresh.ts`). Erfolgs-Copy **an das echte Ergebnis koppeln**
+(`inserted`/`created`-Count), nie optimistisch melden.
+
+**Guard:** `lib/__guard__/no-dead-loaders.test.ts` verhindert Rückfall — (a) kein `load*`-Loader in
+`features/*/api.ts` ohne echten Importeur (Screen-Loader gehören nach `lib/*-api.ts`), (b) jeder
+`redirect(?param=…)`-Erfolgsparameter einer `actions.ts` muss von der zugehörigen `page.tsx` gelesen werden
+(keine tote Erfolgs-Copy).
+
+**Backend-fertig, aber (noch) ohne UI-Auslöser** (bewusst als Roadmap, nicht als Leiche): `map-url`
+(Keyword→URL), `orphan-urls`, `deploy-markers`, `pr-checks`-Historie, Report-Detailansicht,
+`generate-indexability`, manuelles `createOpportunity`. Siehe `ROADMAP.md`.
+
+## 8. Datenhaltung
 
 Bei < 5k URLs/Property liegt **alles in Postgres** (inkl. Crawl-/SERP-/GSC-Historie) — bewusst **kein**
 ClickHouse/Redis/Object-Storage (Master-Spec §9.2). Roh- und Normalisierte Daten bleiben getrennt.

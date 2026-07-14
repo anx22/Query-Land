@@ -8,61 +8,7 @@ import type {
   ReportSchedule,
   ReportType,
 } from "@seo-tool/domain-model";
-import { apiDelete, apiGet, apiPost } from "../../lib/api-client";
-import { loadFoundationDashboardData, type FoundationDashboardData } from "../../lib/foundation-api";
-
-export interface ReportsData extends FoundationDashboardData {
-  reports: Report[];
-  schedules: ReportSchedule[];
-  alertRules: AlertRule[];
-  alertEvents: AlertEvent[];
-  latestReport: Report | null;
-}
-
-export async function loadReports(): Promise<ReportsData> {
-  const dashboard = await loadFoundationDashboardData();
-
-  if (!dashboard.connected || !dashboard.selectedProject) {
-    return {
-      ...dashboard,
-      reports: [],
-      schedules: [],
-      alertRules: [],
-      alertEvents: [],
-      latestReport: null,
-    };
-  }
-
-  try {
-    const projectId = dashboard.selectedProject.id;
-    const [reports, schedules, alertRules, alertEvents] = await Promise.all([
-      apiGet<Report[]>(`/projects/${projectId}/reports`).catch(() => [] as Report[]),
-      apiGet<ReportSchedule[]>(`/projects/${projectId}/report-schedules`).catch(() => [] as ReportSchedule[]),
-      apiGet<AlertRule[]>(`/projects/${projectId}/alert-rules`).catch(() => [] as AlertRule[]),
-      apiGet<AlertEvent[]>(`/projects/${projectId}/alert-events`).catch(() => [] as AlertEvent[]),
-    ]);
-
-    return {
-      ...dashboard,
-      reports,
-      schedules,
-      alertRules,
-      alertEvents,
-      latestReport: reports[0] ?? null,
-    };
-  } catch (error) {
-    return {
-      ...dashboard,
-      reports: [],
-      schedules: [],
-      alertRules: [],
-      alertEvents: [],
-      latestReport: null,
-      connected: false,
-      errorMessage: error instanceof Error ? error.message : "Reports konnten nicht geladen werden.",
-    };
-  }
-}
+import { apiDelete, apiPost } from "../../lib/api-client";
 
 export function generateReport(projectId: string, type: ReportType): Promise<Report> {
   return apiPost<Report>(`/projects/${projectId}/reports`, { type });
